@@ -1,0 +1,50 @@
+[project]
+name = "oop_ml"
+version = "0.1.0"
+description = "An object-oriented machine learning library for Python."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["oop_ml*"]
+
+[tool.pytest.ini_options]
+# Put the project root on sys.path so `import oop_ml` resolves
+# when running pytest from a plain terminal (PyCharm does this for you).
+pythonpath = ["."]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.pyright]
+# Resolve imports against the project virtualenv so numpy/pydantic/pytest are
+# found when pyright runs from a plain terminal.
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.11"
+include = ["oop_ml", "test"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"test/**" = ["E501"]

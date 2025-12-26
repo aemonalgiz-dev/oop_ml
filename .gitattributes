@@ -1,0 +1,4 @@
+# LF in the repository regardless of the platform it was written on.
+# Without this, a Windows checkout commits CRLF and every file looks rewritten
+# the first time someone clones it on Linux.
+* text=auto eol=lf
