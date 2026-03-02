@@ -22,6 +22,64 @@ from oop_ml.core.exceptions import (
     NonUniqueFeaturesError,
 )
 from oop_ml.core.feature import Feature
+from oop_ml.core.types import FloatArray
+
+
+class FeaturePowers:
+    """The source columns, with each power computed at most once.
+
+    Evaluating an expansion term by term asks for the same ``x_j ** k`` over and
+    over, because every term that contains ``x1^2`` needs exactly that column.
+    Recomputing it each time is wasted work, and looking the feature up by
+    scanning the supplied sequence is a second helping of the same, so this
+    holds the columns in a dict and memoises each power as it is first asked
+    for.
+
+    Parameters
+    ----------
+    input_values:
+        The source features an expansion is being computed from.
+    """
+
+    __slots__ = ("_columns", "_raised")
+
+    def __init__(self, input_values: Sequence[Feature]) -> None:
+        self._columns = {feature.name: feature.values for feature in input_values}
+        self._raised: dict[tuple[str, int], FloatArray] = {}
+
+    def raised(self, feature_name: str, exponent: int) -> FloatArray:
+        """``feature_name`` raised to ``exponent``, computed at most once.
+
+        Raises
+        ------
+        InvalidValuesError
+            If the named feature was not among the supplied inputs.
+        """
+        cached = self._raised.get((feature_name, exponent))
+        if cached is not None:
+            return cached
+
+        column = self._columns.get(feature_name)
+        if column is None:
+            raise InvalidValuesError(
+                f"{feature_name!r} is needed by a polynomial term but was not supplied"
+            )
+
+        # An exponent of one is the column itself, and squaring is cheaper as a
+        # multiply than as a general power.
+        if exponent == 1:
+            result = column
+        elif exponent == 2:
+            result = column * column
+        else:
+            result = column**exponent
+
+        self._raised[(feature_name, exponent)] = result
+
+        return result
+
+    def __repr__(self) -> str:
+        return f"FeaturePowers({', '.join(self._columns)})"
 
 
 class PolynomialTerm:
@@ -96,25 +154,33 @@ class PolynomialTerm:
         InvalidValuesError
             If a feature this term needs was not supplied.
         """
+        return self.evaluate_with(FeaturePowers(input_values))
+
+    def evaluate_with(self, powers: FeaturePowers) -> Feature:
+        """Compute this term's column from an existing :class:`FeaturePowers`.
+
+        A whole expansion asks for the same ``x_j ** k`` many times over, since
+        every term containing ``x1^2`` needs that identical column, so sharing
+        one :class:`FeaturePowers` across the terms computes each power once
+        instead of once per term. :meth:`evaluate` is the same thing for a
+        caller holding a single term and nothing to share.
+
+        Raises
+        ------
+        InvalidValuesError
+            If a feature this term needs was not supplied.
+        """
         product = None
 
         for feature_name, exponent in self._powers.items():
-            factor = self._named_feature(input_values, feature_name)
-            raised = factor.values**exponent
+            raised = powers.raised(feature_name, exponent)
             product = raised if product is None else product * raised
 
         assert product is not None
+
+        # Feature copies on the way in, so handing it a cached array cannot let
+        # a later term mutate a column that has already been produced.
         return Feature(self.name, product)
-
-    @staticmethod
-    def _named_feature(input_values: Sequence[Feature], feature_name: str) -> Feature:
-        for feature in input_values:
-            if feature.name == feature_name:
-                return feature
-
-        raise InvalidValuesError(
-            f"{feature_name!r} is needed by a polynomial term but was not supplied"
-        )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, PolynomialTerm):
@@ -179,8 +245,14 @@ class PolynomialTerms:
         return tuple(ordered)
 
     def expand(self, input_values: Sequence[Feature]) -> list[Feature]:
-        """Compute every term's column, in term order."""
-        return [term.evaluate(input_values) for term in self._terms]
+        """Compute every term's column, in term order.
+
+        One :class:`FeaturePowers` is built for the whole expansion so that a
+        power needed by twenty terms is computed once rather than twenty times.
+        """
+        powers = FeaturePowers(input_values)
+
+        return [term.evaluate_with(powers) for term in self._terms]
 
     def __iter__(self) -> Iterator[PolynomialTerm]:
         return iter(self._terms)
