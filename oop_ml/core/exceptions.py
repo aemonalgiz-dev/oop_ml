@@ -40,3 +40,16 @@ class UndefinedMetricError(MLLibError):
 
 class NonUniqueFeaturesError(MLLibError):
     """Raised when an input has a non-unique set of feature names."""
+
+
+class NonBinaryLabelsError(MLLibError):
+    """Raised when a binary classifier is handed a target that is not 0 or 1."""
+
+
+class SingleClassError(MLLibError):
+    """Raised when a classifier's target contains only one of the two classes.
+
+    Separate from :class:`NonBinaryLabelsError` because the labels are perfectly
+    valid; there is simply nothing to discriminate between, and a boundary
+    fitted against them would be meaningless rather than merely wrong.
+    """

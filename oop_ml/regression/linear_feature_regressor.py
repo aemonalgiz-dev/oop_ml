@@ -24,19 +24,15 @@ from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Self
 
-import numpy as np
-from pydantic import PrivateAttr
-
 from oop_ml.core.base import Regressor
-from oop_ml.core.coefficients import Coefficient, Coefficients
 from oop_ml.core.column import Column
-from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
+from oop_ml.core.linear_model import LinearModel
 from oop_ml.core.types import FloatArray
 
 
-class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
+class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature]):
     """A hyperplane fit over named features; weights are read back by name.
 
     The feature-first API is this library's OOP alternative to an anonymous
@@ -53,11 +49,6 @@ class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
         ``False`` the column is omitted and the hyperplane is forced through the
         origin, with ``intercept_`` reported as ``0.0``.
     """
-
-    fit_intercept: bool = True
-
-    _intercept: float | None = PrivateAttr(default=None)
-    _coefficients: Coefficients | None = PrivateAttr(default=None)
 
     @abstractmethod
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
@@ -80,37 +71,6 @@ class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
             ``beta``, with one entry per column of ``design_matrix`` and in the
             same order, the intercept coming first whenever there is one.
         """
-
-    @property
-    def coefficients_(self) -> Coefficients:
-        """The learned weights (available after ``fit``).
-
-        You can read one by name, as in ``model.coefficients_["age"]``, or
-        iterate the :class:`~oop_ml.core.coefficients.Coefficient` objects
-        themselves. The collection is immutable, so handing it out to a caller
-        cannot corrupt the fitted state.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._coefficients is not None
-        return self._coefficients
-
-    @property
-    def intercept_(self) -> float:
-        """Learned bias term, or ``0.0`` when ``fit_intercept`` is ``False``.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._intercept is not None
-        return self._intercept
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit the hyperplane, delegating the solve itself to the subclass.
@@ -145,26 +105,7 @@ class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
         feature_set.check_supports_parameter_count(self._parameter_count(feature_set))
 
         solution = self._solve(self._design_matrix(feature_set), target_values.column)
-
-        # The ones column sits first in the design matrix, so its weight is the
-        # intercept and everything after it lines up with the feature columns --
-        # in the order the feature set fixed at construction.
-        if self.fit_intercept:
-            intercept = float(solution[0])
-            weights = solution[1:]
-        else:
-            intercept = 0.0
-            weights = solution
-
-        self._intercept = intercept
-        self._coefficients = Coefficients(
-            [
-                Coefficient(feature.name, weight)
-                # strict: a length mismatch here would mean the design matrix
-                # and the feature set had drifted out of step.
-                for feature, weight in zip(feature_set, weights, strict=True)
-            ]
-        )
+        self._store_solution(feature_set, solution)
 
         self._mark_fitted()
         return self
@@ -196,46 +137,7 @@ class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        self._check_fitted()
-
-        self._check_names_match_the_fit(input_values)
-
-        # Deliberately not a FeatureSet: its zero-variance guard protects the
-        # *fit* (a constant column is collinear with the intercept), but a
-        # constant column is perfectly legal to predict on.
-        reference_column = input_values[0].column
-        for feature in input_values[1:]:
-            reference_column.check_equal_length(feature.column)
-
-        # Matching by name rather than by position is what lets the caller pass
-        # the features in any order, and no design matrix is rebuilt here.
-        predictions = np.full(reference_column.n_samples, self.intercept_)
-        for feature in input_values:
-            predictions = (
-                predictions + self.coefficients_[feature.name] * feature.values
-            )
-
-        return predictions
-
-    def _check_names_match_the_fit(self, input_values: Sequence[Feature]) -> None:
-        """Raise unless exactly the fitted feature names were supplied."""
-        supplied_names = {feature.name for feature in input_values}
-        fitted_names = {coefficient.name for coefficient in self.coefficients_}
-
-        if supplied_names != fitted_names:
-            raise InvalidValuesError(
-                f"expected features {', '.join(sorted(fitted_names))}; "
-                f"got {', '.join(sorted(supplied_names)) or 'none'}"
-            )
-
-    def _parameter_count(self, feature_set: FeatureSet) -> int:
-        """How many unknowns the fit has to solve for.
-
-        One weight per feature, plus the intercept when it is being learned --
-        which is exactly the width of the design matrix. Least squares needs at
-        least this many observations, or the system is underdetermined.
-        """
-        return feature_set.n_features + (1 if self.fit_intercept else 0)
+        return self._linear_predictor(input_values)
 
     @staticmethod
     def _normal_equations_matrix(design_matrix: FloatArray) -> FloatArray:
@@ -248,12 +150,3 @@ class LinearFeatureRegressor(Regressor[Sequence[Feature], Feature]):
     ) -> FloatArray:
         """``X.T y``, the right-hand side, carrying one entry per parameter."""
         return design_matrix.T @ target_column.values
-
-    def _design_matrix(self, feature_set: FeatureSet) -> FloatArray:
-        """``X``: the feature columns, with a leading ones column if wanted."""
-        design_matrix = feature_set.feature_matrix
-
-        if not self.fit_intercept:
-            return design_matrix
-
-        return np.column_stack([np.ones(feature_set.n_samples), design_matrix])

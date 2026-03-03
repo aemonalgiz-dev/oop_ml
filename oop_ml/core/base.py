@@ -31,6 +31,7 @@ from typing import Generic, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
+from oop_ml.core.classification_evaluation import ClassificationEvaluation
 from oop_ml.core.column import ColumnSource
 from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.core.exceptions import NotFittedError
@@ -129,6 +130,58 @@ class Regressor(Estimator[InputT, TargetT]):
         callers ask for more than any other.
         """
         return self.evaluate(input_values, target_values).r2_score
+
+
+class Classifier(Estimator[InputT, TargetT]):
+    """Base class for estimators that predict a class rather than a quantity.
+
+    The split from :class:`Regressor` is not cosmetic. A classifier answers with
+    a label, although what it actually computes is a probability, and both are
+    worth exposing because they answer different questions. ``predict`` tells
+    you which side of the boundary a row falls on, while
+    ``predict_probability`` tells you how close to that boundary it was, and a
+    row at 0.51 is a very different thing from a row at 0.99 even though the two
+    get the same label.
+
+    Scoring differs as well. R^2 is meaningless on labels, so ``evaluate``
+    returns a :class:`~oop_ml.core.classification_evaluation.ClassificationEvaluation`
+    built on a confusion matrix instead.
+    """
+
+    @abstractmethod
+    def predict(self, input_values: InputT) -> FloatArray:
+        """Return one predicted label per observation, each 0.0 or 1.0.
+
+        Must call ``_check_fitted()`` first.
+        """
+
+    @abstractmethod
+    def predict_probability(self, input_values: InputT) -> FloatArray:
+        """Return P(class is 1) per observation, each in ``[0, 1]``.
+
+        Must call ``_check_fitted()`` first.
+        """
+
+    def evaluate(
+        self, input_values: InputT, actual_values: TargetT
+    ) -> ClassificationEvaluation:
+        """Predict labels on ``input_values`` and pair them with the truth.
+
+        The single scoring entry point every classifier inherits, mirroring
+        ``Regressor.evaluate``. Predictions are computed once, and every metric
+        is then read off the returned evaluation.
+        """
+        return ClassificationEvaluation(actual_values, self.predict(input_values))
+
+    def score(self, input_values: InputT, target_values: TargetT) -> float:
+        """Accuracy of the prediction on the given data.
+
+        A thin convenience over :meth:`evaluate`, and worth treating with more
+        caution than ``Regressor.score``. Accuracy on an unbalanced target can
+        look excellent while the model finds nothing, so reach for the
+        evaluation object and read precision and recall before believing it.
+        """
+        return self.evaluate(input_values, target_values).accuracy
 
 
 class Transformer(Fittable, Generic[InputT]):

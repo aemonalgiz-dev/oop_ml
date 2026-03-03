@@ -34,7 +34,9 @@ from oop_ml.core.types import FloatArray, NumericInput
 from oop_ml.core.validation import (
     ValueRole,
     check_equal_length,
+    check_has_both_classes,
     check_has_variance,
+    check_is_binary,
     check_min_length,
     check_non_empty,
     to_float_array,
@@ -180,6 +182,19 @@ class Column:
     def check_has_variance(self) -> None:
         """Raise :class:`~oop_ml.core.exceptions.AllSameValuesError` if constant."""
         check_has_variance(self._values, self._role)
+
+    def check_is_binary(self) -> None:
+        """Raise :class:`~oop_ml.core.exceptions.NonBinaryLabelsError` unless 0/1.
+
+        A fitting rule rather than a structural one, in the same way as
+        :meth:`check_has_variance`, so it is asked for by the classifier that
+        needs it rather than enforced on every column that happens to exist.
+        """
+        check_is_binary(self._values, self._role)
+
+    def check_has_both_classes(self) -> None:
+        """Raise :class:`~oop_ml.core.exceptions.SingleClassError` if one-sided."""
+        check_has_both_classes(self._values, self._role)
 
     def check_min_length(self, minimum_length: int) -> None:
         """Raise :class:`~oop_ml.core.exceptions.TooFewValuesError` if too short."""
