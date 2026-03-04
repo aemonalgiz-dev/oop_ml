@@ -199,12 +199,16 @@ class LogisticRegression(LinearClassifier):
     def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
         """Map log-odds onto a probability: ``1 / (1 + exp(-z))``.
 
-        Worth writing carefully rather than literally. ``exp(-z)`` overflows for
-        strongly negative ``z``, and a separated dataset drives ``z`` a long way
-        out, so the naive form emits warnings and returns nan exactly when the
-        model is most confident. The usual fix is to branch on the sign of
-        ``z``, using ``exp(z) / (1 + exp(z))`` where ``z`` is negative, so the
-        exponential is only ever taken of a non-positive number.
+        Worth writing carefully rather than literally. In ``1 / (1 + exp(-z))``
+        the exponential overflows once ``z`` drops below about -709, which a
+        separated dataset will happily arrange. The value that comes back is
+        still correct, since ``1 / inf`` is 0, so this costs an accumulating
+        stream of RuntimeWarnings rather than a wrong answer; it is noise from
+        the very rows the model is most certain about.
+
+        Branching on the sign removes it. Use ``exp(z) / (1 + exp(z))`` where
+        ``z`` is negative and the original form where it is not, so the
+        exponential is only ever handed a non-positive number.
 
         Parameters
         ----------
