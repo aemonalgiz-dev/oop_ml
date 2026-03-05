@@ -33,9 +33,16 @@ from __future__ import annotations
 
 import logging
 from argparse import ArgumentParser
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 
-from oop_ml import Coefficients, CrossValidationResult, MLLibError, RegressionEvaluation
+from oop_ml import (
+    ClassificationEvaluation,
+    Coefficients,
+    CrossValidationResult,
+    MLLibError,
+    RegressionEvaluation,
+    UndefinedMetricError,
+)
 
 
 class LevelPrefixFormatter(logging.Formatter):
@@ -183,6 +190,38 @@ class Report:
                 f"{label} R2 is negative: this model is worse on these rows than "
                 f"predicting their mean and ignoring every feature."
             )
+
+    def confusion(self, label: str, evaluation: ClassificationEvaluation) -> None:
+        """The four counts as a table, then the metrics derived from them.
+
+        Any metric whose denominator is empty is reported as ``undefined``
+        rather than being skipped, since a model that never fired having no
+        precision is itself worth seeing.
+        """
+        matrix = evaluation.confusion_matrix
+
+        self.line(f"{label}: {matrix.n_samples} rows")
+        self.table(
+            ["", "predicted 1", "predicted 0"],
+            [
+                ["actual 1", str(matrix.true_positives), str(matrix.false_negatives)],
+                ["actual 0", str(matrix.false_positives), str(matrix.true_negatives)],
+            ],
+        )
+        self.line(
+            f"accuracy={evaluation.accuracy:.4f}  "
+            f"precision={self._or_undefined(lambda: evaluation.precision)}  "
+            f"recall={self._or_undefined(lambda: evaluation.recall)}  "
+            f"f1={self._or_undefined(lambda: evaluation.f1_score)}"
+        )
+
+    @staticmethod
+    def _or_undefined(metric: Callable[[], float]) -> str:
+        """Format a metric, or say so when its denominator was empty."""
+        try:
+            return f"{metric():.4f}"
+        except UndefinedMetricError:
+            return "undefined"
 
     def cross_validation(self, label: str, result: CrossValidationResult) -> None:
         """Mean and spread together -- the mean alone is half the story."""

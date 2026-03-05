@@ -254,3 +254,164 @@ def quadratic_curve(
         5.0,
         Coefficients([Coefficient("x", -4.0), Coefficient("x^2", 1.5)]),
     )
+
+
+class SyntheticClassification:
+    """Generated labels and the boundary they were generated from.
+
+    The classification counterpart to :class:`SyntheticRegression`. Labels are
+    drawn from the true probabilities rather than assigned by thresholding them,
+    so the classes overlap the way real ones do and the fitted boundary has
+    something to be uncertain about.
+
+    Parameters
+    ----------
+    dataset:
+        The features and the 0/1 target.
+    true_intercept, true_coefficients:
+        The log-odds surface the labels were drawn from.
+    """
+
+    __slots__ = ("_dataset", "_true_coefficients", "_true_intercept")
+
+    def __init__(
+        self,
+        dataset: Dataset,
+        true_intercept: float,
+        true_coefficients: Coefficients,
+    ) -> None:
+        self._dataset = dataset
+        self._true_intercept = true_intercept
+        self._true_coefficients = true_coefficients
+
+    @property
+    def dataset(self) -> Dataset:
+        """The features and target, kept together."""
+        return self._dataset
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """Shorthand for ``dataset.input_features``."""
+        return self._dataset.input_features
+
+    @property
+    def target_feature(self) -> Feature:
+        """The 0/1 labels."""
+        return self._dataset.target_feature
+
+    @property
+    def true_intercept(self) -> float:
+        """The intercept of the log-odds surface behind the labels."""
+        return self._true_intercept
+
+    @property
+    def true_coefficients(self) -> Coefficients:
+        """The weights of the log-odds surface behind the labels."""
+        return self._true_coefficients
+
+    @property
+    def positive_rate(self) -> float:
+        """Share of rows whose label is 1."""
+        return float(np.mean(self._dataset.target_feature.values))
+
+    def __repr__(self) -> str:
+        return (
+            f"SyntheticClassification(n_samples={self._dataset.n_samples}, "
+            f"positive_rate={self.positive_rate:.3f})"
+        )
+
+
+def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
+    """The stable sigmoid, so the generators never overflow on extreme inputs."""
+    return np.exp(np.minimum(linear_predictor, 0.0)) / (
+        1.0 + np.exp(-np.abs(linear_predictor))
+    )
+
+
+def _labelled(
+    predictor_columns: Mapping[str, FloatArray],
+    intercept: float,
+    weights: Mapping[str, float],
+    generator: np.random.Generator,
+) -> SyntheticClassification:
+    """Draw 0/1 labels from the log-odds surface these weights describe."""
+    log_odds = np.full(next(iter(predictor_columns.values())).shape, intercept)
+    for name, values in predictor_columns.items():
+        log_odds = log_odds + weights[name] * values
+
+    labels = (generator.uniform(size=log_odds.shape) < _sigmoid(log_odds)).astype(float)
+
+    return SyntheticClassification(
+        Dataset(
+            [Feature(name, values) for name, values in predictor_columns.items()],
+            Feature("passed", labels),
+        ),
+        intercept,
+        Coefficients([Coefficient(name, weights[name]) for name in predictor_columns]),
+    )
+
+
+def exam_outcomes(
+    sample_count: int = 200, random_seed: int = 21
+) -> SyntheticClassification:
+    """Hours studied and hours slept against passing, with genuine overlap.
+
+    Labels are sampled from the true probability rather than thresholded, so a
+    student who studied very little sometimes passes anyway. That overlap is
+    what gives the likelihood a finite maximum to find.
+    """
+    generator = np.random.default_rng(random_seed)
+
+    return _labelled(
+        {
+            "hours_studied": generator.uniform(0.0, 8.0, size=sample_count),
+            "hours_slept": generator.uniform(3.0, 9.0, size=sample_count),
+        },
+        intercept=-6.0,
+        weights={"hours_studied": 0.9, "hours_slept": 0.4},
+        generator=generator,
+    )
+
+
+def separable_outcomes(sample_count: int = 40) -> SyntheticClassification:
+    """Two classes with a clean gap between them, and no finite fit.
+
+    Every row below four hours fails and every row above five passes, with
+    nothing in between. Any boundary drawn in the gap is perfect on this data,
+    so the likelihood keeps rising as the coefficients grow and never attains a
+    maximum.
+    """
+    half = sample_count // 2
+    hours = np.concatenate(
+        [np.linspace(0.5, 4.0, half), np.linspace(5.0, 9.0, sample_count - half)]
+    )
+    labels = np.concatenate([np.zeros(half), np.ones(sample_count - half)])
+
+    return SyntheticClassification(
+        Dataset([Feature("hours_studied", hours)], Feature("passed", labels)),
+        float("nan"),
+        Coefficients([Coefficient("hours_studied", float("nan"))]),
+    )
+
+
+def rare_event(
+    sample_count: int = 600, random_seed: int = 33
+) -> SyntheticClassification:
+    """One predictor, and a positive class that turns up about 10% of the time.
+
+    The shape where accuracy stops being evidence. Predicting negative for every
+    row scores about 0.90 while finding none of the positives at all.
+
+    The coefficient is large enough that fitted probabilities run most of the
+    way from 0 to 1, which is what makes a threshold sweep over this data show
+    anything. A weak predictor on a rare class puts every probability under the
+    default cut, and then the sweep has only one answer to give.
+    """
+    generator = np.random.default_rng(random_seed)
+
+    return _labelled(
+        {"risk_score": generator.normal(size=sample_count)},
+        intercept=-4.5,
+        weights={"risk_score": 2.8},
+        generator=generator,
+    )
