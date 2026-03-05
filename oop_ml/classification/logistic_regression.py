@@ -123,6 +123,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Self
 
+import numpy as np
 from pydantic import Field, PrivateAttr
 
 from oop_ml.classification.linear_classifier import LinearClassifier
@@ -220,7 +221,12 @@ class LogisticRegression(LinearClassifier):
         FloatArray
             Probabilities in ``[0, 1]``, one per observation.
         """
-        raise NotImplementedError
+        # exp(min(z, 0)) is exp(z) where z is negative and 1 where it is not,
+        # and the denominator's exponent is negative by construction, so neither
+        # half can overflow however far out the linear predictor is driven.
+        return np.exp(np.minimum(linear_predictor, 0.0)) / (
+            1.0 + np.exp(-np.abs(linear_predictor))
+        )
 
     def _gradient(
         self,
@@ -252,7 +258,10 @@ class LogisticRegression(LinearClassifier):
         FloatArray
             One partial derivative per parameter.
         """
-        raise NotImplementedError
+        probabilities = self._sigmoid(design_matrix @ weights)
+        differences = target_values - probabilities
+
+        return design_matrix.T @ differences / len(target_values)
 
     def _has_converged(self, step: FloatArray) -> bool:
         """Whether this epoch moved every coefficient less than ``tolerance``.
@@ -261,7 +270,7 @@ class LogisticRegression(LinearClassifier):
         are the same number, and taking it from the step avoids keeping a copy
         of the previous weights around.
         """
-        raise NotImplementedError
+        return bool(np.max(np.abs(step)) < self.tolerance)
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Walk uphill from zero until the coefficients settle.
@@ -288,7 +297,23 @@ class LogisticRegression(LinearClassifier):
             ``b``, one entry per column of ``design_matrix``, intercept first
             when there is one.
         """
-        raise NotImplementedError
+        self._epochs_run = 0
+        self._converged = False
+        weights = np.zeros(design_matrix.shape[1])
+
+        for _ in range(self.max_epochs):
+            step = self.learning_rate * self._gradient(
+                design_matrix, target_column.values, weights
+            )
+
+            if self._has_converged(step):
+                self._converged = True
+                break
+
+            weights = weights + step
+            self._epochs_run += 1
+
+        return weights
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit the boundary, delegating the ascent itself to :meth:`_solve`.

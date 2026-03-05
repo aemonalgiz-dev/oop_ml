@@ -19,6 +19,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from oop_ml.core.base import Classifier
+from oop_ml.core.exceptions import UndefinedMetricError
 from oop_ml.core.feature import Feature
 from oop_ml.core.linear_model import LinearModel
 from oop_ml.core.types import FloatArray
@@ -80,24 +81,55 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        raise NotImplementedError
+        return (self.predict_probability(input_values) >= self.threshold).astype(
+            np.float64
+        )
 
     def decision_boundary_at(self, feature_name: str) -> float:
         """Where this one feature crosses the boundary, holding the rest at zero.
 
-        The boundary is the surface on which the log-odds are zero, so along a
-        single axis it sits at ``-intercept / coefficient``. Only meaningful for
-        a model with one predictor, or when every other feature really is zero,
-        which on standardised columns means every other feature is at its mean.
+        A row is called positive once its probability reaches ``threshold``, and
+        pushing that through the logit turns it into a statement about the
+        linear predictor::
+
+            X b  >=  log(threshold / (1 - threshold))
+
+        So the threshold is a cut on the log-odds scale, and the crossing point
+        along one axis is where the linear predictor meets that cut::
+
+            x_j  =  (log(t / (1 - t)) - intercept) / b_j
+
+        At the default threshold of 0.5 the cut is ``log(1) = 0`` and this
+        collapses to the familiar ``-intercept / b_j``. Written in the general
+        form so that a model with a shifted threshold reports the boundary it
+        actually uses rather than the one it would have used at 0.5.
+
+        Every other feature is held at zero. With one predictor that is the whole
+        story; with several, the boundary is a surface rather than a point and
+        this is where it crosses this particular axis, which is only the number
+        you want if zero is a meaningful place for the others to sit. On
+        standardised columns it is, since zero is then each feature's mean.
 
         Raises
         ------
         NotFittedError
             If called before ``fit``.
+        InvalidValuesError
+            If ``feature_name`` was not among the fitted features.
         UndefinedMetricError
             If this feature's coefficient is zero, leaving no crossing.
         """
-        raise NotImplementedError
+        coefficient = self.coefficients_[feature_name]
+
+        if coefficient == 0.0:
+            raise UndefinedMetricError(
+                f"{feature_name} has a coefficient of zero, so the boundary "
+                f"never crosses it"
+            )
+
+        log_odds_cut = float(np.log(self.threshold / (1.0 - self.threshold)))
+
+        return float((log_odds_cut - self.intercept_) / coefficient)
 
     def odds_multiplier_for(self, feature_name: str) -> float:
         """What one more unit of this feature does to the odds: ``exp(b_j)``.
