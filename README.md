@@ -88,7 +88,7 @@ InvalidValuesError: expected features bathrooms, floor_area_sqm; got floor_area_
 NotFittedError: RidgeRegression must be fit before this is available
 ```
 
-There are nine exception types, all of them deriving from `MLLibError`, so a
+There are ten exception types, all of them deriving from `MLLibError`, so a
 handler can return a 400 for `InvalidValuesError` and a 503 for
 `NotFittedError` without anyone having to match on message strings.
 
@@ -144,12 +144,74 @@ assembled from folds at 0.79, 0.81, and 0.80 is a very different claim than the
 same mean assembled out of 0.2, 0.95, and 1.0, and no single number is going to
 tell you which of the two you are looking at.
 
+## Classifying Instead Of Predicting
+
+```python
+from oop_ml import Feature, LogisticRegression
+
+model = LogisticRegression(learning_rate=0.05, max_epochs=200_000)
+model.fit([hours_studied, hours_slept], passed)
+
+model.predict_probability(features)  # 0.0094 ... 0.9903
+model.predict(features)  # 0.0 ... 1.0
+model.odds_multiplier_for("hours_studied")  # 2.55
+```
+
+Almost nothing about the API moves. Features go in by name, coefficients come
+back by name, and `evaluate` still hands you an object. What changes is the
+question being asked, and two consequences follow from that.
+
+The first is that there is no closed form to jump to. Setting the gradient of
+the logistic likelihood to zero leaves the coefficients trapped inside a
+sigmoid, so gradient ascent here is not the slow way of doing what `solve`
+does; it is the only way. That makes `converged_` worth reading rather than
+decorative. On perfectly separable classes the maximum likelihood estimate does
+not exist at all, the coefficients grow without bound, and the only thing that
+ends the walk is your epoch cap.
+
+The second is that a coefficient no longer means what it meant in regression.
+It is a multiplier on the odds and not an amount added to the answer, so
+`odds_multiplier_for` returns the number you actually want instead of leaving
+you to remember which direction to exponentiate. One more hour of study
+multiplies the odds of passing by 2.55, and it does so no matter where on the
+curve you started, which is not something the change in probability does.
+
+That learning rate is small and the epoch count is large for a reason worth
+knowing about. Both predictors here are raw hours, and a single step size has
+to serve every direction at once, so `Standardizer` earns its keep before a
+gradient method rather than after it.
+
+```python
+evaluation = model.evaluate(features, target)
+
+evaluation.confusion_matrix.false_negatives  # 17
+evaluation.recall  # 0.8350
+evaluation.precision  # 0.7963
+```
+
+`RegressionEvaluation` has a sibling rather than a subclass here, because the
+two of them share no metric worth the name. R-squared has nothing useful to say
+about a column of zeroes and ones.
+
+One decision in there is worth flagging before it surprises you. Ask a model
+that never predicts positive for its precision and you get an
+`UndefinedMetricError`, not a zero and not a nan. A model that has never fired
+has not made a wrong positive call, and it has not made a right one either, so
+zero would be an answer to a question nobody asked.
+
+The threshold is a field on the model rather than an argument to `predict`,
+which matters more than it looks. On an unbalanced target, where the cut falls
+is the decision that determines whether the thing is useful, and a model built
+to miss as little as possible should be a different object that you can pass
+around and log, not a keyword somebody has to remember at every call site.
+
 ## The Package Layout
 
 | Package | Contents |
 |---------|----------|
-| `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
+| `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, `ClassificationEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
 | `oop_ml.regression` | Simple, multiple, ridge, gradient descent, lasso |
+| `oop_ml.classification` | `LogisticRegression`, and the `LinearClassifier` frame behind it |
 | `oop_ml.preprocessing` | `Standardizer`, `PolynomialFeatures` |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
 
@@ -170,8 +232,8 @@ Validation, the design matrix, the intercept split, coefficient pairing by name,
 and `predict` are all inherited. Note that the directory names the task and not
 the model family; "linear" means linear in the coefficients, which is why
 `PolynomialFeatures` can fit curves without the estimator changing at all, and
-why logistic regression will end up in `oop_ml.classification` while still
-reusing this same machinery.
+why `LogisticRegression` sits in `oop_ml.classification` and still reuses
+this same machinery, right down to the design matrix and the intercept split.
 
 ## The Rules I Held To
 
@@ -191,7 +253,7 @@ reusing this same machinery.
 
 ## Examples
 
-There are seven runnable scripts in [examples/](examples/), and each one is
+There are nine runnable scripts in [examples/](examples/), and each one is
 written the way you would write your own code against the installed package
 rather than against the library's internals.
 
@@ -267,17 +329,19 @@ what is costing you.
 
 ## Where This Stands
 
-Regression is complete: five models, two preprocessors, and cross-validation,
-sitting at 445 tests with `ruff` and `pyright` clean.
+Regression is complete: five models, two preprocessors, and cross-validation.
+Binary classification has landed alongside it, with logistic regression and the
+confusion-matrix metrics. That is 534 tests, `ruff` and `pyright` clean.
 
-Rather than leave you to discover these three the hard way, here is what is not
-built yet, in the order it will matter if you are putting this into an
-application:
+Rather than leave you to discover these the hard way, here is what is not built
+yet, in the order it will matter if you are putting this into an application:
 
 1. **Persistence.** A fitted model cannot be serialised yet, so a process has to
    fit at start-up instead of loading a trained artifact.
 2. **`Pipeline`.** A transformer fitted outside of a cross-validation loop can
    leak across the split, and your serving path currently has to re-apply it by
-   hand.
-3. **Classification.** This is next, and the generic base is already shaped for
-   it.
+   hand. This is next.
+3. **Multi-class.** `LogisticRegression` is binary only. One-vs-rest is the
+   obvious route and nothing in the base classes stands in its way.
+4. **Cross-validated classification.** `CrossValidation` scores with R², so it
+   only speaks to regressors for now.
