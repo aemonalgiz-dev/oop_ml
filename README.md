@@ -281,18 +281,20 @@ python -m benchmarks.against_scikit_learn
 
 ```
                  task      size  oop_ml (s)  sklearn (s)  ratio       answers
-                  OLS   1000x20      0.0002       0.0012   0.2x       matches
-                Ridge   1000x20      0.0002       0.0005   0.4x       matches
-                Lasso   1000x20      0.0011       0.0006   1.9x       matches
-     Gradient descent   1000x20      0.0108       0.0385   0.3x  not compared
-         Standardizer   1000x20      0.0006       0.0008   0.8x       matches
-                  OLS  20000x50      0.0111       0.0231   0.5x       matches
-                Ridge  20000x50      0.0110       0.0077   1.4x       matches
-                Lasso  20000x50      0.0894       0.0707   1.3x       matches
-     Gradient descent  20000x50      1.7636       1.4983   1.2x  not compared
-         Standardizer  20000x50      0.0120       0.0129   0.9x       matches
-PolynomialFeatures d3    2000x8      0.0028       0.0018   1.6x       matches
-PolynomialFeatures d3   2000x12      0.0064       0.0037   1.7x       matches
+                  OLS   1000x20      0.0002       0.0008   0.2x       matches
+                Ridge   1000x20      0.0002       0.0004   0.5x       matches
+                Lasso   1000x20      0.0010       0.0005   1.8x       matches
+     Gradient descent   1000x20      0.0086       0.0309   0.3x  not compared
+             Logistic   1000x20      0.0026       0.0033   0.8x       matches
+         Standardizer   1000x20      0.0004       0.0004   1.1x       matches
+                  OLS  20000x50      0.0094       0.0235   0.4x       matches
+                Ridge  20000x50      0.0099       0.0077   1.3x       matches
+                Lasso  20000x50      0.0993       0.0742   1.3x       matches
+     Gradient descent  20000x50      1.7780       1.5165   1.2x  not compared
+             Logistic  20000x50      0.7334       0.0379  19.4x       matches
+         Standardizer  20000x50      0.0124       0.0108   1.2x       matches
+PolynomialFeatures d3    2000x8      0.0022       0.0015   1.4x       matches
+PolynomialFeatures d3   2000x12      0.0047       0.0035   1.3x       matches
 ```
 
 Ratios below 1.0 mean this library was faster, which surprised me the first time
@@ -301,16 +303,31 @@ BLAS either way, so scikit-learn's Cython has very little left to win, while the
 input validation it performs on every call is enough to lose it the smaller
 comparisons outright.
 
-The iterative solvers are where scikit-learn's Cython genuinely should pull
-ahead, and the first version of this table said so, with lasso trailing by
-nearly five times. Profiling turned up something more embarrassing than a
-language gap. Coordinate descent was rebuilding the residual from scratch for
-every column of every sweep, which made a sweep cost O(n p^2) where it should
-cost O(n p). Carrying the residual and repairing it in place after each
-coefficient moves, with the column norms computed once, brought that to 1.3x
-without changing a single coefficient it produces. The polynomial expansion was
-recomputing the same powers for every term that needed them, and memoising those
-took it from 4.1x to 1.7x.
+The iterative solvers are where Cython should genuinely pull ahead, and the
+first version of this table said exactly that, with lasso trailing by nearly
+five times. Then I profiled it, and what turned up was more embarrassing than a
+language gap. My coordinate descent was rebuilding the residual from scratch for
+every column of every sweep, so a sweep cost O(n p^2) when it had no business
+costing more than O(n p). It now carries the residual and repairs it in place
+after each coefficient moves, with the column norms computed once up front. That
+alone got it to around 1.3x, and not one coefficient changed. The polynomial
+expansion had the same disease, recomputing identical powers for every term that
+asked for them, and memoising took it from 4.1x to under 2x.
+
+Logistic regression is the one row where scikit-learn wins outright, and the
+reason is worth understanding before you read 19.4x as a verdict on the
+implementation. Both libraries land on the same coefficients to within 1e-8.
+They simply need very different numbers of passes to get there: 393 epochs of
+gradient ascent against 13 iterations of lbfgs on the larger problem. lbfgs
+builds up an approximation of the curvature as it goes and uses it to pick each
+step, whereas plain gradient ascent knows only which way is uphill and has to be
+told how far to walk by a learning rate that you chose. That is an algorithmic
+gap rather than a language one, and no amount of numpy tuning closes it.
+
+How much of that gap is the hyperparameter is worth knowing too. Raising the
+learning rate from 0.5 to 2.0 took the same row from 135x to 20x without moving
+a coefficient, which is a fair illustration of what you are signing up for when
+the optimiser hands you a dial to set.
 
 Note the last column, because a benchmark that only reported timings would be
 close to worthless. Every task that can be compared agrees with scikit-learn's
@@ -321,9 +338,10 @@ objective by different routes and stop on different rules, so matching
 coefficients was never the expectation. Those numbers came off my machine and
 my BLAS, so run it on yours.
 
-Where scikit-learn is genuinely ahead is breadth, the surrounding ecosystem, and
-robustness on degenerate input; a perfectly collinear design matrix currently
-raises `LinAlgError` here rather than returning a minimum-norm solution. If you
+Where scikit-learn is genuinely ahead is breadth, second-order optimisation,
+the surrounding ecosystem, and robustness on degenerate input; a perfectly
+collinear design matrix currently raises `LinAlgError` here rather than
+returning a minimum-norm solution. If you
 need any of those, use it. Reach for this library when the shape of the API is
 what is costing you.
 

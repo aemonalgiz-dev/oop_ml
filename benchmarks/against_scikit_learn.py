@@ -20,6 +20,13 @@ arbitrarily fast if it is allowed to be wrong, so every linear model here is
 also checked for agreement against scikit-learn's coefficients. The penalty
 parameterisations differ between the two libraries and the conversions are
 handled below.
+
+Logistic regression is the row where scikit-learn wins properly, and it is the
+most informative row in the table for that reason. Both libraries reach the same
+maximum to within 1e-8; lbfgs simply gets there in around a dozen iterations
+where plain gradient ascent needs hundreds of epochs, because it approximates
+the curvature and we only ever look at the slope. That is an algorithmic gap
+rather than a language one, and it is not something faster array code repairs.
 """
 
 from __future__ import annotations
@@ -29,7 +36,13 @@ import warnings
 
 import numpy as np
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.linear_model import Lasso, LinearRegression, Ridge, SGDRegressor
+from sklearn.linear_model import (
+    Lasso,
+    LinearRegression,
+    Ridge,
+    SGDRegressor,
+)
+from sklearn.linear_model import LogisticRegression as ScikitLogisticRegression
 from sklearn.preprocessing import PolynomialFeatures as ScikitPolynomialFeatures
 from sklearn.preprocessing import StandardScaler
 
@@ -40,6 +53,7 @@ from oop_ml import (
     FloatArray,
     GradientDescentRegression,
     LassoRegression,
+    LogisticRegression,
     MultipleLinearRegression,
     PolynomialFeatures,
     RidgeRegression,
@@ -48,27 +62,26 @@ from oop_ml import (
 
 logger = logging.getLogger(__name__)
 
-REGRESSION_SIZES = [(1_000, 20), (20_000, 50)]
+MODEL_SIZES = [(1_000, 20), (20_000, 50)]
 EXPANSION_SIZES = [(2_000, 8), (2_000, 12)]
 COEFFICIENT_TOLERANCE = 1e-6
 
 
-class Problem:
-    """One generated regression problem, in both libraries' input shapes.
+class GeneratedDesign:
+    """The predictors, in both libraries' input shapes.
 
     Both libraries have to see the same numbers for the comparison to mean
     anything, so the matrix and the features are built once from the same draw
-    rather than generated twice.
+    rather than generated twice. What is predicted *from* these columns is the
+    business of a subclass, since a response and a label are not the same thing
+    and no single generator produces both.
     """
 
-    __slots__ = ("_features", "_matrix", "_target")
+    __slots__ = ("_features", "_matrix")
 
     def __init__(self, n_samples: int, n_features: int, random_seed: int = 0) -> None:
-        generator = np.random.default_rng(random_seed)
-        self._matrix = generator.normal(size=(n_samples, n_features))
-        weights = generator.normal(size=n_features)
-        self._target = self._matrix @ weights + generator.normal(
-            scale=0.5, size=n_samples
+        self._matrix = np.random.default_rng(random_seed).normal(
+            size=(n_samples, n_features)
         )
         self._features = [
             Feature(f"x{index}", self._matrix[:, index]) for index in range(n_features)
@@ -80,24 +93,14 @@ class Problem:
         return self._matrix
 
     @property
-    def target_values(self) -> FloatArray:
-        """The response, as a bare array."""
-        return self._target
-
-    @property
     def features(self) -> list[Feature]:
         """The predictors, as oop_ml wants them."""
         return self._features
 
     @property
-    def target_feature(self) -> Feature:
-        """The response, as a named feature."""
-        return Feature("y", self._target)
-
-    @property
     def n_samples(self) -> int:
         """How many rows."""
-        return len(self._target)
+        return self._matrix.shape[0]
 
     @property
     def size(self) -> str:
@@ -105,19 +108,88 @@ class Problem:
         return f"{self._matrix.shape[0]}x{self._matrix.shape[1]}"
 
 
-def _agreement(problem: Problem, ours: Timing, theirs: Timing) -> Agreement:
-    """Compare our coefficients against scikit-learn's, matching by name."""
-    ours_by_name = [
-        ours.result.coefficients_[feature.name] for feature in problem.features
-    ]
+class RegressionProblem(GeneratedDesign):
+    """A continuous response, drawn as a noisy linear combination."""
 
-    if np.allclose(ours_by_name, theirs.result.coef_, atol=COEFFICIENT_TOLERANCE):
+    __slots__ = ("_target",)
+
+    def __init__(self, n_samples: int, n_features: int, random_seed: int = 0) -> None:
+        super().__init__(n_samples, n_features, random_seed)
+
+        generator = np.random.default_rng(random_seed + 1)
+        weights = generator.normal(size=n_features)
+        self._target = self.matrix @ weights + generator.normal(
+            scale=0.5, size=n_samples
+        )
+
+    @property
+    def target_values(self) -> FloatArray:
+        """The response, as a bare array."""
+        return self._target
+
+    @property
+    def target_feature(self) -> Feature:
+        """The response, as a named feature."""
+        return Feature("y", self._target)
+
+
+class ClassificationProblem(GeneratedDesign):
+    """A binary label, drawn from a log-odds surface over the same columns.
+
+    The weights are deliberately halved. A steeper surface pushes most rows to
+    a probability of nearly zero or nearly one, which approaches separation, and
+    a separable problem has no finite maximum likelihood estimate for either
+    library to find. Timing two solvers as they both fail to converge would
+    measure nothing except their epoch caps.
+    """
+
+    __slots__ = ("_labels",)
+
+    def __init__(self, n_samples: int, n_features: int, random_seed: int = 0) -> None:
+        super().__init__(n_samples, n_features, random_seed)
+
+        generator = np.random.default_rng(random_seed + 1)
+        weights = generator.normal(size=n_features) * 0.5
+        probabilities = _sigmoid(self.matrix @ weights)
+        self._labels = (generator.uniform(size=n_samples) < probabilities).astype(float)
+
+    @property
+    def label_values(self) -> FloatArray:
+        """The 0/1 labels, as a bare array."""
+        return self._labels
+
+    @property
+    def label_feature(self) -> Feature:
+        """The 0/1 labels, as a named feature."""
+        return Feature("y", self._labels)
+
+
+def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
+    """The stable sigmoid, so generating labels never overflows."""
+    return np.exp(np.minimum(linear_predictor, 0.0)) / (
+        1.0 + np.exp(-np.abs(linear_predictor))
+    )
+
+
+def _agreement(design: GeneratedDesign, ours: Timing, theirs: Timing) -> Agreement:
+    """Compare our coefficients against scikit-learn's, matching by name.
+
+    Flattened because scikit-learn's regressors hand back a one-dimensional
+    ``coef_`` while its classifiers hand back one row per class, which for the
+    binary case is a single row rather than a plain vector.
+    """
+    ours_by_name = [
+        ours.result.coefficients_[feature.name] for feature in design.features
+    ]
+    theirs_flattened = np.ravel(theirs.result.coef_)
+
+    if np.allclose(ours_by_name, theirs_flattened, atol=COEFFICIENT_TOLERANCE):
         return Agreement.MATCHES
 
     return Agreement.DIFFERS
 
 
-def _least_squares(problem: Problem) -> Comparison:
+def _least_squares(problem: RegressionProblem) -> Comparison:
     ours = Timing.of(
         lambda: MultipleLinearRegression().fit(problem.features, problem.target_feature)
     )
@@ -130,7 +202,7 @@ def _least_squares(problem: Problem) -> Comparison:
     )
 
 
-def _ridge(problem: Problem, penalty: float = 1.0) -> Comparison:
+def _ridge(problem: RegressionProblem, penalty: float = 1.0) -> Comparison:
     # Both libraries minimise ||y - Xb||^2 + penalty * ||b||^2, so the
     # hyperparameter carries across unchanged.
     ours = Timing.of(
@@ -147,7 +219,7 @@ def _ridge(problem: Problem, penalty: float = 1.0) -> Comparison:
     )
 
 
-def _lasso(problem: Problem, penalty: float = 1.0) -> Comparison:
+def _lasso(problem: RegressionProblem, penalty: float = 1.0) -> Comparison:
     # scikit-learn minimises (1 / 2n) * ||y - Xw||^2 + alpha * ||w||_1, so
     # multiplying through by 2n gives alpha = penalty / (2n) for the same
     # objective. With that conversion the two agree to about 1e-14, exact zeros
@@ -170,7 +242,7 @@ def _lasso(problem: Problem, penalty: float = 1.0) -> Comparison:
     )
 
 
-def _gradient_descent(problem: Problem) -> Comparison:
+def _gradient_descent(problem: RegressionProblem) -> Comparison:
     # Batch gradient descent against stochastic gradient descent. They minimise
     # the same objective by genuinely different routes and stop on different
     # rules, so their coefficients are not expected to match and comparing them
@@ -199,9 +271,38 @@ def _gradient_descent(problem: Problem) -> Comparison:
     )
 
 
-def _standardizer(problem: Problem) -> Comparison:
-    ours = Timing.of(lambda: Standardizer().fit_transform(problem.features))
-    theirs = Timing.of(lambda: StandardScaler().fit_transform(problem.matrix))
+def _logistic(problem: ClassificationProblem) -> Comparison:
+    # Both maximise the unpenalised log-likelihood, so there is no penalty to
+    # convert; C=inf is how scikit-learn is told to leave the objective alone.
+    # The two tolerances are set tight enough that both solvers genuinely reach
+    # the maximum rather than one of them stopping early and winning the timing
+    # by declining to finish the job.
+    #
+    # The learning rate is the number to argue with here. Plain gradient ascent
+    # has one, lbfgs does not, and raising it from 0.5 to 2.0 cut the large
+    # problem from 135x to 21x without moving a coefficient. That sensitivity is
+    # the honest finding rather than a footnote to it.
+    ours = Timing.of(
+        lambda: LogisticRegression(
+            learning_rate=2.0, max_epochs=50_000, tolerance=1e-10
+        ).fit(problem.features, problem.label_feature),
+        repeats=1,
+    )
+    theirs = Timing.of(
+        lambda: ScikitLogisticRegression(C=np.inf, tol=1e-10, max_iter=5_000).fit(
+            problem.matrix, problem.label_values
+        ),
+        repeats=1,
+    )
+
+    return Comparison(
+        "Logistic", problem.size, ours, theirs, _agreement(problem, ours, theirs)
+    )
+
+
+def _standardizer(design: GeneratedDesign) -> Comparison:
+    ours = Timing.of(lambda: Standardizer().fit_transform(design.features))
+    theirs = Timing.of(lambda: StandardScaler().fit_transform(design.matrix))
 
     scaled = np.column_stack([feature.values for feature in ours.result])
     agreement = (
@@ -210,17 +311,17 @@ def _standardizer(problem: Problem) -> Comparison:
         else Agreement.DIFFERS
     )
 
-    return Comparison("Standardizer", problem.size, ours, theirs, agreement)
+    return Comparison("Standardizer", design.size, ours, theirs, agreement)
 
 
-def _polynomial_features(problem: Problem, degree: int = 3) -> Comparison:
+def _polynomial_features(design: GeneratedDesign, degree: int = 3) -> Comparison:
     ours = Timing.of(
-        lambda: PolynomialFeatures(degree=degree).fit_transform(problem.features)
+        lambda: PolynomialFeatures(degree=degree).fit_transform(design.features)
     )
     theirs = Timing.of(
         lambda: ScikitPolynomialFeatures(
             degree=degree, include_bias=False
-        ).fit_transform(problem.matrix)
+        ).fit_transform(design.matrix)
     )
 
     # Both expansions produce the same columns, though not in the same order, so
@@ -233,7 +334,7 @@ def _polynomial_features(problem: Problem, degree: int = 3) -> Comparison:
 
     return Comparison(
         f"PolynomialFeatures d{degree}",
-        problem.size,
+        design.size,
         ours,
         theirs,
         agreement,
@@ -244,20 +345,23 @@ def run() -> Comparisons:
     """Time every task at every size and collect the comparisons."""
     comparisons = []
 
-    for n_samples, n_features in REGRESSION_SIZES:
-        problem = Problem(n_samples, n_features)
+    for n_samples, n_features in MODEL_SIZES:
+        problem = RegressionProblem(n_samples, n_features)
         comparisons.extend(
             [
                 _least_squares(problem),
                 _ridge(problem),
                 _lasso(problem),
                 _gradient_descent(problem),
+                _logistic(ClassificationProblem(n_samples, n_features)),
                 _standardizer(problem),
             ]
         )
 
     for n_samples, n_features in EXPANSION_SIZES:
-        comparisons.append(_polynomial_features(Problem(n_samples, n_features)))
+        comparisons.append(
+            _polynomial_features(RegressionProblem(n_samples, n_features))
+        )
 
     return Comparisons(comparisons)
 
