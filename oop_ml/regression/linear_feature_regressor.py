@@ -20,14 +20,12 @@ the user constructs, so ``RidgeRegression(penalty=1.0)`` reads better than
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Self
 
 from oop_ml.core.base import Regressor
 from oop_ml.core.column import Column
 from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
 from oop_ml.core.linear_model import LinearModel
 from oop_ml.core.types import FloatArray
 
@@ -49,28 +47,6 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
         ``False`` the column is omitted and the hyperplane is forced through the
         origin, with ``intercept_`` reported as ``0.0``.
     """
-
-    @abstractmethod
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
-        """Return the coefficient vector for ``design_matrix`` against the target.
-
-        The one thing a linear model has to answer for itself.
-
-        Parameters
-        ----------
-        design_matrix:
-            ``X``, shape ``(n_samples, parameter_count)``. Already carries the
-            leading ones column when ``fit_intercept`` is set, so implementations
-            never handle the intercept as a special case.
-        target_column:
-            ``y``, already validated and aligned with the rows of ``X``.
-
-        Returns
-        -------
-        FloatArray
-            ``beta``, with one entry per column of ``design_matrix`` and in the
-            same order, the intercept coming first whenever there is one.
-        """
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit the hyperplane, delegating the solve itself to the subclass.
@@ -96,19 +72,13 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
             If two features share a name.
         NonEqualArrayLengthError
             If any feature's length differs from the target's.
+        AllSameValuesError
+            If any predictor is constant. This was raised before it was
+            documented; the guard has always been here.
         TooFewValuesError
             If there are fewer observations than parameters to estimate.
         """
-        feature_set = FeatureSet(input_values)
-        feature_set.check_columns_vary()
-        feature_set.check_aligned_with(target_values)
-        feature_set.check_supports_parameter_count(self._parameter_count(feature_set))
-
-        solution = self._solve(self._design_matrix(feature_set), target_values.column)
-        self._store_solution(feature_set, solution)
-
-        self._mark_fitted()
-        return self
+        return self._fit_linear_model(input_values, target_values)
 
     def predict(self, input_values: Sequence[Feature]) -> FloatArray:
         """Evaluate the fitted hyperplane on the given features.
