@@ -15,6 +15,7 @@ from examples import (
     gradient_descent,
     logistic_regression,
     model_selection,
+    multiclass_classification,
     multiple_regression,
     polynomial_curves,
     regularization,
@@ -32,6 +33,7 @@ EXAMPLE_MODULES = [
     model_selection,
     logistic_regression,
     classification_metrics,
+    multiclass_classification,
 ]
 
 

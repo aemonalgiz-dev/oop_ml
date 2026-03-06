@@ -1,6 +1,6 @@
 # Examples
 
-Nine runnable scripts, simplest first. Each one is written the way a user of
+Ten runnable scripts, simplest first. Each one is written the way a user of
 the installed package writes code — everything comes from the top-level
 `oop_ml` import, and no example reaches into the library's internal module
 paths. Reading one tells you what your own code should look like.
@@ -42,6 +42,7 @@ root rather than from anywhere.
 | 7 | `model_selection` | The capstone: hold out, cross-validate, choose, refit, report once. |
 | 8 | `logistic_regression` | The same API pointed at a label instead of a quantity, how to read a coefficient that multiplies the odds, and two solvers arriving at one maximum 749 epochs apart. |
 | 9 | `classification_metrics` | Why accuracy is the wrong number on a rare class, and what moving the threshold buys and costs. |
+| 10 | `multiclass_classification` | Softmax against one-vs-rest on three classes, and why macro and micro averaging are two different claims about one model. |
 
 ## Supporting modules
 

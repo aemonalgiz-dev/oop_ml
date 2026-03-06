@@ -225,13 +225,77 @@ the one to reach for unless the problem is wide, since building the curvature
 matrix costs a factor of the predictor count per pass; the benchmark below
 shows where that trade turns over.
 
+## More Than Two Classes
+
+```python
+from oop_ml import MultinomialLogisticRegression
+
+model = MultinomialLogisticRegression(learning_rate=1.0).fit(features, species)
+
+model.n_classes  # 3
+model.predict_probabilities(features)  # (300, 3), every row summing to 1
+model.coefficients_for(2)["sepal_length"]  # class 2's weight, against class 0
+```
+
+Softmax gives each class its own weight vector and normalises across them, so
+the answer is a distribution by construction rather than by tidying up
+afterwards. The gradient turns out to be the binary one with the 0/1 label
+swapped for a 0/1 indicator of "is this row class k", and at two classes the
+whole thing collapses exactly onto `LogisticRegression` — checked in the tests
+to 1e-6, because it is an identity rather than an approximation.
+
+Class 0 is held at zero and not fitted. That is not a shortcut: add the same
+constant to every class's weight for a feature and every probability comes back
+unchanged, so the likelihood has a flat ridge through it and no unique maximum.
+Pinning one class down is what makes the answer reproducible, and it is why the
+remaining coefficients read as "against class 0".
+
+`OneVsRestClassifier` is the other route, wrapping any binary classifier:
+
+```python
+wrapper = OneVsRestClassifier(binary_model=LogisticRegression())
+wrapper.fit(features, species)
+wrapper.model_for(2).coefficients["sepal_length"]  # that class's own model
+```
+
+It needs no new mathematics and it makes no promises the maths does not
+support. The K models were fitted independently, so their probabilities do not
+sum to one — measured on 300 rows, the row totals ran from 0.4137 to 1.7790
+against exactly 1.0000 for softmax, and the two disagreed on the predicted class
+for 13 of them. The library reports those totals raw. Normalising them would
+produce something that adds to one without being the probability of anything.
+
+### Scoring it
+
+```python
+evaluation = model.evaluate(features, species)
+
+evaluation.accuracy  # 0.9033
+evaluation.micro_recall  # 0.9033
+evaluation.macro_recall  # 0.8731
+evaluation.per_class_recall  # [0.9636, 0.8333, 0.8222]
+```
+
+Accuracy and both micro figures are the same number, always. Every row gets
+exactly one prediction, so the pooled numerator is the diagonal and both pooled
+denominators are every row — reporting all three is reporting one number three
+times.
+
+Macro is the one that says something else. It averages the per-class scores, so
+the class holding 15% of the rows moves it exactly as much as the class holding
+55%. On a target split 165 / 90 / 45 that is a three-point gap here and can
+easily be twenty; wherever macro sits well below micro, the model is failing a
+class too small to dent the overall figure, which is usually the class somebody
+cared about.
+
 ## The Package Layout
 
 | Package | Contents |
 |---------|----------|
-| `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, `ClassificationEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
+| `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, `ClassificationEvaluation`,
+`MultiClassEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
 | `oop_ml.regression` | Simple, multiple, ridge, gradient descent, lasso |
-| `oop_ml.classification` | `LogisticRegression` and `NewtonLogisticRegression`, over the `LinearClassifier` frame |
+| `oop_ml.classification` | `LogisticRegression`, `NewtonLogisticRegression`, `MultinomialLogisticRegression`, `OneVsRestClassifier` |
 | `oop_ml.preprocessing` | `Standardizer`, `PolynomialFeatures` |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
 
@@ -291,7 +355,7 @@ this same machinery, right down to the design matrix and the intercept split.
 
 ## Examples
 
-There are nine runnable scripts in [examples/](examples/), and each one is
+There are ten runnable scripts in [examples/](examples/), and each one is
 written the way you would write your own code against the installed package
 rather than against the library's internals.
 
@@ -410,8 +474,9 @@ what is costing you.
 ## Where This Stands
 
 Regression is complete: five models, two preprocessors, and cross-validation.
-Binary classification has landed alongside it, with two logistic solvers and the
-confusion-matrix metrics. That is 588 tests, `ruff` and `pyright` clean.
+Classification has landed alongside it: two binary logistic solvers, softmax and
+one-vs-rest for more than two classes, and the confusion-matrix metrics for
+both. That is 688 tests, `ruff` and `pyright` clean.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:
@@ -421,7 +486,11 @@ yet, in the order it will matter if you are putting this into an application:
 2. **`Pipeline`.** A transformer fitted outside of a cross-validation loop can
    leak across the split, and your serving path currently has to re-apply it by
    hand. This is next.
-3. **Multi-class.** `LogisticRegression` is binary only. One-vs-rest is the
-   obvious route and nothing in the base classes stands in its way.
-4. **Cross-validated classification.** `CrossValidation` scores with R², so it
-   only speaks to regressors for now.
+3. **Cross-validated classification.** `CrossValidation` scores with R², so it
+   only speaks to regressors. Fixing that needs stratified folds as well: plain
+   k-fold on a rare class produces folds with no positives at all by k=10, and
+   recall on such a fold is undefined rather than zero.
+4. **A second-order multi-class solver.** The softmax model walks uphill where
+   the binary one can jump. Its Hessian has cross-class blocks and is
+   `(K-1)p` square, so Newton there is a judgement call rather than the clear
+   win it was at two classes.
