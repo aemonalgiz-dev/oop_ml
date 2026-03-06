@@ -87,15 +87,15 @@ difference from the closed form.
 
 from __future__ import annotations
 
-import numpy as np
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 from oop_ml.core.column import Column
+from oop_ml.core.iterative_solver import IterativeSolver
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
 
-class GradientDescentRegression(LinearFeatureRegressor):
+class GradientDescentRegression(IterativeSolver, LinearFeatureRegressor):
     """Least squares fit by batch gradient descent.
 
     Parameters
@@ -115,37 +115,14 @@ class GradientDescentRegression(LinearFeatureRegressor):
     max_epochs: int = Field(default=10_000, gt=0)
     tolerance: float = Field(default=1e-8, gt=0.0)
 
-    _epochs_run: int | None = PrivateAttr(default=None)
-    _converged: bool | None = PrivateAttr(default=None)
+    @property
+    def _pass_limit(self) -> int:
+        return self.max_epochs
 
     @property
     def epochs_run_(self) -> int:
-        """How many epochs the last fit actually took.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._epochs_run is not None
-        return self._epochs_run
-
-    @property
-    def converged_(self) -> bool:
-        """Whether the last fit stopped on ``tolerance`` rather than ``max_epochs``.
-
-        ``False`` means the coefficients were still moving when the cap was
-        reached, so treat them as unfinished rather than as an answer.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._converged is not None
-        return self._converged
+        """How many epochs the last fit actually took."""
+        return self._completed_passes
 
     @staticmethod
     def _compute_residuals(
@@ -171,38 +148,18 @@ class GradientDescentRegression(LinearFeatureRegressor):
         residuals = self._compute_residuals(design_matrix, weights, target_column)
         return -(2 / target_column.n_samples) * design_matrix.T @ residuals
 
-    def _has_converged(self, step: FloatArray) -> bool:
-        """Whether the largest single coefficient movement is below tolerance."""
-        return bool(np.max(np.abs(step)) < self.tolerance)
+    def _step(
+        self,
+        design_matrix: FloatArray,
+        target_column: Column,
+        weights: FloatArray,
+    ) -> FloatArray:
+        """One epoch of gradient descent: downhill, scaled by the rate.
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
-        """Walk downhill from zero until the coefficients settle.
-
-        Every weight starts at zero, and since the objective is convex, where
-        the walk begins does not change where it ends. Each epoch computes the
-        gradient, scales it into a step, and subtracts it.
-
-        Two exits, and which one was taken is recorded rather than discarded:
-        the step falling below ``tolerance`` (converged) or ``max_epochs`` being
-        exhausted (gave up). See ``converged_``.
-
-        The intercept needs no special handling here, since its ones column is
-        already sitting in ``design_matrix``. It descends like any other
-        coefficient, and its gradient entry is simply the mean residual.
+        Negative, because squared error is being minimised rather than
+        maximised. Returning the step already signed keeps the walk itself
+        indifferent to which direction a given objective wants.
         """
-        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
-        self._epochs_run = 0
-        self._converged = False
+        gradient = self._compute_gradient(design_matrix, weights, target_column)
 
-        for _ in range(self.max_epochs):
-            gradient = self._compute_gradient(design_matrix, weights, target_column)
-            step = self.learning_rate * gradient
-
-            if self._has_converged(step):
-                self._converged = True
-                break
-
-            weights = weights - step
-            self._epochs_run += 1
-
-        return weights
+        return -self.learning_rate * gradient

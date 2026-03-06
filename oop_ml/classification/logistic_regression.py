@@ -120,16 +120,16 @@ separated dataset turns into a confidently meaningless model.
 
 from __future__ import annotations
 
-import numpy as np
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.column import Column
+from oop_ml.core.iterative_solver import IterativeSolver
 from oop_ml.core.logistic import sigmoid
 from oop_ml.core.types import FloatArray
 
 
-class LogisticRegression(LinearClassifier):
+class LogisticRegression(IterativeSolver, LinearClassifier):
     """A linear decision boundary, fitted by gradient ascent on the likelihood.
 
     Parameters
@@ -159,38 +159,14 @@ class LogisticRegression(LinearClassifier):
     tolerance: float = Field(default=1e-8, gt=0.0)
     threshold: float = Field(default=0.5, gt=0.0, lt=1.0)
 
-    _epochs_run: int | None = PrivateAttr(default=None)
-    _converged: bool | None = PrivateAttr(default=None)
+    @property
+    def _pass_limit(self) -> int:
+        return self.max_epochs
 
     @property
     def epochs_run_(self) -> int:
-        """How many epochs the ascent actually took.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._epochs_run is not None
-        return self._epochs_run
-
-    @property
-    def converged_(self) -> bool:
-        """Whether the walk settled, rather than running out of epochs.
-
-        ``False`` means the coefficients were still moving when ``max_epochs``
-        was reached. Read the module docstring on separation before treating
-        such a fit as an answer.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._converged is not None
-        return self._converged
+        """How many epochs the ascent actually took."""
+        return self._completed_passes
 
     @staticmethod
     def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
@@ -217,9 +193,9 @@ class LogisticRegression(LinearClassifier):
         FloatArray
             Probabilities in ``[0, 1]``, one per observation.
         """
-        # Shared with anything else that needs it rather than spelled twice:
-        # the branch-on-sign trick is easy to get subtly wrong, and two copies
-        # is two chances to do so.
+        # Shared with NewtonLogisticRegression rather than spelled twice: the
+        # branch-on-sign trick is easy to get subtly wrong, and two copies is
+        # two chances to do so.
         return sigmoid(linear_predictor)
 
     def _gradient(
@@ -257,54 +233,18 @@ class LogisticRegression(LinearClassifier):
 
         return design_matrix.T @ differences / len(target_values)
 
-    def _has_converged(self, step: FloatArray) -> bool:
-        """Whether this epoch moved every coefficient less than ``tolerance``.
+    def _step(
+        self,
+        design_matrix: FloatArray,
+        target_column: Column,
+        weights: FloatArray,
+    ) -> FloatArray:
+        """One epoch of gradient ascent: the gradient scaled by the rate.
 
-        Measure the step before it is applied, not the change afterwards; they
-        are the same number, and taking it from the step avoids keeping a copy
-        of the previous weights around.
+        Positive, because the log-likelihood is being maximised. The learning
+        rate is the whole of what stands in for curvature here, which is why it
+        has to be supplied and why a badly chosen one diverges.
         """
-        return bool(np.max(np.abs(step)) < self.tolerance)
-
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
-        """Walk uphill from zero until the coefficients settle.
-
-        Start every weight at zero, which the concavity of the objective makes a
-        safe choice, then each epoch compute the gradient, scale it into a step,
-        and add it. Record both exits: settling below ``tolerance`` sets
-        ``converged_`` to ``True``, and exhausting ``max_epochs`` leaves it
-        ``False``.
-
-        Do not set ``_fitted`` here. ``fit`` owns that, and only after the
-        weights have been paired with their feature names.
-
-        Parameters
-        ----------
-        design_matrix:
-            ``X``, shape ``(n_samples, parameter_count)``.
-        target_column:
-            ``y``, validated as 0/1 and aligned with the rows of ``X``.
-
-        Returns
-        -------
-        FloatArray
-            ``b``, one entry per column of ``design_matrix``, intercept first
-            when there is one.
-        """
-        self._epochs_run = 0
-        self._converged = False
-        weights = np.zeros(design_matrix.shape[1])
-
-        for _ in range(self.max_epochs):
-            step = self.learning_rate * self._gradient(
-                design_matrix, target_column.values, weights
-            )
-
-            if self._has_converged(step):
-                self._converged = True
-                break
-
-            weights = weights + step
-            self._epochs_run += 1
-
-        return weights
+        return self.learning_rate * self._gradient(
+            design_matrix, target_column.values, weights
+        )
