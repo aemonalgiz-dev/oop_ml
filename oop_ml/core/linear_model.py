@@ -93,13 +93,24 @@ class LinearModel(Fittable):
         return feature_set.n_features + (1 if self.fit_intercept else 0)
 
     def _design_matrix(self, feature_set: FeatureSet) -> FloatArray:
-        """``X``: the feature columns, with a leading ones column if wanted."""
-        design_matrix = feature_set.feature_matrix
+        """``X``: the feature columns, with a leading ones column if wanted.
 
+        Column-major, for the reason ``FeatureSet`` gives: the solvers here are
+        dominated by ``X.T @ v``, and that product wants contiguous columns.
+        Allocating in that order costs nothing over ``column_stack``, whereas
+        converting afterwards would cost more than the layout saves on a model
+        that only reads the matrix once.
+        """
         if not self.fit_intercept:
-            return design_matrix
+            return feature_set.feature_matrix
 
-        return np.column_stack([np.ones(feature_set.n_samples), design_matrix])
+        design_matrix = np.empty(
+            (feature_set.n_samples, feature_set.n_features + 1), order="F"
+        )
+        design_matrix[:, 0] = 1.0
+        design_matrix[:, 1:] = feature_set.feature_matrix
+
+        return design_matrix
 
     def _store_solution(self, feature_set: FeatureSet, solution: FloatArray) -> None:
         """Split the intercept off the solution and pair the rest with names.

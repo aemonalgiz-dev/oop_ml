@@ -130,6 +130,7 @@ from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.column import Column
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
+from oop_ml.core.logistic import sigmoid
 from oop_ml.core.types import FloatArray
 
 
@@ -221,12 +222,10 @@ class LogisticRegression(LinearClassifier):
         FloatArray
             Probabilities in ``[0, 1]``, one per observation.
         """
-        # exp(min(z, 0)) is exp(z) where z is negative and 1 where it is not,
-        # and the denominator's exponent is negative by construction, so neither
-        # half can overflow however far out the linear predictor is driven.
-        return np.exp(np.minimum(linear_predictor, 0.0)) / (
-            1.0 + np.exp(-np.abs(linear_predictor))
-        )
+        # Shared with anything else that needs it rather than spelled twice:
+        # the branch-on-sign trick is easy to get subtly wrong, and two copies
+        # is two chances to do so.
+        return sigmoid(linear_predictor)
 
     def _gradient(
         self,
