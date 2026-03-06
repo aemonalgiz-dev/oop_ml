@@ -35,6 +35,7 @@ from oop_ml.core.classification_evaluation import ClassificationEvaluation
 from oop_ml.core.column import ColumnSource
 from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.core.exceptions import NotFittedError
+from oop_ml.core.multiclass_evaluation import MultiClassEvaluation
 from oop_ml.core.types import FloatArray
 
 InputT = TypeVar("InputT")
@@ -180,6 +181,74 @@ class Classifier(Estimator[InputT, TargetT]):
         caution than ``Regressor.score``. Accuracy on an unbalanced target can
         look excellent while the model finds nothing, so reach for the
         evaluation object and read precision and recall before believing it.
+        """
+        return self.evaluate(input_values, target_values).accuracy
+
+
+class MultiClassClassifier(Estimator[InputT, TargetT]):
+    """Base class for estimators that choose between more than two classes.
+
+    A sibling of :class:`Classifier` rather than a parent of it. The binary case
+    hands back one probability per row and this hands back one per class per
+    row, so ``predict_probability`` and ``predict_probabilities`` are different
+    methods with different shapes, and no caller wanting one would accept the
+    other. Collapsing them would mean every binary caller indexing a column out
+    of a matrix to get the number they already had.
+
+    ``predict`` still returns one value per row: the class with the highest
+    probability, as a float on the same 0..K-1 scale the target uses.
+    """
+
+    @abstractmethod
+    def predict(self, input_values: InputT) -> FloatArray:
+        """Return one predicted class per observation, as ``0.0 .. K-1``.
+
+        Must call ``_check_fitted()`` first.
+        """
+
+    @abstractmethod
+    def predict_probabilities(self, input_values: InputT) -> FloatArray:
+        """Return an ``(n_samples, n_classes)`` matrix of probabilities.
+
+        Column ``k`` is P(class is k). Whether the rows sum to 1 is a property
+        of the concrete model rather than of this contract: a softmax model
+        guarantees it by construction, and a one-vs-rest wrapper cannot.
+
+        Must call ``_check_fitted()`` first.
+        """
+
+    def evaluate(
+        self, input_values: InputT, actual_values: TargetT
+    ) -> MultiClassEvaluation:
+        """Predict classes on ``input_values`` and pair them with the truth.
+
+        The single scoring entry point, mirroring ``Classifier.evaluate``. The
+        class count is taken from the fitted model rather than from the truth,
+        so a held-out fold missing one class still produces a table the right
+        size instead of a smaller one that quietly renumbers the rest.
+        """
+        return MultiClassEvaluation(
+            actual_values, self.predict(input_values), self.n_classes
+        )
+
+    @property
+    @abstractmethod
+    def n_classes(self) -> int:
+        """How many classes the fit saw.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+
+    def score(self, input_values: InputT, target_values: TargetT) -> float:
+        """Accuracy of the prediction on the given data.
+
+        Worth even more caution than in the binary case: with many classes a
+        model that only ever names the commonest one can score respectably
+        while getting every other class wrong every time. Read the per-class
+        recalls on the evaluation before believing this number.
         """
         return self.evaluate(input_values, target_values).accuracy
 
