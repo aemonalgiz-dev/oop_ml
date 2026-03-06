@@ -46,6 +46,16 @@ class NonBinaryLabelsError(MLLibError):
     """Raised when a binary classifier is handed a target that is not 0 or 1."""
 
 
+class SingularHessianError(MLLibError):
+    """Raised when a second-order solver's Hessian has no unique solution.
+
+    The numerical face of separation. Once every ``p (1 - p)`` weight has
+    underflowed, ``X.T W X`` is the zero matrix and there is no Newton step to
+    take. Given a name of its own so that it routes with the rest of the
+    hierarchy rather than escaping as a bare ``numpy.linalg.LinAlgError``.
+    """
+
+
 class SingleClassError(MLLibError):
     """Raised when a classifier's target contains only one of the two classes.
 

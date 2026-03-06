@@ -20,6 +20,9 @@ name that this surface does not re-export.
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic_regression import LogisticRegression
+from oop_ml.classification.newton_logistic_regression import (
+    NewtonLogisticRegression,
+)
 from oop_ml.core.base import Classifier, Estimator, Fittable, Regressor, Transformer
 from oop_ml.core.classification_evaluation import (
     ClassificationEvaluation,
@@ -38,6 +41,7 @@ from oop_ml.core.exceptions import (
     NonUniqueFeaturesError,
     NotFittedError,
     SingleClassError,
+    SingularHessianError,
     TooFewValuesError,
     UndefinedMetricError,
 )
@@ -109,6 +113,7 @@ __all__ = [
     "GradientDescentRegression",
     # Classification
     "LogisticRegression",
+    "NewtonLogisticRegression",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
@@ -135,4 +140,5 @@ __all__ = [
     "NonUniqueFeaturesError",
     "NonBinaryLabelsError",
     "SingleClassError",
+    "SingularHessianError",
 ]
