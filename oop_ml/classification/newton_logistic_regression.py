@@ -86,7 +86,7 @@ Gradient ascent crawls toward the infinity that separation implies and an epoch
 cap is enough to stop it. Newton *sprints* there: on the six-row separable
 fixture the weight passes 12.8 by iteration 8 and 36.8 by iteration 20, gaining
 a flat 4.0 per step and never settling. Quadratic convergence toward an optimum
-that does not exist is quadratic divergence, so ``converged_`` carries even more
+that does not exist is quadratic divergence, so ``converged`` carries even more
 weight on this model than on the other one.
 
 **The cost trade genuinely reverses.** A gradient epoch is ``O(n p)``; a Newton
@@ -154,7 +154,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         return self.max_iterations
 
     @property
-    def iterations_run_(self) -> int:
+    def iterations_run(self) -> int:
         """How many Newton steps the fit actually took."""
         return self._completed_passes
 

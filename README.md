@@ -58,9 +58,9 @@ model.fit(
     Feature("price_thousands", [310, 505, 372, 690, 240, 448, 560, 350]),
 )
 
-model.intercept_  # 99.55
-model.coefficients_["floor_area_sqm"]  # 2.81
-model.coefficients_["bathrooms"]  # 2.33
+model.intercept  # 99.55
+model.coefficients["floor_area_sqm"]  # 2.81
+model.coefficients["bathrooms"]  # 2.33
 ```
 
 The constructor takes hyperparameters and `fit` takes data, and the library
@@ -72,8 +72,8 @@ very little about what you actually did wrong.
 ## Names Instead Of Positions
 
 ```python
-model.coefficients_["floor_area_sqm"]  # 2.81
-"garden" in model.coefficients_  # False
+model.coefficients["floor_area_sqm"]  # 2.81
+"garden" in model.coefficients  # False
 ```
 
 `predict` matches by name as well, so you may hand it features in whatever order
@@ -164,7 +164,7 @@ question being asked, and two consequences follow from that.
 The first is that there is no closed form to jump to. Setting the gradient of
 the logistic likelihood to zero leaves the coefficients trapped inside a
 sigmoid, so gradient ascent here is not the slow way of doing what `solve`
-does; it is the only way. That makes `converged_` worth reading rather than
+does; it is the only way. That makes `converged` worth reading rather than
 decorative. On perfectly separable classes the maximum likelihood estimate does
 not exist at all, the coefficients grow without bound, and the only thing that
 ends the walk is your epoch cap.
@@ -215,8 +215,8 @@ single-digit iterations rather than hundreds of epochs:
 walked = LogisticRegression(learning_rate=0.5).fit(features, passed)
 jumped = NewtonLogisticRegression().fit(features, passed)
 
-walked.epochs_run_  # 749
-jumped.iterations_run_  # 7
+walked.epochs_run  # 749
+jumped.iterations_run  # 7
 ```
 
 Both land on `+2.20430913` for the same coefficient. The objective is concave,
@@ -261,7 +261,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
 Start at zero, cap the passes, apply the step, count it, stop when it falls
 under the tolerance, record which of the two exits happened. That is the same
 in every iterative solver, and writing it out per model is how two of them
-ended up reporting `converged_ = True` beside zero passes run.
+ended up reporting `converged = True` beside zero passes run.
 
 Validation, the design matrix, the intercept split, coefficient pairing by name,
 and `predict` are all inherited. Note that the directory names the task and not
@@ -280,8 +280,11 @@ this same machinery, right down to the design matrix and the intercept split.
 - Nothing returns a tuple of several different things. If I found myself
   reaching for `return first, second`, that pairing was a class I had not
   written yet, and the caller should never have to know the positional order.
-- Learned parameters are read-only, end in a trailing underscore, and raise
-  `NotFittedError` if you read them before `fit`.
+- Learned parameters are read-only and raise `NotFittedError` if you read them
+  before `fit`. They carry no trailing underscore: `model.coefficients`, not
+  `model.coefficients_`. The suffix is a scikit-learn habit that exists to mark
+  fitted state, and `NotFittedError` already does that job at the moment it
+  matters, with a message instead of a naming convention you have to know.
 - Public methods hand back Python floats rather than numpy scalars.
 - Everything is typed, and the package ships a `py.typed` marker so that your
   type checker sees the annotations instead of treating all of this as untyped.

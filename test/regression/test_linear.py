@@ -70,8 +70,8 @@ class TestFit:
     ):
         model = fitted_model(inputs, targets)
 
-        assert model.slope_ == pytest.approx(expected_slope)
-        assert model.intercept_ == pytest.approx(expected_intercept)
+        assert model.slope == pytest.approx(expected_slope)
+        assert model.intercept == pytest.approx(expected_intercept)
 
     def test_fit_returns_self(self):
         model = SimpleLinearRegression()
@@ -83,7 +83,7 @@ class TestFit:
 
 
 class TestBeforeFit:
-    @pytest.mark.parametrize("attribute", ["slope_", "intercept_"])
+    @pytest.mark.parametrize("attribute", ["slope", "intercept"])
     def test_learned_attributes_raise_before_fit(self, attribute):
         with pytest.raises(NotFittedError):
             getattr(SimpleLinearRegression(), attribute)

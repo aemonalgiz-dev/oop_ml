@@ -39,15 +39,15 @@ def main() -> None:
 
     expansion = PolynomialFeatures(degree=2)
     expanded_features = expansion.fit_transform(data.input_features)
-    report.line(f"columns produced: {list(expansion.terms_.names)}")
+    report.line(f"columns produced: {list(expansion.terms.names)}")
 
     curved = MultipleLinearRegression()
     curved.fit(expanded_features, data.target_feature)
 
     report.coefficients(
-        curved.coefficients_,
+        curved.coefficients,
         data.true_coefficients,
-        curved.intercept_,
+        curved.intercept,
         data.true_intercept,
     )
     report.line(f"\nR2 = {curved.score(expanded_features, data.target_feature):.4f}")
@@ -61,8 +61,8 @@ def main() -> None:
     powers_only = PolynomialFeatures(degree=2, include_interactions=False)
     powers_only.fit(two_features)
 
-    report.line(f"with interactions : {list(with_interactions.terms_.names)}")
-    report.line(f"powers only       : {list(powers_only.terms_.names)}")
+    report.line(f"with interactions : {list(with_interactions.terms.names)}")
+    report.line(f"powers only       : {list(powers_only.terms.names)}")
     report.paragraph(
         "The cross term is the only way a linear model can say 'the effect of\n"
         "one predictor depends on the level of another'. Without it the model\n"
@@ -101,7 +101,7 @@ def main() -> None:
         rows.append(
             [
                 str(degree),
-                str(expansion.terms_.n_terms),
+                str(expansion.terms.n_terms),
                 f"{training_score:.4f}",
                 f"{testing_score:.4f}",
             ]

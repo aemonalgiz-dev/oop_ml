@@ -120,7 +120,7 @@ class GradientDescentRegression(IterativeSolver, LinearFeatureRegressor):
         return self.max_epochs
 
     @property
-    def epochs_run_(self) -> int:
+    def epochs_run(self) -> int:
         """How many epochs the last fit actually took."""
         return self._completed_passes
 

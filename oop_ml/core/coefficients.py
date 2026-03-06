@@ -121,7 +121,7 @@ class Coefficients:
         return coefficient.value
 
     def __getitem__(self, name: str) -> float:
-        """The weight for ``name``, so that ``coefficients_["age"]`` reads well."""
+        """The weight for ``name``, so that ``coefficients["age"]`` reads well."""
         return self.value_for(name)
 
     def __contains__(self, name: object) -> bool:

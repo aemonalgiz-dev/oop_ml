@@ -55,11 +55,11 @@ def main() -> None:
     with np.errstate(over="ignore", invalid="ignore"):
         raw_descent.fit(data.input_features, data.target_feature)
 
-    report.line(f"converged : {raw_descent.converged_}")
-    report.line(f"epochs    : {raw_descent.epochs_run_}")
-    report.line(f"intercept : {raw_descent.intercept_}")
+    report.line(f"converged : {raw_descent.converged}")
+    report.line(f"epochs    : {raw_descent.epochs_run}")
+    report.line(f"intercept : {raw_descent.intercept}")
 
-    if not np.isfinite(raw_descent.intercept_):
+    if not np.isfinite(raw_descent.intercept):
         report.warn(
             "the walk diverged: it overshot on the first step and never came "
             "back, so every coefficient is nan. Nothing about this model can be "
@@ -76,8 +76,8 @@ def main() -> None:
     scaled_descent = GradientDescentRegression(learning_rate=0.01, max_epochs=5_000)
     scaled_descent.fit(scaled_features, data.target_feature)
 
-    report.line(f"converged : {scaled_descent.converged_}")
-    report.line(f"epochs    : {scaled_descent.epochs_run_}")
+    report.line(f"converged : {scaled_descent.converged}")
+    report.line(f"epochs    : {scaled_descent.epochs_run}")
     report.line(
         f"R2        : {scaled_descent.score(scaled_features, data.target_feature):.6f}"
     )
@@ -101,7 +101,7 @@ def main() -> None:
         # A diverged fit cannot be scored: its predictions are nan, and
         # RegressionEvaluation rejects non-finite values rather than quietly
         # reporting nan as a number. So ask the model before asking for a score.
-        if np.isfinite(model.intercept_):
+        if np.isfinite(model.intercept):
             outcome = f"{model.score(scaled_features, data.target_feature):.6f}"
         else:
             outcome = "diverged"
@@ -110,17 +110,17 @@ def main() -> None:
                 f"further than the last, so the coefficients are nan"
             )
 
-        if not model.converged_ and np.isfinite(model.intercept_):
+        if not model.converged and np.isfinite(model.intercept):
             concerns.append(
                 f"learning_rate={learning_rate:g} ran out of patience at "
-                f"{model.epochs_run_} epochs without converging"
+                f"{model.epochs_run} epochs without converging"
             )
 
         rows.append(
             [
                 f"{learning_rate:g}",
-                str(model.converged_),
-                str(model.epochs_run_),
+                str(model.converged),
+                str(model.epochs_run),
                 outcome,
             ]
         )

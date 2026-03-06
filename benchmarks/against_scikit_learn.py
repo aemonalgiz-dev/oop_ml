@@ -180,7 +180,7 @@ def _agreement(design: GeneratedDesign, ours: Timing, theirs: Timing) -> Agreeme
     binary case is a single row rather than a plain vector.
     """
     ours_by_name = [
-        ours.result.coefficients_[feature.name] for feature in design.features
+        ours.result.coefficients[feature.name] for feature in design.features
     ]
     theirs_flattened = np.ravel(theirs.result.coef_)
 
