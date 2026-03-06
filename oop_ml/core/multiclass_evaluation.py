@@ -186,6 +186,7 @@ class MultiClassEvaluation:
 
     __slots__ = (
         "_actual_column",
+        "_confusion_matrix",
         "_n_classes",
         "_predicted_column",
     )
@@ -206,6 +207,13 @@ class MultiClassEvaluation:
             self._actual_column.n_classes if n_classes is None else int(n_classes)
         )
         self._check_predictions_are_known_classes()
+
+        # Counted once. Every per-class metric reads this table, so macro_f1
+        # used to rebuild it 2K times -- sixteen passes over the data at eight
+        # classes to answer a question settled on the first.
+        self._confusion_matrix = MultiClassConfusionMatrix.of(
+            self._actual_column, self._predicted_column, self._n_classes
+        )
 
     def _check_predictions_are_known_classes(self) -> None:
         """Raise if the model named a class the table has no column for."""
@@ -244,9 +252,7 @@ class MultiClassEvaluation:
     @property
     def confusion_matrix(self) -> MultiClassConfusionMatrix:
         """The ``K x K`` table every metric below is derived from."""
-        return MultiClassConfusionMatrix.of(
-            self._actual_column, self._predicted_column, self._n_classes
-        )
+        return self._confusion_matrix
 
     @staticmethod
     def _ratio(numerator: int, denominator: int, undefined_because: str) -> float:
