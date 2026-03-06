@@ -40,7 +40,7 @@ root rather than from anywhere.
 | 5 | `polynomial_curves` | Fitting a curve without changing the model at all, and what rising degree costs on held-out data. |
 | 6 | `standardization` | Why a penalty and a learning rate care about units when least squares does not — and where leakage gets in. |
 | 7 | `model_selection` | The capstone: hold out, cross-validate, choose, refit, report once. |
-| 8 | `logistic_regression` | The same API pointed at a label instead of a quantity, and how to read a coefficient that multiplies the odds. |
+| 8 | `logistic_regression` | The same API pointed at a label instead of a quantity, how to read a coefficient that multiplies the odds, and two solvers arriving at one maximum 749 epochs apart. |
 | 9 | `classification_metrics` | Why accuracy is the wrong number on a rare class, and what moving the threshold buys and costs. |
 
 ## Supporting modules

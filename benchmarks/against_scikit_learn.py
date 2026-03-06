@@ -55,6 +55,7 @@ from oop_ml import (
     LassoRegression,
     LogisticRegression,
     MultipleLinearRegression,
+    NewtonLogisticRegression,
     PolynomialFeatures,
     RidgeRegression,
     Standardizer,
@@ -296,7 +297,38 @@ def _logistic(problem: ClassificationProblem) -> Comparison:
     )
 
     return Comparison(
-        "Logistic", problem.size, ours, theirs, _agreement(problem, ours, theirs)
+        "Logistic ascent",
+        problem.size,
+        ours,
+        theirs,
+        _agreement(problem, ours, theirs),
+    )
+
+
+def _newton_logistic(problem: ClassificationProblem) -> Comparison:
+    # The same objective and the same maximum as the row above, reached by a
+    # solver that uses the second derivative instead of a learning rate. Both
+    # of these are compared against the same scikit-learn call, so the two rows
+    # are directly readable against each other as well as against lbfgs.
+    ours = Timing.of(
+        lambda: NewtonLogisticRegression(tolerance=1e-10).fit(
+            problem.features, problem.label_feature
+        ),
+        repeats=1,
+    )
+    theirs = Timing.of(
+        lambda: ScikitLogisticRegression(C=np.inf, tol=1e-10, max_iter=5_000).fit(
+            problem.matrix, problem.label_values
+        ),
+        repeats=1,
+    )
+
+    return Comparison(
+        "Logistic Newton",
+        problem.size,
+        ours,
+        theirs,
+        _agreement(problem, ours, theirs),
     )
 
 
@@ -347,13 +379,15 @@ def run() -> Comparisons:
 
     for n_samples, n_features in MODEL_SIZES:
         problem = RegressionProblem(n_samples, n_features)
+        classification = ClassificationProblem(n_samples, n_features)
         comparisons.extend(
             [
                 _least_squares(problem),
                 _ridge(problem),
                 _lasso(problem),
                 _gradient_descent(problem),
-                _logistic(ClassificationProblem(n_samples, n_features)),
+                _logistic(classification),
+                _newton_logistic(classification),
                 _standardizer(problem),
             ]
         )
