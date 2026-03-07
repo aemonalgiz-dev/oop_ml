@@ -17,8 +17,10 @@ from oop_ml.model_selection.cross_validation import (
 )
 from oop_ml.model_selection.dataset import Dataset
 from oop_ml.model_selection.splitting import KFold
-from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
-from oop_ml.regression.ridge_regression import RidgeRegression
+from oop_ml.regression.least_squares.multiple_feature_regression import (
+    MultipleLinearRegression,
+)
+from oop_ml.regression.penalised.ridge_regression import RidgeRegression
 
 
 def exact_dataset(n_samples: int = 20) -> Dataset:

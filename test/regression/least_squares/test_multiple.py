@@ -17,7 +17,9 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     TooFewValuesError,
 )
-from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
+from oop_ml.regression.least_squares.multiple_feature_regression import (
+    MultipleLinearRegression,
+)
 from test.fixtures import (
     DISPLACED_PLANE,
     DISPLACED_PLANE_RESIDUAL_SUM_OF_SQUARES,
