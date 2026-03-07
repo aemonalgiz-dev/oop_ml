@@ -34,9 +34,9 @@ from pydantic import BaseModel, ConfigDict, PrivateAttr
 from oop_ml.core.classification_evaluation import ClassificationEvaluation
 from oop_ml.core.column import ColumnSource
 from oop_ml.core.evaluation import RegressionEvaluation
-from oop_ml.core.exceptions import NotFittedError
 from oop_ml.core.multiclass_evaluation import MultiClassEvaluation
-from oop_ml.core.types import FloatArray
+from oop_ml.exceptions import NotFittedError
+from oop_ml.types import FloatArray
 
 InputT = TypeVar("InputT")
 """What a model is fit and predicted *on*: raw values, or named features."""

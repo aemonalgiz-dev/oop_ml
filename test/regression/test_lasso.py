@@ -8,7 +8,7 @@ self-consistent.
 
 import pytest
 
-from oop_ml.core.exceptions import NotFittedError
+from oop_ml.exceptions import NotFittedError
 from oop_ml.regression.lasso_regression import LassoRegression
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 from oop_ml.regression.ridge_regression import RidgeRegression

@@ -16,7 +16,8 @@ import numpy as np
 import pytest
 
 from oop_ml.classification.logistic_regression import LogisticRegression
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
@@ -26,7 +27,6 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     SingleClassError,
 )
-from oop_ml.core.feature import Feature
 from test.fixtures import (
     OVERLAPPING_LABELS,
     OVERLAPPING_LABELS_BOUNDARY,

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import EmptyValuesError, InvalidValuesError
 from oop_ml.core.feature import Feature
+from oop_ml.exceptions import EmptyValuesError, InvalidValuesError
 
 
 class TestConstruction:

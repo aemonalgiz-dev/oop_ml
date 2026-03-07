@@ -89,11 +89,11 @@ from pydantic import Field, PrivateAttr
 from oop_ml.core.base import MultiClassClassifier
 from oop_ml.core.coefficients import Coefficient, Coefficients
 from oop_ml.core.column import Column
-from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
 from oop_ml.core.logistic import softmax
-from oop_ml.core.types import FloatArray
+from oop_ml.exceptions import InvalidValuesError
+from oop_ml.types import FloatArray
 
 
 class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feature]):

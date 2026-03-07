@@ -14,16 +14,16 @@ that made them differ would have computed something else entirely.
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.multiclass_evaluation import (
+    MultiClassConfusionMatrix,
+    MultiClassEvaluation,
+)
+from oop_ml.exceptions import (
     InvalidValuesError,
     NonBinaryLabelsError,
     NonEqualArrayLengthError,
     SingleClassError,
     UndefinedMetricError,
-)
-from oop_ml.core.multiclass_evaluation import (
-    MultiClassConfusionMatrix,
-    MultiClassEvaluation,
 )
 
 # actual, predicted -- three classes, laid out so every metric differs.

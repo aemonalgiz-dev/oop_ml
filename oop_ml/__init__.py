@@ -42,7 +42,14 @@ from oop_ml.core.classification_evaluation import (
 from oop_ml.core.coefficients import Coefficient, Coefficients
 from oop_ml.core.column import Column
 from oop_ml.core.evaluation import RegressionEvaluation
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.core.feature_set import FeatureSet
+from oop_ml.core.linear_model import LinearModel
+from oop_ml.core.multiclass_evaluation import (
+    MultiClassConfusionMatrix,
+    MultiClassEvaluation,
+)
+from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
@@ -55,20 +62,6 @@ from oop_ml.core.exceptions import (
     SingularHessianError,
     TooFewValuesError,
     UndefinedMetricError,
-)
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
-from oop_ml.core.linear_model import LinearModel
-from oop_ml.core.multiclass_evaluation import (
-    MultiClassConfusionMatrix,
-    MultiClassEvaluation,
-)
-from oop_ml.core.types import (
-    FloatArray,
-    IndexArray,
-    Numeric,
-    NumericInput,
-    NumericValues,
 )
 from oop_ml.model_selection.cross_validation import (
     CrossValidation,
@@ -91,6 +84,13 @@ from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 from oop_ml.regression.ridge_regression import RidgeRegression
 from oop_ml.regression.simple_linear_regression import SimpleLinearRegression
+from oop_ml.types import (
+    FloatArray,
+    IndexArray,
+    Numeric,
+    NumericInput,
+    NumericValues,
+)
 
 __all__ = [
     # Type aliases, for annotating your own code

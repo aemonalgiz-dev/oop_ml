@@ -3,12 +3,12 @@
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     EmptyValuesError,
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
 )
-from oop_ml.core.feature import Feature
 from oop_ml.model_selection.dataset import Dataset, DataSplit
 from test.fixtures import EXACT_PLANE
 

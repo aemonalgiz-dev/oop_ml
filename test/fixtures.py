@@ -16,7 +16,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from oop_ml.core.feature import Feature
-from oop_ml.core.types import NumericValues
+from oop_ml.types import NumericValues
 
 FIRST_PREDICTOR: NumericValues = [1, 1, 2, 0, 3]
 SECOND_PREDICTOR: NumericValues = [1, 2, 2, 1, 0]

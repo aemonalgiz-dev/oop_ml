@@ -91,8 +91,8 @@ from pydantic import Field
 
 from oop_ml.core.column import Column
 from oop_ml.core.iterative_solver import IterativeSolver
-from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
+from oop_ml.types import FloatArray
 
 
 class GradientDescentRegression(IterativeSolver, LinearFeatureRegressor):

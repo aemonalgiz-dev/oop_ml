@@ -23,8 +23,8 @@ from pydantic import PrivateAttr
 
 from oop_ml.core.base import Regressor
 from oop_ml.core.column import Column
-from oop_ml.core.types import FloatArray, NumericInput
-from oop_ml.core.validation import ValueRole
+from oop_ml.types import FloatArray, NumericInput
+from oop_ml.validation import ValueRole
 
 MINIMUM_SAMPLES = 2
 """Two points determine a line, and anything fewer cannot pin down a slope."""

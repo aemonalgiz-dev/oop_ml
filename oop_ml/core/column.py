@@ -14,7 +14,7 @@ boundary. Hand it raw input and it validates, hand it a :class:`Column` and it
 hands the very same object straight back, so passing a validated column down
 through three layers costs nothing at all.
 
-A column also carries its own :class:`~oop_ml.core.validation.ValueRole`, which
+A column also carries its own :class:`~oop_ml.validation.ValueRole`, which
 means a guard that fails can name the offending input without every caller
 having to thread a label along behind it.
 
@@ -30,8 +30,8 @@ from typing import Protocol, TypeAlias, cast
 
 import numpy as np
 
-from oop_ml.core.types import FloatArray, NumericInput
-from oop_ml.core.validation import (
+from oop_ml.types import FloatArray, NumericInput
+from oop_ml.validation import (
     ValueRole,
     check_equal_length,
     check_has_both_classes,
@@ -181,11 +181,11 @@ class Column:
         return float(np.sqrt(self.sum_of_squared_deviations / self.n_samples))
 
     def check_has_variance(self) -> None:
-        """Raise :class:`~oop_ml.core.exceptions.AllSameValuesError` if constant."""
+        """Raise :class:`~oop_ml.exceptions.AllSameValuesError` if constant."""
         check_has_variance(self._values, self._role)
 
     def check_is_binary(self) -> None:
-        """Raise :class:`~oop_ml.core.exceptions.NonBinaryLabelsError` unless 0/1.
+        """Raise :class:`~oop_ml.exceptions.NonBinaryLabelsError` unless 0/1.
 
         A fitting rule rather than a structural one, in the same way as
         :meth:`check_has_variance`, so it is asked for by the classifier that
@@ -213,11 +213,11 @@ class Column:
         return int(np.unique(self._values).size)
 
     def check_has_both_classes(self) -> None:
-        """Raise :class:`~oop_ml.core.exceptions.SingleClassError` if one-sided."""
+        """Raise :class:`~oop_ml.exceptions.SingleClassError` if one-sided."""
         check_has_both_classes(self._values, self._role)
 
     def check_min_length(self, minimum_length: int) -> None:
-        """Raise :class:`~oop_ml.core.exceptions.TooFewValuesError` if too short."""
+        """Raise :class:`~oop_ml.exceptions.TooFewValuesError` if too short."""
         check_min_length(self._values, minimum_length, self._role)
 
     def check_equal_length(self, other: Column) -> None:

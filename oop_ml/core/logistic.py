@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from oop_ml.core.types import FloatArray
+from oop_ml.types import FloatArray
 
 
 def sigmoid(linear_predictor: FloatArray) -> FloatArray:
