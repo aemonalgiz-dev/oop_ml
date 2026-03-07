@@ -7,14 +7,14 @@ object rather than free functions, so this is where their behaviour is pinned.
 import numpy as np
 import pytest
 
-from oop_ml.data.column import Column
-from oop_ml.evaluation.regression import RegressionEvaluation
-from oop_ml.exceptions import (
+from oop_ml.core.data.column import Column
+from oop_ml.core.evaluation.regression import RegressionEvaluation
+from oop_ml.core.exceptions import (
     EmptyValuesError,
     NonEqualArrayLengthError,
     UndefinedMetricError,
 )
-from oop_ml.validation import ValueRole
+from oop_ml.core.validation import ValueRole
 
 
 class TestConstruction:

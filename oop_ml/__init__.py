@@ -18,15 +18,6 @@ whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
 
-from oop_ml.base.estimator import (
-    Classifier,
-    Estimator,
-    Fittable,
-    MultiClassClassifier,
-    Regressor,
-    Transformer,
-)
-from oop_ml.base.linear_model import LinearModel
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic_regression import LogisticRegression
 from oop_ml.classification.multinomial_logistic_regression import (
@@ -36,20 +27,29 @@ from oop_ml.classification.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
 from oop_ml.classification.one_vs_rest import OneVsRestClassifier
-from oop_ml.data.coefficients import Coefficient, Coefficients
-from oop_ml.data.column import Column
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.evaluation.classification import (
+from oop_ml.core.base.estimator import (
+    Classifier,
+    Estimator,
+    Fittable,
+    MultiClassClassifier,
+    Regressor,
+    Transformer,
+)
+from oop_ml.core.base.linear_model import LinearModel
+from oop_ml.core.data.coefficients import Coefficient, Coefficients
+from oop_ml.core.data.column import Column
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
 )
-from oop_ml.evaluation.multiclass import (
+from oop_ml.core.evaluation.multiclass import (
     MultiClassConfusionMatrix,
     MultiClassEvaluation,
 )
-from oop_ml.evaluation.regression import RegressionEvaluation
-from oop_ml.exceptions import (
+from oop_ml.core.evaluation.regression import RegressionEvaluation
+from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
@@ -62,6 +62,13 @@ from oop_ml.exceptions import (
     SingularHessianError,
     TooFewValuesError,
     UndefinedMetricError,
+)
+from oop_ml.core.types import (
+    FloatArray,
+    IndexArray,
+    Numeric,
+    NumericInput,
+    NumericValues,
 )
 from oop_ml.model_selection.cross_validation import (
     CrossValidation,
@@ -84,13 +91,6 @@ from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 from oop_ml.regression.ridge_regression import RidgeRegression
 from oop_ml.regression.simple_linear_regression import SimpleLinearRegression
-from oop_ml.types import (
-    FloatArray,
-    IndexArray,
-    Numeric,
-    NumericInput,
-    NumericValues,
-)
 
 __all__ = [
     # Type aliases, for annotating your own code

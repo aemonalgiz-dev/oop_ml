@@ -110,12 +110,12 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 
-from oop_ml.base.iterative_solver import IterativeSolver
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic import sigmoid
-from oop_ml.data.column import Column
-from oop_ml.exceptions import SingularHessianError
-from oop_ml.types import FloatArray
+from oop_ml.core.base.iterative_solver import IterativeSolver
+from oop_ml.core.data.column import Column
+from oop_ml.core.exceptions import SingularHessianError
+from oop_ml.core.types import FloatArray
 
 
 class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
@@ -142,7 +142,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         The probability above which a row is called positive. Defaults to 0.5,
         the point where the log-odds are zero.
     fit_intercept:
-        Inherited from :class:`~oop_ml.base.linear_model.LinearModel`.
+        Inherited from :class:`~oop_ml.core.base.linear_model.LinearModel`.
     """
 
     max_iterations: int = Field(default=100, gt=0)
@@ -177,7 +177,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         Wired rather than left as a stub because the interesting part is the
         failure. ``numpy`` reports a singular system by raising ``LinAlgError``,
         which is the one exception in this library that would otherwise escape
-        the :class:`~oop_ml.exceptions.MLLibError` hierarchy, so a caller
+        the :class:`~oop_ml.core.exceptions.MLLibError` hierarchy, so a caller
         could not route it with the rest.
 
         Parameters

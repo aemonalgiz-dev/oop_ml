@@ -2,8 +2,8 @@
 
 import pytest
 
-from oop_ml.data.coefficients import Coefficient, Coefficients
-from oop_ml.exceptions import (
+from oop_ml.core.data.coefficients import Coefficient, Coefficients
+from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonUniqueFeaturesError,

@@ -37,12 +37,12 @@ from typing import Self
 import numpy as np
 from pydantic import ConfigDict, PrivateAttr
 
-from oop_ml.base.estimator import MultiClassClassifier
 from oop_ml.classification.linear_classifier import LinearClassifier
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.exceptions import InvalidValuesError
-from oop_ml.types import FloatArray
+from oop_ml.core.base.estimator import MultiClassClassifier
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.types import FloatArray
 
 
 class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):

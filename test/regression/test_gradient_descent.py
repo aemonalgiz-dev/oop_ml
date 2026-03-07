@@ -8,8 +8,8 @@ difference between the two.
 import numpy as np
 import pytest
 
-from oop_ml.data.feature import Feature
-from oop_ml.exceptions import NotFittedError
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.exceptions import NotFittedError
 from oop_ml.regression.gradient_descent_regression import GradientDescentRegression
 from test.fixtures import EXACT_PLANE, ORIGIN_PLANE
 

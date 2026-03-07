@@ -31,12 +31,14 @@ from typing import Generic, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from oop_ml.data.column import ColumnSource
-from oop_ml.evaluation.classification import ClassificationEvaluation
-from oop_ml.evaluation.multiclass import MultiClassEvaluation
-from oop_ml.evaluation.regression import RegressionEvaluation
-from oop_ml.exceptions import NotFittedError
-from oop_ml.types import FloatArray
+from oop_ml.core.data.column import ColumnSource
+from oop_ml.core.evaluation.classification import (
+    ClassificationEvaluation,
+)
+from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
+from oop_ml.core.evaluation.regression import RegressionEvaluation
+from oop_ml.core.exceptions import NotFittedError
+from oop_ml.core.types import FloatArray
 
 InputT = TypeVar("InputT")
 """What a model is fit and predicted *on*: raw values, or named features."""
@@ -45,7 +47,7 @@ TargetT = TypeVar("TargetT", bound=ColumnSource)
 """What a model is fit against.
 
 This one is bounded rather than free, because every target eventually has to
-become a :class:`~oop_ml.data.column.Column` in order to be scored, and raw
+become a :class:`~oop_ml.core.data.column.Column` in order to be scored, and raw
 values, a ``Column``, and a ``Feature`` can all manage that.
 """
 
@@ -144,8 +146,8 @@ class Classifier(Estimator[InputT, TargetT]):
     row at 0.51 is a very different thing from a row at 0.99 even though the two
     get the same label.
 
-    Scoring differs as well. R^2 is meaningless on labels, so ``evaluate``
-    returns a :class:`~oop_ml.evaluation.classification.ClassificationEvaluation`
+    Scoring differs as well. R^2 is meaningless on labels, so ``evaluate`` returns a
+    :class:`~oop_ml.core.evaluation.classification.ClassificationEvaluation`
     built on a confusion matrix instead.
     """
 

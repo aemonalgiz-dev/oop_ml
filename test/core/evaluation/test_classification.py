@@ -10,11 +10,11 @@ positives, and the unbalanced case where accuracy flatters a useless classifier.
 
 import pytest
 
-from oop_ml.evaluation.classification import (
+from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
 )
-from oop_ml.exceptions import (
+from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonBinaryLabelsError,

@@ -18,9 +18,9 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.types import IndexArray
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.types import IndexArray
 
 
 class Dataset:

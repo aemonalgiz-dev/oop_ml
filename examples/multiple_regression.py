@@ -1,10 +1,9 @@
 """Several predictors, and why the library insists they carry names.
 
-``MultipleLinearRegression`` takes ``Sequence[Feature]`` rather than a matrix.
-That is the central API decision in the library, and this example is where it
-pays: the learned weights come back as
-:class:`~oop_ml.data.coefficients.Coefficients`, keyed by the name of the column that
-produced them, and ``predict`` matches by name too.
+``MultipleLinearRegression`` takes ``Sequence[Feature]`` rather than a matrix. That is
+the central API decision in the library, and this example is where it pays: the learned
+weights come back as :class:`~oop_ml.core.data.coefficients.Coefficients`,
+keyed by the name of the column that produced them, and ``predict`` matches by name too.
 
 So reordering the features between fit and predict is harmless here, where in an
 array-in/array-out library it silently produces confident nonsense. The last

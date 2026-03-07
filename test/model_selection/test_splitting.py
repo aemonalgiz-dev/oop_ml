@@ -9,8 +9,8 @@ the tests check it directly rather than checking sizes alone.
 import numpy as np
 import pytest
 
-from oop_ml.data.feature import Feature
-from oop_ml.exceptions import EmptyValuesError, TooFewValuesError
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.exceptions import EmptyValuesError, TooFewValuesError
 from oop_ml.model_selection.dataset import Dataset
 from oop_ml.model_selection.splitting import (
     KFold,

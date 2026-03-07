@@ -3,16 +3,16 @@
 import numpy as np
 import pytest
 
-from oop_ml.data.column import Column
-from oop_ml.data.feature import Feature
-from oop_ml.exceptions import (
+from oop_ml.core.data.column import Column
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
     NonEqualArrayLengthError,
     TooFewValuesError,
 )
-from oop_ml.validation import ValueRole
+from oop_ml.core.validation import ValueRole
 
 
 def make_column(values: list[float] | None = None) -> Column:

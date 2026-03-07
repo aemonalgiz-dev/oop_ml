@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from oop_ml.exceptions import (
+from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,

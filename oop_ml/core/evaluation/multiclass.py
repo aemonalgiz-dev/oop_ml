@@ -37,10 +37,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from oop_ml.data.column import Column, ColumnSource
-from oop_ml.exceptions import InvalidValuesError, UndefinedMetricError
-from oop_ml.types import FloatArray, IndexArray
-from oop_ml.validation import ValueRole
+from oop_ml.core.data.column import Column, ColumnSource
+from oop_ml.core.exceptions import InvalidValuesError, UndefinedMetricError
+from oop_ml.core.types import FloatArray, IndexArray
+from oop_ml.core.validation import ValueRole
 
 
 class MultiClassConfusionMatrix:
@@ -154,7 +154,7 @@ class MultiClassEvaluation:
     """What a multi-class classifier predicted, against what actually happened.
 
     A sibling of
-    :class:`~oop_ml.evaluation.classification.ClassificationEvaluation`
+    :class:`~oop_ml.core.evaluation.classification.ClassificationEvaluation`
     rather than a generalisation of it, for the same reason that one is a
     sibling of the regression evaluation: the binary object hands back a single
     precision, and no caller who wants one number would accept a vector.

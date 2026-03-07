@@ -8,8 +8,8 @@ through-the-origin plane for the no-intercept path.
 import numpy as np
 import pytest
 
-from oop_ml.data.feature import Feature
-from oop_ml.exceptions import (
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonEqualArrayLengthError,
