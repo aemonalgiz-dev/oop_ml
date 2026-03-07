@@ -94,7 +94,7 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 
-from oop_ml.core.column import Column
+from oop_ml.data.column import Column
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 from oop_ml.types import FloatArray
 

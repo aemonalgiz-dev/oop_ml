@@ -12,7 +12,7 @@ That shared part lives here, including the fitting skeleton itself. An earlier
 version of this module argued that it should say nothing about the target at
 all, on the grounds that least squares fits against a number while logistic
 regression fits against a label. That reasoning confused two different things.
-Both of them fit against a :class:`~oop_ml.core.column.Column`; what differs is
+Both of them fit against a :class:`~oop_ml.data.column.Column`; what differs is
 only which *constraints* that column has to satisfy, and a single abstract hook
 covers that. Holding the line cost three byte-identical copies of ``fit``, one
 per concrete frame, which is a worse trade than the one it was avoiding.
@@ -38,10 +38,10 @@ import numpy as np
 from pydantic import PrivateAttr
 
 from oop_ml.core.base import Fittable
-from oop_ml.core.coefficients import Coefficient, Coefficients
-from oop_ml.core.column import Column
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
+from oop_ml.data.coefficients import Coefficient, Coefficients
+from oop_ml.data.column import Column
+from oop_ml.data.feature import Feature
+from oop_ml.data.feature_set import FeatureSet
 from oop_ml.exceptions import InvalidValuesError
 from oop_ml.types import FloatArray
 
@@ -68,7 +68,7 @@ class LinearModel(Fittable):
         """The learned weights, available once ``fit`` has run.
 
         You can read one by name, as in ``model.coefficients["age"]``, or
-        iterate the :class:`~oop_ml.core.coefficients.Coefficient` objects
+        iterate the :class:`~oop_ml.data.coefficients.Coefficient` objects
         themselves. The collection is immutable, so handing it out to a caller
         cannot corrupt the fitted state.
 
@@ -121,7 +121,7 @@ class LinearModel(Fittable):
         """The target as a column, checked against whatever the task requires.
 
         The seam between the two frames built on this class. The default is the
-        regression answer -- a :class:`~oop_ml.core.column.Column` is already
+        regression answer -- a :class:`~oop_ml.data.column.Column` is already
         numeric, finite and non-empty, and least squares asks nothing further of
         it. Classification overrides this to insist on 0/1 labels with both
         classes present.

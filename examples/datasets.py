@@ -6,7 +6,7 @@ into a plausibility argument. Generating the data means the truth is available
 to print beside the estimate, so a reader watches recovery happen rather than
 taking it on faith.
 
-The truth is carried as :class:`~oop_ml.core.coefficients.Coefficients` -- the same type
+The truth is carried as :class:`~oop_ml.data.coefficients.Coefficients` -- the same type
 the models learn -- so the comparison is like against like rather than a bare
 dict against an object.
 """

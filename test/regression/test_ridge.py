@@ -6,7 +6,7 @@ with the intercept slot of ``I`` zeroed, and checked against a reference solve.
 
 import pytest
 
-from oop_ml.core.feature import Feature
+from oop_ml.data.feature import Feature
 from oop_ml.exceptions import NotFittedError
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 from oop_ml.regression.ridge_regression import RidgeRegression

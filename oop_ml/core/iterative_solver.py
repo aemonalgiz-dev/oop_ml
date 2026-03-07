@@ -52,8 +52,8 @@ from abc import abstractmethod
 import numpy as np
 from pydantic import Field, PrivateAttr
 
-from oop_ml.core.column import Column
 from oop_ml.core.linear_model import LinearModel
+from oop_ml.data.column import Column
 from oop_ml.types import FloatArray
 
 
