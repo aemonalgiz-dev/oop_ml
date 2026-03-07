@@ -10,7 +10,7 @@ positives, and the unbalanced case where accuracy flatters a useless classifier.
 
 import pytest
 
-from oop_ml.core.classification_evaluation import (
+from oop_ml.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
 )

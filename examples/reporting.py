@@ -24,9 +24,9 @@ side effects, which is what lets the test suite run every ``main()`` without
 each one fighting over the root logger.
 
 :class:`Report` is an object rather than a module of functions for the same
-reason :class:`~oop_ml.core.evaluation.RegressionEvaluation` is: the logger is state the
-formatting needs, and passing it to every call would be a parameter every caller
-has to remember.
+reason :class:`~oop_ml.evaluation.regression.RegressionEvaluation` is: the
+logger is state the formatting needs, and passing it to every call would be a
+parameter every caller has to remember.
 """
 
 from __future__ import annotations

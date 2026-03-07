@@ -139,7 +139,7 @@ class ConfusionMatrix:
 class ClassificationEvaluation:
     """What a classifier predicted, against what actually happened.
 
-    The counterpart to :class:`~oop_ml.core.evaluation.RegressionEvaluation`,
+    The counterpart to :class:`~oop_ml.evaluation.regression.RegressionEvaluation`,
     and deliberately a sibling of it rather than a subclass. The two share the
     idea of pairing predictions with truth and nothing else; there is no metric
     they have in common, and no caller who wants one would accept the other.

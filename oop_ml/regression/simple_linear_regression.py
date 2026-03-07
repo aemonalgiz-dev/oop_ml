@@ -12,9 +12,10 @@ Aligned onto the shared ``core`` frame:
   module never coerces an array itself, and the mean/deviation arithmetic the
   slope needs is asked of the column rather than recomputed here;
 * metrics are not re-exposed here. ``evaluate(input_values, actual_values)``
-  returns a :class:`~oop_ml.core.evaluation.RegressionEvaluation` carrying residuals,
-  RSS, MSE, TSS and R^2 off a single ``predict``, so that there is one way to
-  ask the question and every other regressor answers it identically.
+  returns a :class:`~oop_ml.evaluation.regression.RegressionEvaluation`
+  carrying residuals, RSS, MSE, TSS and R^2 off a single ``predict``, so that
+  there is one way to ask the question and every other regressor answers it
+  identically.
 """
 
 from typing import Self

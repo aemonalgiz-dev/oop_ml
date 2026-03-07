@@ -154,7 +154,7 @@ class MultiClassEvaluation:
     """What a multi-class classifier predicted, against what actually happened.
 
     A sibling of
-    :class:`~oop_ml.core.classification_evaluation.ClassificationEvaluation`
+    :class:`~oop_ml.evaluation.classification.ClassificationEvaluation`
     rather than a generalisation of it, for the same reason that one is a
     sibling of the regression evaluation: the binary object hands back a single
     precision, and no caller who wants one number would accept a vector.

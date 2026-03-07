@@ -7,8 +7,8 @@ object rather than free functions, so this is where their behaviour is pinned.
 import numpy as np
 import pytest
 
-from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.data.column import Column
+from oop_ml.evaluation.regression import RegressionEvaluation
 from oop_ml.exceptions import (
     EmptyValuesError,
     NonEqualArrayLengthError,

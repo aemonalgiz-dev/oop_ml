@@ -14,7 +14,7 @@ that made them differ would have computed something else entirely.
 import numpy as np
 import pytest
 
-from oop_ml.core.multiclass_evaluation import (
+from oop_ml.evaluation.multiclass import (
     MultiClassConfusionMatrix,
     MultiClassEvaluation,
 )
