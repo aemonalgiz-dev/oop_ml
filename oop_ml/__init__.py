@@ -18,6 +18,15 @@ whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
 
+from oop_ml.base.estimator import (
+    Classifier,
+    Estimator,
+    Fittable,
+    MultiClassClassifier,
+    Regressor,
+    Transformer,
+)
+from oop_ml.base.linear_model import LinearModel
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic_regression import LogisticRegression
 from oop_ml.classification.multinomial_logistic_regression import (
@@ -27,15 +36,6 @@ from oop_ml.classification.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
 from oop_ml.classification.one_vs_rest import OneVsRestClassifier
-from oop_ml.core.base import (
-    Classifier,
-    Estimator,
-    Fittable,
-    MultiClassClassifier,
-    Regressor,
-    Transformer,
-)
-from oop_ml.core.linear_model import LinearModel
 from oop_ml.data.coefficients import Coefficient, Coefficients
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature

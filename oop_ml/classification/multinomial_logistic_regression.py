@@ -86,8 +86,8 @@ from typing import Self
 import numpy as np
 from pydantic import Field, PrivateAttr
 
-from oop_ml.core.base import MultiClassClassifier
-from oop_ml.core.logistic import softmax
+from oop_ml.base.estimator import MultiClassClassifier
+from oop_ml.classification.logistic import softmax
 from oop_ml.data.coefficients import Coefficient, Coefficients
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature

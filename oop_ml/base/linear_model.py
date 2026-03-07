@@ -37,7 +37,7 @@ from typing import Self
 import numpy as np
 from pydantic import PrivateAttr
 
-from oop_ml.core.base import Fittable
+from oop_ml.base.estimator import Fittable
 from oop_ml.data.coefficients import Coefficient, Coefficients
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature

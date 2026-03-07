@@ -110,9 +110,9 @@ from __future__ import annotations
 import numpy as np
 from pydantic import Field
 
+from oop_ml.base.iterative_solver import IterativeSolver
 from oop_ml.classification.linear_classifier import LinearClassifier
-from oop_ml.core.iterative_solver import IterativeSolver
-from oop_ml.core.logistic import sigmoid
+from oop_ml.classification.logistic import sigmoid
 from oop_ml.data.column import Column
 from oop_ml.exceptions import SingularHessianError
 from oop_ml.types import FloatArray
@@ -142,7 +142,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         The probability above which a row is called positive. Defaults to 0.5,
         the point where the log-odds are zero.
     fit_intercept:
-        Inherited from :class:`~oop_ml.core.linear_model.LinearModel`.
+        Inherited from :class:`~oop_ml.base.linear_model.LinearModel`.
     """
 
     max_iterations: int = Field(default=100, gt=0)
@@ -162,9 +162,9 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
     def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
         """Map the linear predictor onto a probability.
 
-        Delegates to :func:`~oop_ml.core.logistic.sigmoid`, which is shared with
-        the gradient-ascent model so that the overflow-safe spelling of it lives
-        in exactly one place.
+        Delegates to :func:`~oop_ml.classification.logistic.sigmoid`, shared
+        with the gradient-ascent model so that the overflow-safe spelling of it
+        lives in exactly one place.
         """
         return sigmoid(linear_predictor)
 

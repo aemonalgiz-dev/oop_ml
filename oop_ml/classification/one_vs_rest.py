@@ -37,8 +37,8 @@ from typing import Self
 import numpy as np
 from pydantic import ConfigDict, PrivateAttr
 
+from oop_ml.base.estimator import MultiClassClassifier
 from oop_ml.classification.linear_classifier import LinearClassifier
-from oop_ml.core.base import MultiClassClassifier
 from oop_ml.data.feature import Feature
 from oop_ml.data.feature_set import FeatureSet
 from oop_ml.exceptions import InvalidValuesError
