@@ -38,7 +38,7 @@ binary model::
     max | softmax_class1 - sigmoid(X (b1 - b0)) |  =  2.2e-16
 
 Two softmax weight vectors reduce to one sigmoid applied to their difference,
-so :class:`~oop_ml.classification.logistic_regression.LogisticRegression` is
+so :class:`~oop_ml.classification.binary.logistic_regression.LogisticRegression` is
 the ``K = 2`` special case of this and not a separate idea.
 
 The parameters are not unique

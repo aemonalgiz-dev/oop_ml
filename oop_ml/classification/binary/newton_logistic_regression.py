@@ -2,7 +2,7 @@
 
 Theory
 ------
-:class:`~oop_ml.classification.logistic_regression.LogisticRegression` walks
+:class:`~oop_ml.classification.binary.logistic_regression.LogisticRegression` walks
 uphill knowing only which way is up. Ask it how far to step and it cannot say,
 which is precisely what a learning rate is: a hyperparameter standing in for
 information the method does not have.
@@ -122,7 +122,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
     """Logistic regression by Newton-Raphson, equivalently IRLS.
 
     Fits the same boundary as
-    :class:`~oop_ml.classification.logistic_regression.LogisticRegression` and
+    :class:`~oop_ml.classification.binary.logistic_regression.LogisticRegression` and
     reaches it in single-digit iterations rather than hundreds of epochs,
     because it uses the second derivative to choose the length of each step
     instead of being told.
