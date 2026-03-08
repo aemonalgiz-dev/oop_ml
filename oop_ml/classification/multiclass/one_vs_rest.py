@@ -57,7 +57,7 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
         harmless for the same reason.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     binary_model: LinearClassifier
 

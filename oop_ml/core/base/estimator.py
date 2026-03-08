@@ -61,8 +61,20 @@ class Fittable(BaseModel):
     own slightly different version of it.
     """
 
-    # Learned parameters are numpy scalars/arrays, so allow arbitrary types.
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    # arbitrary_types_allowed: learned parameters are numpy scalars and arrays.
+    #
+    # extra="forbid": pydantic's default is to ignore a keyword it does not
+    # recognise, and for hyperparameters that default is dangerous rather than
+    # merely lax. A misspelled name does not raise, it silently leaves the
+    # field at its default -- and a default is by construction a plausible
+    # number, so the model fits, scores, and reports something that looks
+    # entirely reasonable while answering a different question. Writing
+    # RidgeRegression(alpha=2.0), which is scikit-learn's spelling of penalty,
+    # would fit an unpenalised model and say nothing about it. This is not
+    # hypothetical: an example in this repository was written with
+    # TrainTestSplitter(testing_share=...) against a field named
+    # test_fraction, and ran quietly on the wrong split.
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     _fitted: bool = PrivateAttr(default=False)
 
