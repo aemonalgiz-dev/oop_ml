@@ -30,14 +30,13 @@ best mean held-out score. Nothing in the derivations gives you those numbers,
 because they depend on the noise level and the collinearity of *your* data --
 quantities you do not know and cannot compute directly.
 
-A warning this design does not yet enforce
-------------------------------------------
-Anything *learned* from the data must be learned inside the fold. Standardizing
-before splitting lets the training rows see the test rows' mean, which is
-leakage, and it flatters every score computed afterwards. Until a pipeline
-object exists to make that structural, the caller has to fit the
-:class:`~oop_ml.preprocessing.standardizer.Standardizer` on ``split.training`` and only
-transform ``split.testing``.
+A warning this design does not yet enforce ------------------------------------------
+Anything *learned* from the data must be learned inside the fold. Standardizing before
+splitting lets the training rows see the test rows' mean, which is leakage, and it
+flatters every score computed afterwards. Until a pipeline object exists to make that
+structural, the caller has to fit the
+:class:`~oop_ml.preprocessing.standardization.standardizer.Standardizer` on
+``split.training`` and only transform ``split.testing``.
 """
 
 from __future__ import annotations

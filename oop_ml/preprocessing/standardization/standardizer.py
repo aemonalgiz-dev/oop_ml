@@ -82,7 +82,7 @@ from oop_ml.core.base.estimator import Transformer
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.preprocessing.scaling import FeatureScaling, FeatureScalings
+from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
 
 
 class Standardizer(Transformer[Sequence[Feature]]):
@@ -98,9 +98,10 @@ class Standardizer(Transformer[Sequence[Feature]]):
     def scalings(self) -> FeatureScalings:
         """The statistics learned per feature (available after ``fit``).
 
-        You can read one by name, as in ``standardizer.scalings["age"].mean``,
-        or iterate the
-        :class:`~oop_ml.preprocessing.scaling.FeatureScaling` objects directly.
+        You can read one by name, as in ``standardizer.scalings["age"].mean``, or
+        iterate the
+        :class:`~oop_ml.preprocessing.standardization.scaling.FeatureScaling` objects
+        directly.
 
         Raises
         ------
@@ -174,7 +175,7 @@ class Standardizer(Transformer[Sequence[Feature]]):
         standardized, its spread being zero. Then pair each feature's name with the
         statistics its :class:`~oop_ml.core.data.column.Column` already knows
         how to compute, and store the result as a
-        :class:`~oop_ml.preprocessing.scaling.FeatureScalings`.
+        :class:`~oop_ml.preprocessing.standardization.scaling.FeatureScalings`.
 
         Returns
         -------
@@ -207,10 +208,9 @@ class Standardizer(Transformer[Sequence[Feature]]):
 
         Match features to scalings by name and never by position, so that the caller may
         pass them in any order, which is the same contract ``predict`` follows. Ask each
-        :class:`~oop_ml.preprocessing.scaling.FeatureScaling` to do the arithmetic
-        rather than repeating the formula here, and return new
-        :class:`~oop_ml.core.data.feature.Feature` objects keeping their
-        original names.
+        :class:`~oop_ml.preprocessing.standardization.scaling.FeatureScaling` to do the
+        arithmetic rather than repeating the formula here, and return new
+        :class:`~oop_ml.core.data.feature.Feature` objects keeping their original names.
 
         Returns
         -------

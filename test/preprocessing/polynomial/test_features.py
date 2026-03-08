@@ -17,7 +17,7 @@ from oop_ml.core.exceptions import (
     NonUniqueFeaturesError,
     NotFittedError,
 )
-from oop_ml.preprocessing.polynomial_features import PolynomialFeatures
+from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.regression.least_squares.multiple_feature_regression import (
     MultipleLinearRegression,
 )

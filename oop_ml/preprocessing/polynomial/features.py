@@ -8,10 +8,10 @@ are perfectly ordinary columns, and fitting::
 
     y = b0 + b1*x + b2*x**2 + b3*x**3
 
-is still solving ``X.T X b = X.T y``. Nothing about the estimator changes. What
-changes is the design matrix handed to it, which is why this belongs in
-preprocessing beside :class:`~oop_ml.preprocessing.standardizer.Standardizer` rather
-than in ``regression``.
+is still solving ``X.T X b = X.T y``. Nothing about the estimator changes. What changes
+is the design matrix handed to it, which is why this belongs in preprocessing beside
+:class:`~oop_ml.preprocessing.standardization.standardizer.Standardizer` rather than in
+``regression``.
 
 That single observation buys curves out of a straight-line model, and it
 generalises: any transform of the inputs is fair game. Polynomials are simply
@@ -50,13 +50,13 @@ training point and is useless between them: test R^2 has fallen from 0.9907 to
 0.8583. The training score cannot see any of this happening, since it improves
 the whole way down, and that is the entire argument for held-out evaluation.
 
-Degree is therefore a complexity dial, and turning it up always improves the fit
-you can measure while eventually destroying the one you care about. Pair it with
+Degree is therefore a complexity dial, and turning it up always improves the fit you can
+measure while eventually destroying the one you care about. Pair it with
 :class:`~oop_ml.regression.penalised.ridge_regression.RidgeRegression` or
 :class:`~oop_ml.regression.penalised.lasso_regression.LassoRegression` to keep the extra
 freedom in check, and with
-:class:`~oop_ml.preprocessing.standardizer.Standardizer` because ``x ** 9`` on raw
-units produces columns whose scales differ by orders of magnitude.
+:class:`~oop_ml.preprocessing.standardization.standardizer.Standardizer` because ``x **
+9`` on raw units produces columns whose scales differ by orders of magnitude.
 """
 
 from __future__ import annotations
@@ -72,7 +72,7 @@ from oop_ml.core.base.estimator import Transformer
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
+from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
 
 
 class PolynomialFeatures(Transformer[Sequence[Feature]]):
@@ -156,7 +156,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
 
         ``collections.Counter`` does the counting and is already a
         ``Mapping[str, int]``, so it can be handed straight to
-        :class:`~oop_ml.preprocessing.polynomial.PolynomialTerm`.
+        :class:`~oop_ml.preprocessing.polynomial.terms.PolynomialTerm`.
         """
         return PolynomialTerm(Counter(repeated_names))
 
@@ -192,7 +192,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
            different arrangement, so no term is duplicated.
         3. Keep the ones :meth:`_is_wanted` accepts, turn each into a term with
            :meth:`_term_for`, and hand the list to
-           :class:`~oop_ml.preprocessing.polynomial.PolynomialTerms`.
+           :class:`~oop_ml.preprocessing.polynomial.terms.PolynomialTerms`.
         """
         terms_to_build = []
 

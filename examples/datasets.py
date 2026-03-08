@@ -240,7 +240,7 @@ def quadratic_curve(
     """A genuinely curved relationship: ``y = 5 - 4x + 1.5x^2 + noise``.
 
     Handed back with the single column ``x``. Recovering the curve is the job of
-    :class:`~oop_ml.preprocessing.polynomial_features.PolynomialFeatures`, which is the
+    :class:`~oop_ml.preprocessing.polynomial.features.PolynomialFeatures`, which is the
     whole point of the example that uses this.
     """
     generator = np.random.default_rng(random_seed)

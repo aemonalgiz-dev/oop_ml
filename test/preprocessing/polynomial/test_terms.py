@@ -9,7 +9,7 @@ from oop_ml.core.exceptions import (
     InvalidValuesError,
     NonUniqueFeaturesError,
 )
-from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
+from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
 
 INPUT_FEATURES = [Feature("x1", [1, 2, 3]), Feature("x2", [4, 5, 6])]
 
