@@ -459,3 +459,79 @@ def iris_like_species(
         float("nan"),
         Coefficients([Coefficient("sepal_length", float("nan"))]),
     )
+
+
+def concentric_rings(sample_count: int = 400, random_seed: int = 7) -> Dataset:
+    """Two classes, one enclosing the other, so no straight line separates them.
+
+    There are no true coefficients to carry here, which is the point: the
+    boundary is a circle, and a circle is not a hyperplane at any intercept.
+    Logistic regression on these columns cannot do better than chance, and it
+    fails without complaint -- it fits, it converges, and it is wrong. A
+    neighbour model needs no boundary at all and reads the shape straight off
+    the rows.
+
+    The two rings are deliberately given enough spread to overlap. Cleanly
+    separated ones make the point about shape and then hide the one about
+    ``k``: every value from 1 to 15 scores a perfect 1.0, and a table of
+    identical numbers teaches nothing about a bias-variance trade.
+
+    Returned as a bare :class:`~oop_ml.model_selection.dataset.Dataset` rather
+    than a ``SyntheticClassification`` for that reason. There is nothing to
+    print in a "truth" column.
+    """
+    generator = np.random.default_rng(random_seed)
+
+    inner_count = sample_count // 2
+    outer_count = sample_count - inner_count
+
+    angles = generator.uniform(0.0, 2.0 * np.pi, size=sample_count)
+    radii = np.concatenate(
+        [
+            generator.normal(loc=1.0, scale=0.70, size=inner_count),
+            generator.normal(loc=2.6, scale=0.70, size=outer_count),
+        ]
+    )
+    labels = np.concatenate([np.zeros(inner_count), np.ones(outer_count)])
+
+    return Dataset(
+        [
+            Feature("horizontal", radii * np.cos(angles)),
+            Feature("vertical", radii * np.sin(angles)),
+        ],
+        Feature("ring", labels),
+    )
+
+
+def temperature_by_hour(sample_count: int = 240, random_seed: int = 21) -> Dataset:
+    """A daily temperature cycle, plus a column measured in the wrong units.
+
+    Two predictors. ``hour`` runs 0 to 24 and carries the whole signal, a sine
+    wave that no straight line follows. ``pressure_pascals`` runs near 101325
+    and carries nothing at all.
+
+    The second column is what makes this worth having. It is pure noise, and it
+    is measured in numbers four orders of magnitude larger than the useful one,
+    so an unstandardised distance is very nearly a ranking of pressure alone.
+    A regressor that weights its inputs would shrink that column toward zero on
+    the evidence; a neighbour model has no coefficients to shrink and no way to
+    notice, which is why standardising is part of being correct here rather
+    than a convenience.
+    """
+    generator = np.random.default_rng(random_seed)
+
+    hours = generator.uniform(0.0, 24.0, size=sample_count)
+    temperature = 14.0 + 9.0 * np.sin((hours - 9.0) * np.pi / 12.0)
+
+    return Dataset(
+        [
+            Feature("hour", hours),
+            Feature(
+                "pressure_pascals",
+                101325.0 + generator.normal(scale=180.0, size=sample_count),
+            ),
+        ],
+        Feature(
+            "temperature", temperature + generator.normal(scale=0.8, size=sample_count)
+        ),
+    )

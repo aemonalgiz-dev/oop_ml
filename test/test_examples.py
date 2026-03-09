@@ -17,6 +17,7 @@ from examples import (
     model_selection,
     multiclass_classification,
     multiple_regression,
+    nearest_neighbours,
     polynomial_curves,
     regularization,
     simple_regression,
@@ -34,6 +35,7 @@ EXAMPLE_MODULES = [
     logistic_regression,
     classification_metrics,
     multiclass_classification,
+    nearest_neighbours,
 ]
 
 
