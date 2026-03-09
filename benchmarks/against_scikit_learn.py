@@ -43,6 +43,7 @@ from sklearn.linear_model import (
     SGDRegressor,
 )
 from sklearn.linear_model import LogisticRegression as ScikitLogisticRegression
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.preprocessing import PolynomialFeatures as ScikitPolynomialFeatures
 from sklearn.preprocessing import StandardScaler
 
@@ -52,6 +53,8 @@ from oop_ml import (
     Feature,
     FloatArray,
     GradientDescentRegression,
+    KNearestNeighboursClassifier,
+    KNearestNeighboursRegressor,
     LassoRegression,
     LogisticRegression,
     MultipleLinearRegression,
@@ -65,6 +68,11 @@ logger = logging.getLogger(__name__)
 
 MODEL_SIZES = [(1_000, 20), (20_000, 50)]
 EXPANSION_SIZES = [(2_000, 8), (2_000, 12)]
+# Neighbour models do no work at fit time, so what matters is how many rows
+# are remembered and how many queries are asked against them.
+NEIGHBOUR_SIZES = [(5_000, 20), (20_000, 20)]
+NEIGHBOUR_QUERIES = 500
+NEIGHBOURS = 5
 COEFFICIENT_TOLERANCE = 1e-6
 
 
@@ -373,6 +381,86 @@ def _polynomial_features(design: GeneratedDesign, degree: int = 3) -> Comparison
     )
 
 
+class NeighbourProblem:
+    """Rows to remember, plus a separate set of rows to ask about.
+
+    Every other problem here is timed on ``fit``. This one is timed on
+    ``predict``, because a neighbour model does no work at fit time at all --
+    it validates its inputs and keeps them. The query rows are generated
+    separately rather than sliced out of the training set: a row queried
+    against a set containing itself is at distance zero from one of its own
+    neighbours, which is not what a held-out query looks like.
+    """
+
+    __slots__ = ("_classification", "_queries", "_regression")
+
+    def __init__(self, n_samples: int, n_features: int) -> None:
+        self._regression = RegressionProblem(n_samples, n_features)
+        self._classification = ClassificationProblem(n_samples, n_features)
+        self._queries = GeneratedDesign(NEIGHBOUR_QUERIES, n_features, random_seed=99)
+
+    @property
+    def regression(self) -> RegressionProblem:
+        return self._regression
+
+    @property
+    def classification(self) -> ClassificationProblem:
+        return self._classification
+
+    @property
+    def queries(self) -> GeneratedDesign:
+        return self._queries
+
+    @property
+    def size(self) -> str:
+        """Remembered rows by features, with the query count alongside."""
+        return f"{self._regression.size} q{NEIGHBOUR_QUERIES}"
+
+
+def _k_nearest_regressor(problem: NeighbourProblem) -> Comparison:
+    ours = KNearestNeighboursRegressor(n_neighbours=NEIGHBOURS)
+    ours.fit(problem.regression.features, problem.regression.target_feature)
+
+    theirs = KNeighborsRegressor(n_neighbors=NEIGHBOURS)
+    theirs.fit(problem.regression.matrix, problem.regression.target_values)
+
+    our_timing = Timing.of(lambda: ours.predict(problem.queries.features))
+    their_timing = Timing.of(lambda: theirs.predict(problem.queries.matrix))
+
+    agreement = (
+        Agreement.MATCHES
+        if np.allclose(our_timing.result, their_timing.result, atol=1e-9)
+        else Agreement.DIFFERS
+    )
+
+    return Comparison(
+        "k-NN regressor", problem.size, our_timing, their_timing, agreement
+    )
+
+
+def _k_nearest_classifier(problem: NeighbourProblem) -> Comparison:
+    ours = KNearestNeighboursClassifier(n_neighbours=NEIGHBOURS)
+    ours.fit(problem.classification.features, problem.classification.label_feature)
+
+    theirs = KNeighborsClassifier(n_neighbors=NEIGHBOURS)
+    theirs.fit(problem.classification.matrix, problem.classification.label_values)
+
+    our_timing = Timing.of(lambda: ours.predict(problem.queries.features))
+    their_timing = Timing.of(lambda: theirs.predict(problem.queries.matrix))
+
+    # Both break ties toward the lowest class index, so on identical neighbour
+    # sets the labels should agree exactly rather than approximately.
+    agreement = (
+        Agreement.MATCHES
+        if np.array_equal(our_timing.result, their_timing.result)
+        else Agreement.DIFFERS
+    )
+
+    return Comparison(
+        "k-NN classifier", problem.size, our_timing, their_timing, agreement
+    )
+
+
 def run() -> Comparisons:
     """Time every task at every size and collect the comparisons."""
     comparisons = []
@@ -395,6 +483,15 @@ def run() -> Comparisons:
     for n_samples, n_features in EXPANSION_SIZES:
         comparisons.append(
             _polynomial_features(RegressionProblem(n_samples, n_features))
+        )
+
+    for n_samples, n_features in NEIGHBOUR_SIZES:
+        neighbours = NeighbourProblem(n_samples, n_features)
+        comparisons.extend(
+            [
+                _k_nearest_regressor(neighbours),
+                _k_nearest_classifier(neighbours),
+            ]
         )
 
     return Comparisons(comparisons)
