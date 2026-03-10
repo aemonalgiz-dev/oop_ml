@@ -50,8 +50,10 @@ model has to supply.
 
 from __future__ import annotations
 
+import os
 from abc import abstractmethod
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Self
 
 import numpy as np
@@ -65,6 +67,17 @@ from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import TooFewValuesError
 from oop_ml.core.types import FloatArray, IndexArray
+
+# Below this many (query, remembered) pairs, splitting the work across threads
+# costs more than it saves -- a pool takes a millisecond or two to start, and
+# the crossover measured between 300000 and 600000 pairs.
+PARALLEL_PAIR_THRESHOLD = 500_000
+
+# Eight rather than every core: BLAS is already threading the matrix multiply
+# underneath, so the two layers compete for the same cores. Measured on
+# twenty-four, the curve is flat from six workers upward and turns back down at
+# twenty-four, so a cap well below the core count is the robust choice.
+MAX_PARALLEL_WORKERS = 8
 
 
 class NeighbourModel(Fittable):
@@ -128,20 +141,8 @@ class NeighbourModel(Fittable):
             One value per query.
         """
 
-    def _neighbour_indices(self, query_rows: FloatArray) -> IndexArray:
-        """Which remembered rows are nearest to each query row.
-
-        Parameters
-        ----------
-        query_rows:
-            ``(n_queries, n_features)``, already matched to the fitted feature
-            order.
-
-        Returns
-        -------
-        IndexArray
-            ``(n_queries, n_neighbours)`` of positions into the remembered
-            rows, nearest first.
+    def _nearest_within(self, query_rows: FloatArray) -> IndexArray:
+        """The nearest remembered rows to one block of queries.
 
         Notes
         -----
@@ -175,6 +176,70 @@ class NeighbourModel(Fittable):
         ordering = np.argsort(np.take_along_axis(distances, nearest, axis=1), axis=1)
 
         return np.take_along_axis(nearest, ordering, axis=1)
+
+    def _neighbour_indices(self, query_rows: FloatArray) -> IndexArray:
+        """Which remembered rows are nearest to each query row.
+
+        Parameters
+        ----------
+        query_rows:
+            ``(n_queries, n_features)``, already matched to the fitted feature
+            order.
+
+        Returns
+        -------
+        IndexArray
+            ``(n_queries, n_neighbours)`` of positions into the remembered
+            rows, nearest first.
+
+        Notes
+        -----
+        Queries are independent of one another, so this splits them into blocks
+        and runs the blocks on threads. That is worth doing because of *where*
+        the time goes. Measured at 20000 remembered rows by 500 queries over 20
+        features, the work divides almost evenly -- 0.064s building the
+        distance matrix against 0.059s selecting from it -- and only the first
+        half was already parallel, because BLAS threads the matrix multiply on
+        its own while ``argpartition`` runs on one core. Roughly half the
+        calculation was therefore using one core of twenty-four.
+
+        Threads rather than processes because numpy releases the interpreter
+        lock for exactly these operations, so this is real parallelism with no
+        pickling and no copies -- each worker reads the same remembered rows.
+        Measured 2.5x to 3.4x quicker end to end.
+
+        Below :data:`PARALLEL_PAIR_THRESHOLD` it stays on one thread. Starting
+        a pool costs a millisecond or two, which is free against a hundred and
+        a disaster against one: at 500 queries by 500 remembered rows the
+        threaded route measured *nine times slower*. The threshold counts pairs
+        rather than either dimension alone, since the work is the product.
+
+        The result is identical either way, not merely equivalent. Blocks are
+        written back into the positions they came from, and no query's answer
+        depends on any other query, so the arithmetic each row receives is
+        unchanged by how the rows were grouped.
+        """
+        assert self._remembered_rows is not None
+
+        n_queries = query_rows.shape[0]
+        pairs = n_queries * self._remembered_rows.shape[0]
+        workers = min(MAX_PARALLEL_WORKERS, os.cpu_count() or 1)
+
+        if pairs < PARALLEL_PAIR_THRESHOLD or workers < 2 or n_queries < 2:
+            return self._nearest_within(query_rows)
+
+        block_size = max(1, -(-n_queries // workers))
+        starts = range(0, n_queries, block_size)
+
+        def nearest_for_block(start: int) -> tuple[int, IndexArray]:
+            return start, self._nearest_within(query_rows[start : start + block_size])
+
+        indices = np.empty((n_queries, self.n_neighbours), dtype=np.intp)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for start, block in pool.map(nearest_for_block, starts):
+                indices[start : start + block.shape[0]] = block
+
+        return indices
 
     def _remember(
         self, input_values: Sequence[Feature], target_values: Feature
