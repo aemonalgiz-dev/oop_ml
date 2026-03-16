@@ -518,26 +518,26 @@ python -m benchmarks.against_scikit_learn
 
 ```
                  task           size  oop_ml (s)  sklearn (s)  ratio       answers
-                  OLS        1000x20      0.0003       0.0017   0.2x       matches
-                Ridge        1000x20      0.0003       0.0010   0.3x       matches
-                Lasso        1000x20      0.0030       0.0037   0.8x       matches
-     Gradient descent        1000x20      0.0172       0.0671   0.3x  not compared
-      Logistic ascent        1000x20      0.0049       0.0059   0.8x       matches
-      Logistic Newton        1000x20      0.0015       0.0042   0.3x       matches
-         Standardizer        1000x20      0.0011       0.0009   1.1x       matches
-                  OLS       20000x50      0.0198       0.0452   0.4x       matches
-                Ridge       20000x50      0.0111       0.0161   0.7x       matches
-                Lasso       20000x50      0.2102       0.1792   1.2x       matches
-     Gradient descent       20000x50      2.4369       3.8955   0.6x  not compared
-      Logistic ascent       20000x50      0.6059       0.0646   9.4x       matches
-      Logistic Newton       20000x50      0.0940       0.0753   1.2x       matches
-         Standardizer       20000x50      0.0131       0.0191   0.7x       matches
-PolynomialFeatures d3         2000x8      0.0093       0.0041   2.3x       matches
-PolynomialFeatures d3        2000x12      0.0125       0.0056   2.2x       matches
-       k-NN regressor   5000x20 q500      0.0761       0.0107   7.1x       matches
-      k-NN classifier   5000x20 q500      0.0600       0.0096   6.3x       matches
-       k-NN regressor  20000x20 q500      0.2619       0.0167  15.7x       matches
-      k-NN classifier  20000x20 q500      0.2304       0.0166  13.8x       matches
+                  OLS        1000x20      0.0003       0.0018   0.2x       matches
+                Ridge        1000x20      0.0003       0.0011   0.3x       matches
+                Lasso        1000x20      0.0022       0.0012   1.9x       matches
+     Gradient descent        1000x20      0.0166       0.0648   0.3x  not compared
+      Logistic ascent        1000x20      0.0048       0.0062   0.8x       matches
+      Logistic Newton        1000x20      0.0020       0.0053   0.4x       matches
+         Standardizer        1000x20      0.0009       0.0009   1.0x       matches
+                  OLS       20000x50      0.0109       0.0333   0.3x       matches
+                Ridge       20000x50      0.0113       0.0123   0.9x       matches
+                Lasso       20000x50      0.1258       0.1035   1.2x       matches
+     Gradient descent       20000x50      1.8879       2.5219   0.7x  not compared
+      Logistic ascent       20000x50      0.3805       0.0363  10.5x       matches
+      Logistic Newton       20000x50      0.0865       0.0642   1.3x       matches
+         Standardizer       20000x50      0.0259       0.0181   1.4x       matches
+PolynomialFeatures d3         2000x8      0.0038       0.0028   1.4x       matches
+PolynomialFeatures d3        2000x12      0.0095       0.0056   1.7x       matches
+       k-NN regressor   5000x20 q500      0.0264       0.0096   2.8x       matches
+      k-NN classifier   5000x20 q500      0.0261       0.0095   2.7x       matches
+       k-NN regressor  20000x20 q500      0.0686       0.0157   4.4x       matches
+      k-NN classifier  20000x20 q500      0.0657       0.0161   4.1x       matches
 ```
 
 Ratios below 1.0 mean this library was faster, which surprised me the first time
@@ -621,11 +621,34 @@ unchanged. On that same pathological pair the centred form is exact to the last
 bit, and across random data the largest relative error against the definition
 was 3.5e-16.
 
-What is left is a fused-kernel gap. scikit-learn never materialises the
-distance matrix at all; it keeps a per-query heap of the k smallest while
+Those two findings left the row at 15.7x, and I wrote at that point that what
+remained was a fused-kernel gap numpy could not close. That was half right, and
+the half I had wrong was the more useful half. Timing the two halves separately
+showed the work splitting almost evenly — 0.064s building the distance matrix
+against 0.059s selecting from it — and only the first half was parallel, because
+BLAS threads the matrix multiply on its own while `argpartition` runs on one
+core. Roughly half the calculation was using one core of twenty-four.
+
+Queries are independent of each other, so the fix is to hand blocks of them to
+threads. Threads rather than processes, because numpy releases the interpreter
+lock for exactly these operations, which makes it real parallelism with no
+pickling and no copies — every worker reads the same remembered rows. That is
+another 2.5x to 3.4x, and it takes the largest row from 15.7x to 4.4x.
+
+It needs a floor. Starting a pool costs a millisecond or two, which is nothing
+against a hundred and ruinous against one: at 500 queries by 500 remembered rows
+the threaded route measured nine times *slower*, so below half a million
+(query, remembered) pairs it stays on one thread. The threshold counts pairs
+rather than either dimension alone, because the work is the product of the two.
+
+What is left now really is a fused-kernel gap. scikit-learn never materialises
+the distance matrix at all; it keeps a per-query heap of the k smallest while
 streaming the distances past it, in Cython, across threads. numpy has no way to
 express that — every intermediate is a real array — so 160 MB gets written and
-read back before the selection even starts.
+read back before the selection even starts. Blocking over the remembered rows to
+keep those intermediates in cache is the obvious numpy answer to that, and it
+measured *worse*, between 0.4x and 0.7x, because maintaining a running top-k
+across blocks costs more than the cache locality returns.
 
 The interesting part is what does *not* close it. The textbook answer to a slow
 brute-force sweep is a spatial index, and at twenty features it is dramatically
@@ -680,7 +703,16 @@ Regression is complete: six models, two preprocessors, and cross-validation.
 Classification has landed alongside it: two binary logistic solvers, softmax and
 one-vs-rest for more than two classes, and the confusion-matrix metrics for
 both. Nearest neighbours now covers both tasks from one frame, with six distance
-metrics behind a closed enum. That is 888 tests, `ruff` and `pyright` clean.
+metrics behind a closed enum. That is 973 passing tests, `ruff` and `pyright`
+clean.
+
+**Decision trees are scaffolded, not finished.** The package layout, the node
+types, the criteria and the full specification are in; eight method bodies are
+not, so 95 tests are deliberately red and every one of them fails with
+`NotImplementedError`. That is the working order in this repository -- the
+failing spec is written first and is checked to be satisfiable before any body
+is written -- so if you have cloned this at exactly the wrong moment, that is
+what you are looking at rather than a broken build.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:
