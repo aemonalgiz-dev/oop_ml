@@ -20,6 +20,8 @@ from pydantic import ValidationError
 
 from oop_ml import (
     CrossValidation,
+    DecisionTreeClassifier,
+    DecisionTreeRegressor,
     GradientDescentRegression,
     KFold,
     KNearestNeighboursClassifier,
@@ -45,11 +47,13 @@ CONSTRUCTIBLE = [
     LassoRegression,
     GradientDescentRegression,
     KNearestNeighboursRegressor,
+    DecisionTreeRegressor,
     LogisticRegression,
     NewtonLogisticRegression,
     MultinomialLogisticRegression,
     OneVsRestClassifier,
     KNearestNeighboursClassifier,
+    DecisionTreeClassifier,
     Standardizer,
     PolynomialFeatures,
     RowShuffler,
