@@ -15,6 +15,13 @@ from __future__ import annotations
 
 from oop_ml.core.types import FloatArray, MaskArray
 
+# Two routes through the same definition -- the swept search and the recorded
+# one -- reach a gain by different arithmetic, so a genuine tie can come back
+# differing in the last bits. Comparing strictly would then let the two
+# disagree about which candidate won, which is the one thing the tie rule
+# exists to prevent. Anything closer than this counts as tied.
+GAIN_TIE_TOLERANCE = 1e-12
+
 
 class Split:
     """A threshold on one feature, and the impurity drop it achieved.
@@ -67,6 +74,26 @@ class Split:
     def gain(self) -> float:
         """How much impurity this split removed."""
         return self._gain
+
+    def beats(self, other: Split | None) -> bool:
+        """Whether this split should displace ``other`` as the node's winner.
+
+        The tie rule, in one place because two searches apply it. A candidate
+        has to be better by more than :data:`GAIN_TIE_TOLERANCE` to displace
+        one already held, so an exact tie -- or a tie to the last bit -- keeps
+        whichever was met first. Scanning goes features in fitted order and
+        thresholds ascending, which makes "first" the lowest threshold on the
+        earliest feature.
+
+        Arbitrary, and that is fine. What is not fine is being arbitrary
+        *differently* depending on which route computed the gain.
+        """
+        if other is None:
+            return True
+
+        return self._gain > other._gain + GAIN_TIE_TOLERANCE * max(
+            1.0, abs(other._gain)
+        )
 
     def sends_left(self, rows: FloatArray) -> MaskArray:
         """Which of these rows this split sends to the left child.

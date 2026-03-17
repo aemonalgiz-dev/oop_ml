@@ -53,9 +53,10 @@ from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import LeafNode, TreeNode
-from oop_ml.core.tree.split import Split
+from oop_ml.core.tree.split import GAIN_TIE_TOLERANCE, Split
 from oop_ml.core.types import FloatArray
 
 
@@ -83,6 +84,9 @@ class TreeModel(Fittable):
     min_samples_split: int = Field(default=2, ge=2)
     min_samples_leaf: int = Field(default=1, ge=1)
     min_impurity_decrease: float = Field(default=0.0, ge=0.0)
+    classification_criterion: ClassificationCriterion = Field(
+        default=ClassificationCriterion.GINI
+    )
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _root: TreeNode | None = PrivateAttr(default=None)
@@ -140,9 +144,9 @@ class TreeModel(Fittable):
         return "\n".join(self.root.description_lines())
 
     @property
-    @abstractmethod
     def _impurity(self) -> Impurity:
         """The measure this task scores splits with."""
+        return self.classification_criterion.impurity
 
     @abstractmethod
     def _leaf(self, target_values: FloatArray) -> LeafNode:
@@ -238,13 +242,68 @@ class TreeModel(Fittable):
         facts about the node and the caller acts on them the same way only by
         coincidence.
         """
-        raise NotImplementedError
+
+        assert self._feature_names is not None
+
+        n_rows = int(target_values.size)
+        if n_rows < 2:
+            return None
+
+        best: Split | None = None
+
+        for index, name in enumerate(self._feature_names):
+            column = feature_matrix[:, index]
+
+            # Sort once, then every cut on this feature is read off one swept
+            # array. Scoring candidates one at a time recomputes both
+            # children's impurity from scratch, which makes a feature cost
+            # O(n^2); this makes it O(n log n), and measured on one node it is
+            # the difference between a second and a millisecond.
+            order = np.argsort(column, kind="stable")
+            sorted_column = column[order]
+            gains = self._impurity.gains_at_every_prefix(target_values[order])
+
+            # Entry i of gains is the cut leaving i + 1 rows on the left. Such
+            # a cut is only a real question where the sorted value actually
+            # changes -- between two equal values there is no threshold that
+            # separates them -- and only legal where both children clear
+            # min_samples_leaf.
+            rows_left = np.arange(1, n_rows)
+            eligible = (
+                (sorted_column[:-1] < sorted_column[1:])
+                & (rows_left >= self.min_samples_leaf)
+                & (n_rows - rows_left >= self.min_samples_leaf)
+            )
+            if not eligible.any():
+                continue
+
+            # argmax takes the first maximum, so a tie within a feature keeps
+            # the lower threshold, and the strict comparison below keeps the
+            # earlier feature. Same tie rule as scoring them one at a time.
+            scored = np.where(eligible, gains, -np.inf)
+            highest = float(scored.max())
+            tolerance = GAIN_TIE_TOLERANCE * max(1.0, abs(highest))
+
+            # The first candidate within a tolerance of the best, not the
+            # numerically largest: on a tie the lower threshold wins, and the
+            # recorded search has to reach the same answer.
+            at = int(np.argmax(scored >= highest - tolerance))
+            gain = float(gains[at])
+
+            if gain == 0.0 or gain < self.min_impurity_decrease:
+                continue
+
+            threshold = (sorted_column[at] + sorted_column[at + 1]) / 2.0
+            candidate = Split(index, name, float(threshold), gain)
+            if candidate.beats(best):
+                best = candidate
+
+        return best
 
     def _grow(
         self, feature_matrix: FloatArray, target_values: FloatArray, depth: int
     ) -> TreeNode:
         """Build the subtree for these rows, recursively.
-
         This node becomes a leaf, via :meth:`_leaf`, when **any** of:
 
         - ``depth`` has reached ``max_depth``
@@ -310,7 +369,7 @@ class TreeModel(Fittable):
         # never forms X.T @ v; it reads one column at a time while searching
         # and then slices rows to hand each child its share, and slicing rows
         # is what C order makes contiguous.
-        matrix = np.ascontiguousarray(feature_set.feature_matrix)
+        matrix = np.ascontiguousarray(feature_set.feature_matrix, dtype=np.float64)
         self._root = self._grow(matrix, self._validated_target(target_values).values, 0)
 
         self._mark_fitted()
