@@ -96,6 +96,7 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.solving.normal_equations import NormalEquations
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -108,6 +109,37 @@ class MultipleLinearRegression(LinearFeatureRegressor):
     which covers validation, the design matrix, the intercept split, pairing the
     weights with their feature names, and ``predict``.
     """
+
+    def normal_equations(
+        self, design_matrix: FloatArray, target_column: Column
+    ) -> NormalEquations:
+        """The matrices behind the solution, rather than only the solution.
+
+        The observed route beside :meth:`_solve`. Same system, same solver --
+        it keeps ``X``, ``X.T X`` and ``X.T y`` instead of building them as
+        arguments and dropping them.
+
+        Worth having because the coefficients cannot answer the question that
+        matters most about a closed-form fit: whether the system was
+        well-posed. Collinear predictors make ``X.T X`` singular and
+        near-collinear ones make it nearly so, and
+        ``NormalEquations.condition_number`` is where that shows.
+
+        Returns
+        -------
+        NormalEquations
+            ``equations.result`` is the same array :meth:`_solve` returns.
+        """
+        moment_matrix = self._normal_equations_matrix(design_matrix)
+        target_moments = self._normal_equations_vector(design_matrix, target_column)
+
+        return NormalEquations(
+            design_matrix,
+            moment_matrix,
+            target_moments,
+            None,
+            np.linalg.solve(moment_matrix, target_moments),
+        )
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Solve ``X.T X b = X.T y`` directly.

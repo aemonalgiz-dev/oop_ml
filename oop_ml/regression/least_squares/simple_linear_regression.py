@@ -25,6 +25,7 @@ from pydantic import PrivateAttr
 
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.column import Column
+from oop_ml.core.solving.normal_equations import LeastSquaresLine
 from oop_ml.core.types import FloatArray, NumericInput
 from oop_ml.core.validation import ValueRole
 
@@ -76,6 +77,57 @@ class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
         self._mark_fitted()
 
         return self
+
+    def least_squares_line(
+        self, input_values: NumericInput, target_values: NumericInput
+    ) -> LeastSquaresLine:
+        """The two sums behind the line, rather than only the line.
+
+        The observed route beside :meth:`fit`. Same arithmetic; it keeps the
+        means, the covariation and the predictor's own variation instead of
+        collapsing them into two numbers.
+
+        Worth naming because every larger least-squares fit is this
+        generalised, and because the denominator is where the one structural
+        failure lives: a constant predictor has zero variation, and no amount
+        of target makes the slope defined.
+
+        Records rather than mutates: this does not fit the model.
+
+        Returns
+        -------
+        LeastSquaresLine
+            ``line.result`` is the ``(slope, intercept)`` pair :meth:`fit`
+            stores.
+
+        Raises
+        ------
+        NonEqualArrayLengthError
+            If the two columns differ in length.
+        TooFewValuesError
+            If there are fewer than two rows.
+        AllSameValuesError
+            If the predictor does not vary.
+        """
+        input_column = Column.of(input_values, ValueRole.INPUT_VALUES)
+        target_column = Column.of(target_values, ValueRole.TARGET_VALUES)
+
+        input_column.check_equal_length(target_column)
+        input_column.check_min_length(MINIMUM_SAMPLES)
+        input_column.check_has_variance()
+
+        covariation = float((input_column.deviations * target_column.deviations).sum())
+        variation = float(input_column.sum_of_squared_deviations)
+        slope = covariation / variation
+
+        return LeastSquaresLine(
+            float(input_column.mean),
+            float(target_column.mean),
+            covariation,
+            variation,
+            slope,
+            float(target_column.mean - slope * input_column.mean),
+        )
 
     def predict(self, input_values: NumericInput) -> FloatArray:
         """Evaluate the fitted line at each input value."""
