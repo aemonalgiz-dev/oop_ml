@@ -66,6 +66,7 @@ from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import TooFewValuesError
+from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
 from oop_ml.core.types import FloatArray, IndexArray
 
 # Below this many (query, remembered) pairs, splitting the work across threads
@@ -240,6 +241,54 @@ class NeighbourModel(Fittable):
                 indices[start : start + block.shape[0]] = block
 
         return indices
+
+    def neighbour_search(self, input_values: Sequence[Feature]) -> NeighbourSearch:
+        """Every distance behind each query, rather than only the winners.
+
+        The observed route beside :meth:`_neighbour_indices`. Same metric,
+        same selection, same tie-breaking -- it keeps each query's whole
+        distance vector instead of selecting from it and dropping it.
+
+        Deliberately the expensive shape: one distance vector per query is
+        precisely the allocation the efficient route avoids. Sized for
+        looking at, not for twenty thousand remembered rows.
+
+        Runs on one thread whatever the size, because the block loop exists to
+        divide work rather than to be watched, and dividing it here would
+        interleave the record.
+
+        Returns
+        -------
+        NeighbourSearch
+            Iterable over the queries. ``search.result`` is the same array
+            :meth:`_neighbour_indices` returns, and a test asserts that.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        InvalidValuesError
+            If the supplied feature names do not match those seen in ``fit``.
+        """
+        query_rows = self._matched_rows(input_values)
+
+        assert self._remembered_rows is not None
+        assert self._remembered_targets is not None
+
+        distances = self.metric.between(query_rows, self._remembered_rows)
+        chosen = self._nearest_within(query_rows)
+
+        return NeighbourSearch(
+            [
+                NeighbourQuery(
+                    query_rows[position],
+                    distances[position],
+                    chosen[position],
+                    self._remembered_targets[chosen[position]],
+                )
+                for position in range(query_rows.shape[0])
+            ]
+        )
 
     def _remember(
         self, input_values: Sequence[Feature], target_values: Feature
