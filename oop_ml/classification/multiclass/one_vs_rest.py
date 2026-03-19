@@ -38,6 +38,10 @@ import numpy as np
 from pydantic import ConfigDict, PrivateAttr
 
 from oop_ml.classification.linear_classifier import LinearClassifier
+from oop_ml.classification.multiclass.one_vs_rest_fits import (
+    ClassFit,
+    OneVsRestFits,
+)
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
@@ -116,6 +120,47 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
         return Feature(
             f"{target_values.name}=={class_index}",
             (target_values.values == float(class_index)).astype(np.float64),
+        )
+
+    def one_vs_rest_fits(
+        self, input_values: Sequence[Feature], target_values: Feature
+    ) -> OneVsRestFits:
+        """The K separate fits, rather than only the ensemble they form.
+
+        The observed route beside :meth:`fit`. Same recoding, same per-class
+        deep copy, same sub-model -- it keeps each recoded target beside the
+        model that was fitted against it instead of discarding the targets.
+
+        Worth having because the thing to understand about one-vs-rest is that
+        the K models were never introduced to each other, which is why their
+        probabilities do not sum to one. Holding the sub-fits makes that
+        checkable rather than assertable.
+
+        Records rather than mutates: this does not fit the model.
+
+        Returns
+        -------
+        OneVsRestFits
+            ``fits.result`` is the tuple of fitted models :meth:`fit` stores.
+        """
+        feature_set = self._validated_feature_set(input_values)
+        feature_set.check_aligned_with(target_values)
+
+        target_column = target_values.column
+        target_column.check_is_label_encoded()
+
+        return OneVsRestFits(
+            [
+                ClassFit(
+                    class_index,
+                    self._binary_target(target_values, class_index),
+                    self.binary_model.model_copy(deep=True).fit(
+                        input_values,
+                        self._binary_target(target_values, class_index),
+                    ),
+                )
+                for class_index in range(target_column.n_classes)
+            ]
         )
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
