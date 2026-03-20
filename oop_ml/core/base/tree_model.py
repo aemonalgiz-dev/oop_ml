@@ -55,7 +55,7 @@ from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
-from oop_ml.core.tree.node import LeafNode, TreeNode
+from oop_ml.core.tree.node import DecisionNode, LeafNode, TreeNode
 from oop_ml.core.tree.search import (
     SplitCandidate,
     SplitRejection,
@@ -173,7 +173,8 @@ class TreeModel(Fittable):
             Carrying the prediction, the row count and the impurity.
         """
 
-    def _candidate_thresholds(self, column: FloatArray) -> FloatArray:
+    @staticmethod
+    def _candidate_thresholds(column: FloatArray) -> FloatArray:
         """Every threshold worth trying on one column.
 
         Sorting the distinct values, the only cuts that separate rows
@@ -418,7 +419,33 @@ class TreeModel(Fittable):
         shape. It is the price of being greedy, and it is why ensembles that
         randomise the split choice exist.
         """
-        raise NotImplementedError
+        if depth == self.max_depth:
+            return self._leaf(target_values)
+
+        best_split = self._best_split(feature_matrix, target_values)
+
+        if best_split is None:
+            return self._leaf(target_values)
+
+        if best_split.gain < self.min_impurity_decrease:
+            return self._leaf(target_values)
+
+        send_left = best_split.sends_left(feature_matrix)
+
+        if len(send_left) < self.min_samples_split:
+            return self._leaf(target_values)
+
+        return DecisionNode(
+            split=best_split,
+            left=self._grow(
+                feature_matrix[send_left], target_values[send_left], depth + 1
+            ),
+            right=self._grow(
+                feature_matrix[~send_left], target_values[~send_left], depth + 1
+            ),
+            n_samples=len(target_values),
+            impurity=self._impurity.of(target_values),
+        )
 
     def _fit_tree(
         self, input_values: Sequence[Feature], target_values: Feature
