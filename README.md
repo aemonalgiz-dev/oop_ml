@@ -403,20 +403,138 @@ extrapolate. Query past the edge of the training data and every neighbour is on
 the same side, so the answer is their mean and stays their mean forever. A
 linear model extends its line instead — confidently, and just as unfoundedly.
 
+## Trees, Which Read Instead Of Weigh
+
+Every model above assembles its answer from weights. A tree asks questions.
+
+```python
+from oop_ml import DecisionTreeClassifier
+
+model = DecisionTreeClassifier(min_samples_split=5)
+model.fit(features, passed)
+
+print(model.describe())
+```
+
+```
+slept < 6.25 ?  [n=15, impurity=0.4800, gain=0.2133]
+  predict 0  [n=6, impurity=0.0000]
+  studied < 4.5 ?  [n=9, impurity=0.4444, gain=0.2778]
+    predict 0  [n=4, impurity=0.3750]
+    predict 1  [n=5, impurity=0.0000]
+```
+
+That is the entire model, and you can read it. Sleep is the first gate; study is
+tested only inside the region where sleep already cleared its threshold. That
+conditional — *studying helps only if you slept* — is an interaction, and a tree
+expresses it by nesting one question inside another. A linear model needs the
+product term handed to it as a column before it can say the same thing.
+
+It costs nothing for units, either. A split compares one column against one
+threshold, so nothing is summed across features and no column can drown another
+by being measured in thousands. Standardising a tree's inputs changes precisely
+nothing — which is the opposite of the neighbour models above, where it was part
+of being correct.
+
+### What it pays for that
+
+**Stopping rules are the whole of the regularisation.** Left alone the tree
+carves out a box per row:
+
+```
+min_samples_split=5   depth 2   leaves 3   training accuracy 0.9333
+defaults              depth 4   leaves 5   training accuracy 1.0000
+```
+
+The second is not the better model, it is the memorised one — the same failure
+`k=1` produced for a neighbour model, wearing a different hat. Watch `n_leaves`
+against your row count.
+
+**The search is greedy, and cannot be otherwise.** Finding the optimal tree is
+NP-hard, so each node takes the best split available now and never reconsiders.
+Usually fine, occasionally fatal: on a parity target every single first split
+scores exactly zero, and the recursion stops at the root even though two levels
+would separate the classes perfectly.
+
+**The boundary is axis-aligned.** A diagonal is only reachable as a staircase.
+
+## Watching A Model Work
+
+Every model here has a second route through its own calculation. The efficient
+one returns the answer and discards the working; the observed one keeps all of
+it.
+
+```python
+search = model.split_search(rows, targets)
+
+len(search)        # 22 candidates considered
+search.best        # Split(slept < 6.25, gain=0.2133)
+```
+
+```
+Split(slept < 6.25, gain=0.2133)     6/9
+Split(studied < 7.25, gain=0.1800)   12/3
+Split(studied < 6.25, gain=0.1600)   10/5
+```
+
+The winner is rarely the interesting part; the field it beat is. Rejected
+candidates are kept too, with their gain and the reason they were excluded,
+because *"excluded despite scoring 0.24"* is a fact about the model that a list
+of survivors cannot express.
+
+Same shape everywhere:
+
+| model | efficient | observed |
+|---|---|---|
+| trees | `_best_split` | `split_search()` |
+| gradient descent, logistic, Newton, softmax, lasso | `_solve` | `solver_path()` |
+| k-NN | `_neighbour_indices` | `neighbour_search()` |
+| multiple, ridge | `_solve` | `normal_equations()` |
+| simple linear | `fit` | `least_squares_line()` |
+| one-vs-rest | `fit` | `one_vs_rest_fits()` |
+
+What it makes visible is hard to say any other way. The same objective, two
+solvers:
+
+```
+ascent    4495 passes   movement 4.06e-02 -> 9.98e-09
+newton       6 passes   movement 1.98e+00 -> 2.28e-16
+```
+
+`normal_equations` exposes `condition_number`, which is the only place
+collinearity shows — the coefficients just come back large and cancelling.
+`NeighbourQuery.first_rejected_distance` answers whether `k` was a real choice
+or an arbitrary one. `OneVsRestFits` makes *"the probabilities do not sum to
+one"* something you can check rather than something a docstring claims.
+
+**Two routes, one definition.** Each pair carries a test asserting they agree,
+because a fast path and a slow path with nothing between them are two
+implementations rather than one calculation seen two ways. That test earned its
+keep immediately, catching the two tree routes disagreeing on an exact tie.
+
+The observed route is free to be slow and allocates freely; the efficient one is
+untouched by any of it.
+
 ## The Package Layout
 
 | Package | Contents |
 |---------|----------|
 | `oop_ml.core.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients` — the vocabulary every other package speaks |
 | `oop_ml.core.evaluation` | `RegressionEvaluation`, `ClassificationEvaluation`, `MultiClassEvaluation` |
-| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel`, `IterativeSolver` and `NeighbourModel` frames |
+| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel`, `IterativeSolver`, `NeighbourModel` and `TreeModel` frames |
 | `oop_ml.core.distance` | `DistanceMetric` and the six `Distance` calculations behind it |
+| `oop_ml.core.tree` | Impurity measures, criteria, `Split`, and the nodes a fitted tree is made of |
+| `oop_ml.core.observation` | The `Observation` protocol — the second route through a calculation |
+| `oop_ml.core.solving` | `SolverPath`, `NormalEquations`, `LeastSquaresLine` |
+| `oop_ml.core.neighbours` | `NeighbourSearch` — every distance behind a prediction |
 | `oop_ml.regression.least_squares` | Simple, multiple, gradient descent — squared error and nothing added to it |
 | `oop_ml.regression.penalised` | Ridge and lasso, where the *shape* of the penalty is the whole difference |
 | `oop_ml.regression.neighbours` | `KNearestNeighboursRegressor` — no assumed shape, no coefficients |
+| `oop_ml.regression.trees` | `DecisionTreeRegressor` — a piecewise-constant surface you can read |
 | `oop_ml.classification.binary` | `LogisticRegression` and `NewtonLogisticRegression`, one objective and two solvers |
 | `oop_ml.classification.multiclass` | `MultinomialLogisticRegression` and `OneVsRestClassifier` |
 | `oop_ml.classification.neighbours` | `KNearestNeighboursClassifier`, where any number of classes is the same code |
+| `oop_ml.classification.trees` | `DecisionTreeClassifier`, whose boundary is a union of boxes |
 | `oop_ml.preprocessing.standardization` | `Standardizer` and the `FeatureScalings` it learns |
 | `oop_ml.preprocessing.polynomial` | `PolynomialFeatures` and the `PolynomialTerms` it builds |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
@@ -699,20 +817,20 @@ what is costing you.
 
 ## Where This Stands
 
-Regression is complete: six models, two preprocessors, and cross-validation.
-Classification has landed alongside it: two binary logistic solvers, softmax and
-one-vs-rest for more than two classes, and the confusion-matrix metrics for
-both. Nearest neighbours now covers both tasks from one frame, with six distance
-metrics behind a closed enum. That is 973 passing tests, `ruff` and `pyright`
-clean.
+Every model family that predicts from a single fitted thing is here. Regression:
+simple, multiple, gradient descent, ridge, lasso. Classification: two binary
+logistic solvers, softmax, one-vs-rest. Both non-parametric families, k-nearest
+neighbours and decision trees, across both tasks. Plus preprocessing, splitting,
+cross-validation and three kinds of evaluation — and a second, observed route
+through every calculation with intermediates worth seeing.
 
-**Decision trees are scaffolded, not finished.** The package layout, the node
-types, the criteria, the split search and the recursion that grows the tree are
-in; the two methods that build a leaf are not, so 58 tests are deliberately red
-and every one of them fails with `NotImplementedError`. That is the working order in this repository -- the
-failing spec is written first and is checked to be satisfiable before any body
-is written -- so if you have cloned this at exactly the wrong moment, that is
-what you are looking at rather than a broken build.
+That is **1170 passing tests**, `ruff` and `pyright` clean, with no stubs left.
+
+What is missing is not a gap in that list but three areas beside it: **ensembles**
+(bagging, forests, boosting — trees are their prerequisite, which is why they are
+next), **unsupervised learning** entirely, since every base class here takes a
+target, and **kernels**. Naive Bayes and discriminant analysis are smaller and
+would slot in anywhere.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:
@@ -721,7 +839,7 @@ yet, in the order it will matter if you are putting this into an application:
    fit at start-up instead of loading a trained artifact.
 2. **`Pipeline`.** A transformer fitted outside of a cross-validation loop can
    leak across the split, and your serving path currently has to re-apply it by
-   hand. This is next.
+   hand.
 3. **Cross-validated classification.** `CrossValidation` scores with R², so it
    only speaks to regressors. Fixing that needs stratified folds as well: plain
    k-fold on a rare class produces folds with no positives at all by k=10, and
@@ -735,6 +853,9 @@ yet, in the order it will matter if you are putting this into an application:
    improvement and also a different model — it has no `k` at which it stops
    caring, and it needs a rule for a query sitting exactly on a training row,
    where the weight is infinite.
-6. **Trees.** The other non-parametric family, and the one that gets to a
-   non-linear boundary without carrying the training set around or depending on
-   the units its inputs arrived in.
+6. **Tree pruning.** Growth stops on rules chosen up front. Cost-complexity
+   pruning grows first and cuts back afterwards, judging a subtree by what it
+   was worth rather than by a limit set before anything was seen.
+7. **Hyperparameter search.** `CrossValidation` scores a candidate; nothing
+   searches a space of them, so choosing `max_depth` is currently a loop you
+   write yourself.
