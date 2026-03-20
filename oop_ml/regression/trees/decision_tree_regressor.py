@@ -86,7 +86,11 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
             Carrying the mean as its prediction, the row count, and the
             impurity of these targets under the configured criterion.
         """
-        raise NotImplementedError
+        return LeafNode(
+            prediction=np.mean(target_values),
+            n_samples=len(target_values),
+            impurity=self._impurity.of(target_values),
+        )
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Grow the tree. Unlike a neighbour model, all the work is here.

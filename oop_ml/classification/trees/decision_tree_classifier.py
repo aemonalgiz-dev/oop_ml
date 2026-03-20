@@ -156,7 +156,22 @@ class DecisionTreeClassifier(
             row count, and the impurity of these targets under the configured
             criterion.
         """
-        raise NotImplementedError
+        assert self._n_classes is not None
+
+        # Width is the classes the FIT saw, not the ones present here, so a
+        # pure leaf still reports a full row and predict_probabilities can
+        # stack them. _n_classes rather than n_classes: this runs during
+        # growth, and the public property is still refusing until fit ends.
+        counts = np.bincount(target_values.astype(np.int64), minlength=self._n_classes)
+
+        return ClassificationLeaf(
+            # argmax takes the first maximum, so the documented tie-break --
+            # lowest class index -- arrives without being written.
+            prediction=float(np.argmax(counts)),
+            class_shares=counts / target_values.size,
+            n_samples=int(target_values.size),
+            impurity=self._impurity.of(target_values),
+        )
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Grow the tree, and record how many classes it spans.
