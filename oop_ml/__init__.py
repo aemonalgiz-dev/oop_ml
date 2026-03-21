@@ -50,6 +50,7 @@ from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.distance.calculations import (
@@ -122,7 +123,7 @@ from oop_ml.model_selection.cross_validation import (
     CrossValidation,
     CrossValidationResult,
 )
-from oop_ml.model_selection.dataset import Dataset, DataSplit
+from oop_ml.model_selection.dataset import DataSplit
 from oop_ml.model_selection.splitting import (
     KFold,
     RowShuffler,
