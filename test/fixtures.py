@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import numpy as np
+
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.types import NumericValues
 
@@ -643,3 +645,10 @@ STEP_SPLIT = ("position", 3.5)
 STEP_ROOT_VARIANCE = 400.0
 STEP_ROOT_GAIN = 400.0
 STEP_LEAF_MEANS = (10.0, 50.0)
+
+
+# Drawing n from n with replacement misses (1 - 1/n)^n of the rows, which is
+# 1/e in the limit and close to it well before two hundred. The band is wide
+# enough that no particular seed is being pinned.
+OUT_OF_BAG_SHARE = 1.0 / np.e
+OUT_OF_BAG_TOLERANCE = 0.06
