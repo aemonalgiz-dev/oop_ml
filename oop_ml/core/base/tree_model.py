@@ -83,18 +83,34 @@ class TreeModel(Fittable):
     min_impurity_decrease:
         A split buying less than this is not worth making. Zero admits any
         split with a strictly positive gain.
+    max_features:
+        How many features each node may consider, drawn afresh at every node.
+        ``None`` considers all of them, which is what a lone tree should do.
+
+        Set below the feature count a single tree gets *worse*, being denied
+        the best question some of the time. It exists for ensembles, where the
+        point is not to make one tree better but to stop many trees being the
+        same tree. Bagged trees all find the same strong first split and stay
+        correlated, and a correlation is a floor no number of members can get
+        below. This is the only thing that lowers it.
+    random_seed:
+        Fixes which features each node draws, so a fit is reproducible.
+        Ignored when ``max_features`` is ``None``, because nothing is drawn.
     """
 
     max_depth: int | None = Field(default=None, ge=1)
     min_samples_split: int = Field(default=2, ge=2)
     min_samples_leaf: int = Field(default=1, ge=1)
     min_impurity_decrease: float = Field(default=0.0, ge=0.0)
+    max_features: int | None = Field(default=None, ge=1)
+    random_seed: int | None = None
     classification_criterion: ClassificationCriterion = Field(
         default=ClassificationCriterion.GINI
     )
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _root: TreeNode | None = PrivateAttr(default=None)
+    _generator: np.random.Generator | None = PrivateAttr(default=None)
 
     @property
     def root(self) -> TreeNode:
@@ -172,6 +188,41 @@ class TreeModel(Fittable):
         LeafNode
             Carrying the prediction, the row count and the impurity.
         """
+
+    def _features_to_consider(self) -> list[tuple[int, str]]:
+        """Which features this node may split on, as ``(index, name)`` pairs.
+
+        All of them unless ``max_features`` says otherwise, in which case a
+        fresh subset is drawn *per node* rather than per tree. That
+        distinction is the whole of it: drawn once per tree, a tree never sees
+        the excluded features at any depth and is simply handicapped; drawn
+        per node, it reaches every feature somewhere along its length and is
+        only stopped from always reaching for the same one first.
+
+        Used by :meth:`_best_split` and deliberately not by
+        :meth:`split_search`, which reports the whole field. The draw is
+        random, so two calls cannot see the same subset, and an observation
+        that quietly showed a different set of candidates than the fit
+        considered would be worse than one that shows all of them.
+
+        Returns
+        -------
+        list[tuple[int, str]]
+            Ascending by index, so the tie rule -- earlier feature wins -- does
+            not depend on which subset came up.
+        """
+        assert self._feature_names is not None
+
+        available = list(enumerate(self._feature_names))
+        if self.max_features is None or self.max_features >= len(available):
+            return available
+
+        assert self._generator is not None
+        drawn = self._generator.choice(
+            len(available), size=self.max_features, replace=False
+        )
+
+        return [available[index] for index in sorted(drawn)]
 
     @staticmethod
     def _candidate_thresholds(column: FloatArray) -> FloatArray:
@@ -326,7 +377,7 @@ class TreeModel(Fittable):
 
         best: Split | None = None
 
-        for index, name in enumerate(self._feature_names):
+        for index, name in self._features_to_consider():
             column = feature_matrix[:, index]
 
             # Sort once, then every cut on this feature is read off one swept
@@ -465,6 +516,7 @@ class TreeModel(Fittable):
         feature_set.check_aligned_with(target_values)
 
         self._feature_names = tuple(feature.name for feature in feature_set)
+        self._generator = np.random.default_rng(self.random_seed)
 
         # Row-major here, unlike every linear model in the library. A tree
         # never forms X.T @ v; it reads one column at a time while searching
