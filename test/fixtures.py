@@ -647,8 +647,201 @@ STEP_ROOT_GAIN = 400.0
 STEP_LEAF_MEANS = (10.0, 50.0)
 
 
+class EnsembleFixture:
+    """Data noisy enough that averaging measurably beats one tree.
+
+    Everything else in this file is small enough to check by hand, and this one
+    cannot be, because what an ensemble does is statistical. A single unpruned
+    tree memorises whatever it is given, so on its training rows it is perfect
+    and no fixture can tell it apart from a good model. The evidence has to come
+    from rows the fit never saw, and from enough of them to be more than luck.
+
+    Six predictors, and their sizes are the point. ``dominant`` carries a much
+    stronger effect than any other, which is what makes every unrestricted tree
+    put it at the root -- measured, twenty times out of twenty. That is the
+    correlation a random forest exists to break, and a fixture without a
+    dominant feature cannot show it: an earlier version of this one had four
+    features with no clear winner, and unrestricted bagged trees already spread
+    their roots across all four, leaving the restriction with nothing to fix.
+
+    The remaining five are an interaction, two plain linear terms, and one pure
+    noise column that no correct model should lean on.
+
+    Parameters
+    ----------
+    n_rows:
+        How many training rows, and how many held out.
+    seed:
+        Fixes the whole fixture.
+    """
+
+    __slots__ = ("_held_out", "_training")
+
+    FEATURE_NAMES = ("dominant", "second", "third", "fourth", "fifth", "noise")
+
+    def __init__(self, n_rows: int, seed: int) -> None:
+        generator = np.random.default_rng(seed)
+        self._training = self._draw(generator, n_rows)
+        self._held_out = self._draw(generator, n_rows)
+
+    @classmethod
+    def _draw(
+        cls, generator: np.random.Generator, n_rows: int
+    ) -> dict[str, np.ndarray]:
+        columns = {
+            name: generator.uniform(-3.0, 3.0, size=n_rows)
+            for name in cls.FEATURE_NAMES
+        }
+
+        # One term far larger than the rest, so the greedy split search has an
+        # obvious first question and every unrestricted tree asks it.
+        signal = (
+            5.0 * columns["dominant"]
+            + 1.5 * columns["second"] * columns["third"]
+            + 1.2 * columns["fourth"]
+            + 1.0 * columns["fifth"]
+        )
+
+        return {
+            **columns,
+            "quantity": signal + generator.normal(scale=2.0, size=n_rows),
+            "classes": (signal + generator.normal(scale=2.0, size=n_rows) > 0.0).astype(
+                np.float64
+            ),
+        }
+
+    @classmethod
+    def _features(cls, drawn: dict[str, np.ndarray]) -> list[Feature]:
+        return [Feature(name, drawn[name]) for name in cls.FEATURE_NAMES]
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The six training predictors, one of them irrelevant."""
+        return self._features(self._training)
+
+    @property
+    def target_feature(self) -> Feature:
+        """The noisy training target."""
+        return Feature("quantity", self._training["quantity"])
+
+    @property
+    def class_feature(self) -> Feature:
+        """The training classes, 0/1."""
+        return Feature("classes", self._training["classes"])
+
+    @property
+    def held_out_features(self) -> list[Feature]:
+        """The six predictors of rows no fit sees."""
+        return self._features(self._held_out)
+
+    @property
+    def held_out_target(self) -> Feature:
+        """The held-out target."""
+        return Feature("quantity", self._held_out["quantity"])
+
+    @property
+    def held_out_classes(self) -> Feature:
+        """The held-out classes."""
+        return Feature("classes", self._held_out["classes"])
+
+    @property
+    def n_samples(self) -> int:
+        """How many training rows."""
+        return self._training["dominant"].size
+
+    @property
+    def n_features(self) -> int:
+        """How many predictors."""
+        return len(self.FEATURE_NAMES)
+
+
 # Drawing n from n with replacement misses (1 - 1/n)^n of the rows, which is
 # 1/e in the limit and close to it well before two hundred. The band is wide
 # enough that no particular seed is being pinned.
 OUT_OF_BAG_SHARE = 1.0 / np.e
 OUT_OF_BAG_TOLERANCE = 0.06
+
+DOMINATED_SIGNAL = EnsembleFixture(200, 20260827)
+"""Two hundred rows and two hundred held out, six features, one dominating."""
+
+# How many members is enough to see the effect without the suite getting slow.
+# Twenty is well short of where the running average flattens and already far
+# past where the difference from one tree is unambiguous.
+ENSEMBLE_MEMBERS = 20
+
+# Three of six. Measured on this fixture: unrestricted, all twenty members root
+# on `dominant`; at three, five or six different features appear there. It also
+# happens to be the setting where the forest matches plain bagging rather than
+# trailing it -- see the note on the forest specs, since that is a genuine
+# trade rather than a tuning detail.
+FOREST_MAX_FEATURES = 3
+
+
+class ParityFixture:
+    """The target a greedy tree cannot start on.
+
+    The class is 1 when exactly one of two binary features is 1. Split on
+    either one alone and both sides come back half and half, which is the
+    impurity the node already had -- so the gain of the *right* question is
+    essentially zero, and a continuous distractor column that happens to line
+    up with a few rows scores higher. Measured here: 0.0037 for the real
+    features against 0.0084 for pure noise.
+
+    A lone tree therefore roots on the noise and never recovers, scoring near
+    chance at any depth short of memorisation. It is the clearest failure of
+    greed in this library: the search is not unlucky, it is correctly reporting
+    that no single question helps, and a single question is all it can see.
+
+    Parameters
+    ----------
+    n_rows:
+        How many rows.
+    seed:
+        Fixes the draw.
+    """
+
+    __slots__ = ("_distractor", "_first", "_second")
+
+    def __init__(self, n_rows: int, seed: int) -> None:
+        generator = np.random.default_rng(seed)
+        self._first = generator.integers(0, 2, size=n_rows).astype(np.float64)
+        self._second = generator.integers(0, 2, size=n_rows).astype(np.float64)
+        self._distractor = generator.normal(size=n_rows)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two real features and the noise column that outscores them."""
+        return [
+            Feature("first", self._first),
+            Feature("second", self._second),
+            Feature("distractor", self._distractor),
+        ]
+
+    @property
+    def real_features(self) -> list[Feature]:
+        """Just the two that carry the signal."""
+        return self.input_features[:2]
+
+    @property
+    def class_feature(self) -> Feature:
+        """1 where exactly one of the two features is 1."""
+        return Feature("classes", (self._first != self._second).astype(np.float64))
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows."""
+        return self._first.size
+
+
+EXCLUSIVE_OR = ParityFixture(300, 4)
+"""Three hundred rows of parity, plus a noise column the greedy search prefers."""
+
+# Depth 3 is enough for parity (two questions) and far short of memorising 300
+# rows, which an unstopped tree does perfectly and which would hide the point.
+PARITY_MAX_DEPTH = 3
+
+# Measured across two seeds: a lone tree lands at 0.52-0.59, an unrestricted
+# ensemble at 0.95-0.97, and a restricted one at 0.99+. The bands are wide
+# enough not to pin a particular draw.
+PARITY_LONE_TREE_CEILING = 0.65
+PARITY_ENSEMBLE_FLOOR = 0.95
