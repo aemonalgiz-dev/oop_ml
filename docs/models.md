@@ -435,8 +435,8 @@ find the members whose resample never drew it, average only those, and compare
 to the truth.
 
 ```python
-forest.out_of_bag_score()      # R^2 against rows each member never saw
-forest.out_of_bag_evaluate()   # the full evaluation, if you want more than one metric
+forest.out_of_bag_score()  # R^2 against rows each member never saw
+forest.out_of_bag_evaluate()  # the full evaluation, if you want more than one metric
 ```
 
 Measured on the same fixture:

@@ -99,6 +99,11 @@ from oop_ml.core.exceptions import (
     TooFewValuesError,
     UndefinedMetricError,
 )
+from oop_ml.core.importance.importances import (
+    FeatureImportance,
+    FeatureImportances,
+)
+from oop_ml.core.importance.permutation import PermutationImportance
 from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
 from oop_ml.core.observation import Observation, Stage
 from oop_ml.core.solving.normal_equations import (
@@ -261,6 +266,9 @@ __all__ = [
     "BoostingEnsemble",
     "BootstrapSample",
     "OutOfBagEstimate",
+    "FeatureImportance",
+    "FeatureImportances",
+    "PermutationImportance",
     "MemberFit",
     "EnsembleFits",
     "BoostingRound",
