@@ -23,21 +23,23 @@ import pytest
 from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
+from oop_ml.core.data.column import Column
 from oop_ml.core.observation import Observation
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.search import SplitRejection, SplitSearch
 from oop_ml.core.tree.split import Split
+from oop_ml.core.validation import ValueRole
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import EXAM_OUTCOMES, STEP_FUNCTION
 
 EXAM_ROWS = np.column_stack(
     [feature.values for feature in EXAM_OUTCOMES.input_features]
 )
-EXAM_TARGETS = EXAM_OUTCOMES.class_feature.values
+EXAM_TARGETS = EXAM_OUTCOMES.class_feature.column
 STEP_ROWS = np.column_stack(
     [feature.values for feature in STEP_FUNCTION.input_features]
 )
-STEP_TARGETS = STEP_FUNCTION.target_feature.values
+STEP_TARGETS = STEP_FUNCTION.target_feature.column
 
 
 def classifier(**overrides) -> DecisionTreeClassifier:
@@ -110,7 +112,10 @@ class TestTheTwoRoutesAgree:
         model._feature_names = ("flat",)
         model._n_classes = 2
         rows = np.full((8, 1), 2.0)
-        targets = np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
+        targets = Column(
+            np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]),
+            ValueRole.TARGET_VALUES,
+        )
 
         assert model._best_split(rows, targets) is None
         assert model.split_search(rows, targets).best is None
@@ -123,7 +128,10 @@ class TestTheTwoRoutesAgree:
         for _ in range(60):
             n_rows = int(generator.integers(4, 30))
             rows = generator.integers(0, 4, size=(n_rows, 3)).astype(float)
-            targets = generator.integers(0, 2, size=n_rows).astype(float)
+            targets = Column(
+                generator.integers(0, 2, size=n_rows).astype(float),
+                ValueRole.TARGET_VALUES,
+            )
 
             model = DecisionTreeClassifier(
                 min_samples_leaf=int(generator.integers(1, 4))

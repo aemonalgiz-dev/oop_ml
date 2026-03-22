@@ -20,20 +20,37 @@ a split search comparing gains would then silently never choose that candidate.
 import numpy as np
 import pytest
 
+from oop_ml.core.data.column import Column
+from oop_ml.core.exceptions import EmptyValuesError
 from oop_ml.core.tree.impurity import (
     EntropyImpurity,
     GiniImpurity,
     Impurity,
     VarianceImpurity,
 )
+from oop_ml.core.validation import ValueRole
 
 CLASSIFICATION_MEASURES = [GiniImpurity(), EntropyImpurity()]
 EVERY_MEASURE = [*CLASSIFICATION_MEASURES, VarianceImpurity()]
 
 
-def labels(zeros: int, ones: int) -> np.ndarray:
+def targets(values) -> Column:
+    """These values as the target column an impurity measure now takes.
+
+    ``Impurity.of`` used to take a bare array and define the empty node as
+    zero. It takes a :class:`~oop_ml.core.data.column.Column` now, which cannot
+    be empty, so the case is unrepresentable rather than defined away and the
+    two tests that pinned it have gone.
+    """
+    if isinstance(values, Column):
+        return values
+
+    return Column(np.asarray(values, dtype=float), ValueRole.TARGET_VALUES)
+
+
+def labels(zeros: int, ones: int) -> Column:
     """A class column holding this many of each class."""
-    return np.concatenate([np.zeros(zeros), np.ones(ones)])
+    return targets(np.concatenate([np.zeros(zeros), np.ones(ones)]))
 
 
 class TestGini:
@@ -47,16 +64,16 @@ class TestGini:
         ],
     )
     def test_matches_the_formula(self, values, expected):
-        assert GiniImpurity().of(np.array(values, dtype=float)) == (
-            pytest.approx(expected)
-        )
+        assert GiniImpurity().of(targets(values)) == (pytest.approx(expected))
 
     def test_it_is_the_chance_two_draws_disagree(self):
         # The reading that explains the formula: with three quarters class 0,
         # two independent draws match with probability 0.75^2 + 0.25^2.
         values = labels(30, 10)
 
-        assert GiniImpurity().of(values) == pytest.approx(1.0 - (0.75**2 + 0.25**2))
+        assert GiniImpurity().of(targets(values)) == pytest.approx(
+            1.0 - (0.75**2 + 0.25**2)
+        )
 
     def test_the_maximum_is_at_a_uniform_split(self):
         uniform = GiniImpurity().of(labels(50, 50))
@@ -76,9 +93,7 @@ class TestEntropy:
         ],
     )
     def test_matches_the_formula(self, values, expected):
-        assert EntropyImpurity().of(np.array(values, dtype=float)) == (
-            pytest.approx(expected)
-        )
+        assert EntropyImpurity().of(targets(values)) == (pytest.approx(expected))
 
     def test_a_class_with_no_rows_contributes_zero_not_nan(self):
         # 0 * log2(0) is the limit 0, and numpy says nan. A single nan makes
@@ -86,7 +101,7 @@ class TestEntropy:
         # never chosen and the failure looks like a bad tree rather than a bug.
         values = np.array([0.0, 0.0, 2.0, 2.0])
 
-        result = EntropyImpurity().of(values)
+        result = EntropyImpurity().of(targets(values))
 
         assert not np.isnan(result)
         assert result == pytest.approx(1.0)
@@ -105,12 +120,12 @@ class TestVariance:
         ],
     )
     def test_matches_the_formula(self, values, expected):
-        assert VarianceImpurity().of(np.array(values)) == pytest.approx(expected)
+        assert VarianceImpurity().of(targets(values)) == pytest.approx(expected)
 
     def test_the_mean_is_what_minimises_it(self):
         # Why a regression leaf predicts a mean: no other constant does better.
         values = np.array([2.0, 4.0, 9.0, 13.0])
-        at_the_mean = VarianceImpurity().of(values)
+        at_the_mean = VarianceImpurity().of(targets(values))
 
         for guess in (0.0, 3.0, 6.0, 7.5, 12.0):
             elsewhere = float(((values - guess) ** 2).mean())
@@ -120,13 +135,20 @@ class TestVariance:
 class TestEveryMeasure:
     @pytest.mark.parametrize("measure", EVERY_MEASURE)
     def test_a_pure_node_is_zero(self, measure):
-        assert measure.of(np.full(7, 3.0)) == pytest.approx(0.0)
+        assert measure.of(targets(np.full(7, 3.0))) == pytest.approx(0.0)
 
     @pytest.mark.parametrize("measure", EVERY_MEASURE)
-    def test_an_empty_node_is_zero(self, measure):
-        # Nothing in it to disagree. Defined rather than incidental, because a
-        # nan here would travel straight into a gain comparison.
-        assert measure.of(np.empty(0)) == pytest.approx(0.0)
+    def test_an_empty_node_cannot_be_asked_about(self, measure):
+        """What used to be defined as zero is now unrepresentable.
+
+        Gini would return 1.0 on nothing, variance ``nan``, and a ``nan``
+        makes every comparison against it false, so a split search would
+        silently never choose that candidate. ``of`` took a bare array and
+        had to define the case away; taking a column means no measure can be
+        handed one.
+        """
+        with pytest.raises(EmptyValuesError):
+            measure.of(targets(np.empty(0)))
 
     @pytest.mark.parametrize("measure", EVERY_MEASURE)
     def test_it_is_never_negative(self, measure):
@@ -134,22 +156,23 @@ class TestEveryMeasure:
 
         for _ in range(20):
             values = generator.integers(0, 4, size=12).astype(float)
-            assert measure.of(values) >= 0.0
+            assert measure.of(targets(values)) >= 0.0
 
     @pytest.mark.parametrize("measure", EVERY_MEASURE)
     def test_it_returns_a_python_float(self, measure):
         # numpy reductions hand back float64, which is duck-compatible enough
         # that nothing complains until the value has travelled through a gain
         # and into a leaf. The base coerces once so no measure has to.
-        assert type(measure.of(np.array([1.0, 2.0, 3.0, 4.0]))) is float
-        assert type(measure.of(np.empty(0))) is float
+        assert type(measure.of(targets([1.0, 2.0, 3.0, 4.0]))) is float
 
     @pytest.mark.parametrize("measure", CLASSIFICATION_MEASURES)
     def test_it_ignores_how_the_rows_are_ordered(self, measure):
         values = labels(4, 6)
-        shuffled = np.random.default_rng(1).permutation(values)
+        shuffled = np.random.default_rng(1).permutation(values.values)
 
-        assert measure.of(values) == pytest.approx(measure.of(shuffled))
+        assert measure.of(targets(values)) == pytest.approx(
+            measure.of(targets(shuffled))
+        )
 
 
 class TestGain:
@@ -209,7 +232,12 @@ class TestGain:
         for _ in range(50):
             parent = generator.integers(0, 3, size=30).astype(float)
             cut = int(generator.integers(1, 29))
-            assert measure.gain(parent, parent[:cut], parent[cut:]) >= -1e-12
+            assert (
+                measure.gain(
+                    targets(parent), targets(parent[:cut]), targets(parent[cut:])
+                )
+                >= -1e-12
+            )
 
 
 class TestTheHierarchy:

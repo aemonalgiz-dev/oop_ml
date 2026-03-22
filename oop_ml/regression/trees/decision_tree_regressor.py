@@ -43,6 +43,7 @@ import numpy as np
 
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.base.tree_model import TreeModel
+from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.tree.criterion import RegressionCriterion
 from oop_ml.core.tree.impurity import Impurity
@@ -71,7 +72,7 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
     def _impurity(self) -> Impurity:
         return self.criterion.impurity
 
-    def _leaf(self, target_values: FloatArray) -> LeafNode:
+    def _leaf(self, target_values: Column) -> LeafNode:
         """A leaf predicting the mean of these targets.
 
         Parameters
@@ -87,8 +88,8 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
             impurity of these targets under the configured criterion.
         """
         return LeafNode(
-            prediction=np.mean(target_values),
-            n_samples=len(target_values),
+            prediction=float(np.mean(target_values.values)),
+            n_samples=target_values.n_samples,
             impurity=self._impurity.of(target_values),
         )
 

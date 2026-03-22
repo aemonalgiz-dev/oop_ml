@@ -62,7 +62,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from oop_ml.core.data.column import Column
 from oop_ml.core.types import FloatArray
+from oop_ml.core.validation import ValueRole
 
 
 class Impurity(ABC):
@@ -70,7 +72,7 @@ class Impurity(ABC):
 
     __slots__ = ()
 
-    def of(self, target_values: FloatArray) -> float:
+    def of(self, target_values: Column) -> float:
         """How mixed this node is. Zero when every row agrees.
 
         Parameters
@@ -83,37 +85,28 @@ class Impurity(ABC):
         -------
         float
             Impurity, at or above zero, and zero exactly when the node is pure.
-            An empty node is defined as zero: there is nothing in it to
-            disagree.
 
         Notes
         -----
-        The empty case is settled here rather than in each measure, which is
-        the whole reason this method is concrete and :meth:`_of_non_empty` is
-        the one a subclass writes. Stated as a rule in a contract, every
-        implementation has to remember it independently and eventually one will
-        not -- and the symptom differs by measure, which makes it worse. Gini
-        returns 1.0, because the sum of no squared proportions is zero and one
-        minus zero is one. Variance returns ``nan``, because the mean of
-        nothing is undefined, and a ``nan`` then makes every comparison against
-        it false, so a split search would silently never choose that candidate.
-        Entropy happens to return zero and would have hidden the problem.
+        This used to take a bare array and define the empty node as zero, with
+        a long note explaining why: Gini returns 1.0 on nothing, because the
+        sum of no squared proportions is zero; variance returns ``nan``,
+        because the mean of nothing is undefined, and a ``nan`` then makes
+        every comparison against it false, so a split search would silently
+        never choose that candidate.
 
-        Whether an empty node is reachable at all is a separate question --
-        ``_best_split`` rejects any split that would empty a child, so within
-        the models it is not. This is a guarantee about the type rather than a
-        defence against the callers it currently has.
+        Taking a :class:`~oop_ml.core.data.column.Column` retires the whole
+        discussion. A column cannot be empty, so the case is not defined away,
+        it is unrepresentable, and no measure can be written that gets it
+        wrong. That is the difference between a rule stated in a contract and
+        an invariant carried by a type.
 
-        The coercion to ``float`` is here for the same reason. A measure whose
-        formula ends in a numpy reduction hands back a ``float64``, which is
-        duck-compatible enough that neither the tests nor the type checker
-        notice, and which then travels outward into every gain and every leaf.
-        Doing it once at the boundary means no measure has to remember.
+        The coercion to ``float`` stays. A measure whose formula ends in a
+        numpy reduction hands back a ``float64``, which is duck-compatible
+        enough that neither the tests nor the type checker notice, and which
+        then travels outward into every gain and every leaf.
         """
-        if target_values.size == 0:
-            return 0.0
-
-        return float(self._of_non_empty(target_values))
+        return float(self._of_non_empty(target_values.values))
 
     @abstractmethod
     def _of_non_empty(self, target_values: FloatArray) -> float:
@@ -155,9 +148,9 @@ class Impurity(ABC):
 
     def gain(
         self,
-        parent_values: FloatArray,
-        left_values: FloatArray,
-        right_values: FloatArray,
+        parent_values: Column,
+        left_values: Column,
+        right_values: Column,
     ) -> float:
         """How much impurity a split removes.
 
@@ -190,6 +183,7 @@ class Impurity(ABC):
         parent_impurity = self.of(parent_values)
         left_impurity = self.of(left_values)
         right_impurity = self.of(right_values)
+
         n = len(left_values) + len(right_values)
 
         return (
@@ -233,9 +227,16 @@ class Impurity(ABC):
         subclasses below exist to avoid. Every override is covered by a test
         asserting it agrees with this.
         """
+        role = ValueRole.TARGET_VALUES
+        parent = Column.selecting(sorted_targets, role)
+
         return np.array(
             [
-                self.gain(sorted_targets, sorted_targets[:cut], sorted_targets[cut:])
+                self.gain(
+                    parent,
+                    Column.selecting(sorted_targets[:cut], role),
+                    Column.selecting(sorted_targets[cut:], role),
+                )
                 for cut in range(1, sorted_targets.size)
             ],
             dtype=np.float64,
@@ -297,7 +298,7 @@ class GiniImpurity(Impurity):
             rows_left[:, 0] * left_impurity + rows_right[:, 0] * right_impurity
         ) / n_rows
 
-        return self.of(sorted_targets) - weighted
+        return float(self._of_non_empty(sorted_targets)) - weighted
 
 
 class EntropyImpurity(Impurity):
@@ -341,7 +342,7 @@ class EntropyImpurity(Impurity):
             + rows_right[:, 0] * self._bits(right_counts, rows_right)
         ) / n_rows
 
-        return self.of(sorted_targets) - weighted
+        return float(self._of_non_empty(sorted_targets)) - weighted
 
     @staticmethod
     def _bits(counts: FloatArray, row_totals: FloatArray) -> FloatArray:
