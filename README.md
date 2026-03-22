@@ -41,7 +41,7 @@ Python 3.11 or later.
 | **Classification** | logistic (gradient ascent and IRLS), softmax, one-vs-rest |
 | **Neighbours** | k-nearest for both tasks, six distance metrics |
 | **Trees** | decision tree for both tasks, Gini / entropy / variance |
-| **Ensembles** | bagging, random forest, gradient boosting |
+| **Ensembles** | bagging, random forest, gradient boosting, out-of-bag scoring |
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, cross-validation |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
@@ -130,7 +130,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1310 tests
+pytest                  # 1326 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -144,7 +144,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1310 passing tests**, `ruff`
+Every supervised family is implemented and green: **1326 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -156,12 +156,10 @@ an application:
    leak across the split, and the serving path has to re-apply it by hand.
 3. **Cross-validated classification.** `CrossValidation` scores with R², so it
    only speaks to regressors, and fixing that needs stratified folds as well.
-4. **Out-of-bag scoring.** `BootstrapSample` already reports the rows each
-   member never saw, although nothing consumes them yet.
-5. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
+4. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
    first and cutting back on what a subtree turned out to be worth.
-6. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
+5. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
    searches a space of them.
-7. **Unsupervised learning and kernels.** Both absent entirely. Every base
+6. **Unsupervised learning and kernels.** Both absent entirely. Every base
    class here takes a target, so k-means and PCA need new frames rather than
    new models.

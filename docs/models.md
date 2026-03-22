@@ -427,6 +427,45 @@ already does most of the work, simply by varying which spurious split happens
 to win each member's root. Restricting features sharpens the result, though it
 is doing less of the work than I expected it to.
 
+### The Held-Out Score That Was Already There
+
+Every member missed about 36.8% of the training set, so the ensemble is already
+carrying a held-out set and nobody has to set one aside. For each training row,
+find the members whose resample never drew it, average only those, and compare
+to the truth.
+
+```python
+forest.out_of_bag_score()      # R^2 against rows each member never saw
+forest.out_of_bag_evaluate()   # the full evaluation, if you want more than one metric
+```
+
+Measured on the same fixture:
+
+```
+                       training    out-of-bag    held out
+BaggingClassifier        0.9900        0.8350      0.8500
+RandomForestRegressor    0.9615        0.6992      0.7545
+```
+
+The out-of-bag number sits beside the held-out number and nowhere near the
+training one, which is the whole claim. It also lands slightly *below* the
+held-out number in both rows, and that is not noise. Each row is judged by
+roughly `0.368 * B` members rather than by all `B`, so what we are measuring is
+a smaller ensemble than the one we fitted, and a smaller averaging ensemble is
+a worse one. The estimate is conservative by construction.
+
+There is a failure mode worth knowing before leaning on it. A row is in-bag for
+*every* member with probability `(1 - 1/e)^B`, so at three members:
+
+```
+3 members:   152 covered, 48 uncovered, 1.5 judges per row
+```
+
+A quarter of the rows had nobody entitled to judge them, against the 25.2% the
+formula predicts. At a hundred members the same quantity is around 1e-20 and
+the concern evaporates, but `OutOfBagEstimate` reports `n_uncovered` either way
+rather than quietly scoring on whatever was left.
+
 ### Boosting, Which Fits The Mistakes
 
 Where averaging fits members that never meet each other, boosting fits one

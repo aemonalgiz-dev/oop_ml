@@ -67,7 +67,8 @@ from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
-from oop_ml.core.types import FloatArray
+from oop_ml.core.ensemble.out_of_bag import OutOfBagEstimate
+from oop_ml.core.types import FloatArray, MaskArray
 
 # What a member is, and why the two frames disagree about it.
 #
@@ -111,6 +112,26 @@ class AveragingEnsemble(Fittable):
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _members: tuple[AveragingMember, ...] | None = PrivateAttr(default=None)
     _samples: tuple[BootstrapSample, ...] | None = PrivateAttr(default=None)
+
+    # Kept for the same reason NeighbourModel keeps its rows, and at the same
+    # cost: the out-of-bag estimate asks what each member says about training
+    # rows it never drew, and there is no way to ask that after the data has
+    # been let go. Every other model here discards its training set once the
+    # parameters are learned.
+    _training: Dataset | None = PrivateAttr(default=None)
+
+    @property
+    def samples(self) -> tuple[BootstrapSample, ...]:
+        """The resample each member was fitted on, in member order.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+        self._check_fitted()
+        assert self._samples is not None
+        return self._samples
 
     @property
     def members(self) -> tuple[AveragingMember, ...]:
@@ -253,8 +274,98 @@ class AveragingEnsemble(Fittable):
             members.append(member.fit(resample.input_features, resample.target_feature))
 
         self._members = tuple(members)
+        self._training = dataset
         self._mark_fitted()
         return self
+
+    def out_of_bag_estimate(self) -> OutOfBagEstimate:
+        """Predict each training row using only the members that missed it.
+
+        Line the samples up as a ``(n_members, n_rows)`` grid of "did this
+        member draw this row". Reading *down* a column gives the members
+        entitled to judge that row, because they are the ones that never saw
+        it, and averaging only those is an honest prediction for a row the
+        model was nonetheless fitted on.
+
+        Every row has a different set of judges and the sets are different
+        sizes, so this is not one ensemble answering ``n_rows`` times. Rows
+        that every member happened to draw have no judges at all and no
+        prediction is available for them; mark them false in ``covered``
+        rather than inventing one. At a hundred members that is vanishingly
+        rare, and at five it happens to roughly one row in ten.
+
+        Combine the judges' answers with ``_combine``, the same seam
+        ``predict`` uses, so a regressor averages and a classifier takes the
+        most probable class. Feed it only the rows of ``member_predictions``
+        belonging to that row's judges.
+
+        Returns
+        -------
+        OutOfBagEstimate
+            The predictions, which rows they cover, and how many members stood
+            behind each one.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        member_predictions = self._training_member_predictions()
+        in_bag = self._in_bag_grid()
+        n_rows = in_bag.shape[1]
+
+        # Counting the misses down each column gives every row's judge count in
+        # one pass, and a row is covered exactly when that count is not zero.
+        judges = (~in_bag).sum(axis=0).astype(np.float64)
+        covered = judges > 0
+
+        # NaN rather than zero for the uncovered rows. Zero is a number a
+        # caller could average by accident; NaN poisons anything that forgets
+        # to mask, which is the failure worth having.
+        predictions = np.full(n_rows, np.nan, dtype=np.float64)
+
+        for row in np.flatnonzero(covered):
+            missed = np.flatnonzero(~in_bag[:, row])
+
+            # Slice the row as a width-1 query rather than as a scalar, so the
+            # array keeps the shape _combine expects: members on axis 0,
+            # queries on axis 1, and for a classifier the class axis after it.
+            judged = member_predictions[missed, row : row + 1]
+            predictions[row] = self._combine(judged)[0]
+
+        return OutOfBagEstimate(predictions, covered, judges)
+
+    def _training_member_predictions(self) -> FloatArray:
+        """Every member's answer about every *training* row, uncombined.
+
+        ``(n_members, n_rows)`` for a regressor and
+        ``(n_members, n_rows, n_classes)`` for a classifier, which is the same
+        shape ``_combine`` takes. Members are asked about rows they drew as
+        well as rows they missed; the out-of-bag rule is applied afterwards, by
+        selecting rather than by re-predicting.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        self._check_fitted()
+        assert self._training is not None
+
+        return self._member_predictions(self._training.input_features)
+
+    def _in_bag_grid(self) -> MaskArray:
+        """``(n_members, n_rows)`` -- true where that member drew that row.
+
+        Reading down column ``i`` and negating gives the members allowed to
+        judge row ``i``.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        return np.array([sample.in_bag for sample in self.samples])
 
     def _member_predictions(self, input_values: Sequence[Feature]) -> FloatArray:
         """``(n_members, n_queries)`` -- every member's answer, uncombined.
