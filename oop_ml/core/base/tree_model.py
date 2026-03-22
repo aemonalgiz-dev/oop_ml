@@ -53,6 +53,7 @@ from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.importance.importances import (
     FeatureContribution,
     FeatureImportances,
@@ -341,7 +342,7 @@ class TreeModel(Fittable):
         return (distinct[:-1] + distinct[1:]) / 2.0
 
     def split_search(
-        self, feature_matrix: FloatArray, target_values: Column
+        self, feature_matrix: RowBlock, target_values: Column
     ) -> SplitSearch:
         """Every candidate this node considered, kept or not, and why.
 
@@ -374,7 +375,7 @@ class TreeModel(Fittable):
         candidates: list[SplitCandidate] = []
 
         for index, name in enumerate(self._feature_names):
-            column = feature_matrix[:, index]
+            column = feature_matrix.column_at(index)
 
             for threshold in self._candidate_thresholds(column):
                 goes_left = column < threshold
@@ -411,7 +412,7 @@ class TreeModel(Fittable):
         return SplitSearch(candidates)
 
     def _best_split(
-        self, feature_matrix: FloatArray, target_values: Column
+        self, feature_matrix: RowBlock, target_values: Column
     ) -> Split | None:
         """The highest-gain split of these rows, or ``None`` if there is none.
 
@@ -463,7 +464,7 @@ class TreeModel(Fittable):
         best: Split | None = None
 
         for index, name in self._features_to_consider():
-            column = feature_matrix[:, index]
+            column = feature_matrix.column_at(index)
 
             # Sort once, then every cut on this feature is read off one swept
             # array. Scoring candidates one at a time recomputes both
@@ -512,7 +513,7 @@ class TreeModel(Fittable):
         return best
 
     def _grow(
-        self, feature_matrix: FloatArray, target_values: Column, depth: int
+        self, feature_matrix: RowBlock, target_values: Column, depth: int
     ) -> TreeNode:
         """Build the subtree for these rows, recursively.
         This node becomes a leaf, via :meth:`_leaf`, when **any** of:
@@ -575,12 +576,12 @@ class TreeModel(Fittable):
         return DecisionNode(
             split=best_split,
             left=self._grow(
-                feature_matrix[send_left],
+                feature_matrix.select_rows(send_left),
                 Column.selecting(target_values.values[send_left], role),
                 depth + 1,
             ),
             right=self._grow(
-                feature_matrix[~send_left],
+                feature_matrix.select_rows(~send_left),
                 Column.selecting(target_values.values[~send_left], role),
                 depth + 1,
             ),
@@ -612,13 +613,13 @@ class TreeModel(Fittable):
         # never forms X.T @ v; it reads one column at a time while searching
         # and then slices rows to hand each child its share, and slicing rows
         # is what C order makes contiguous.
-        matrix = np.ascontiguousarray(feature_set.feature_matrix, dtype=np.float64)
-        self._root = self._grow(matrix, self._validated_target(target_values), 0)
+        rows = rows_of(feature_set.feature_matrix, [one.name for one in feature_set])
+        self._root = self._grow(rows, self._validated_target(target_values), 0)
 
         self._mark_fitted()
         return self
 
-    def _matched_rows(self, input_values: Sequence[Feature]) -> FloatArray:
+    def _matched_rows(self, input_values: Sequence[Feature]) -> RowBlock:
         """The query rows, in the column order the fit saw.
 
         Raises
@@ -633,7 +634,9 @@ class TreeModel(Fittable):
         self._check_fitted()
         assert self._feature_names is not None
 
-        return FeatureSet.matching(self._feature_names, input_values).feature_matrix
+        matched = FeatureSet.matching(self._feature_names, input_values)
+
+        return rows_of(matched.feature_matrix, self._feature_names)
 
     def _leaves_for(self, input_values: Sequence[Feature]) -> list[LeafNode]:
         """The leaf each query row reaches, in the order supplied.

@@ -24,6 +24,7 @@ from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.row_block import rows_of
 from oop_ml.core.observation import Observation
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.search import SplitRejection, SplitSearch
@@ -32,12 +33,14 @@ from oop_ml.core.validation import ValueRole
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import EXAM_OUTCOMES, STEP_FUNCTION
 
-EXAM_ROWS = np.column_stack(
-    [feature.values for feature in EXAM_OUTCOMES.input_features]
+EXAM_ROWS = rows_of(
+    np.column_stack([feature.values for feature in EXAM_OUTCOMES.input_features]),
+    [feature.name for feature in EXAM_OUTCOMES.input_features],
 )
 EXAM_TARGETS = EXAM_OUTCOMES.class_feature.column
-STEP_ROWS = np.column_stack(
-    [feature.values for feature in STEP_FUNCTION.input_features]
+STEP_ROWS = rows_of(
+    np.column_stack([feature.values for feature in STEP_FUNCTION.input_features]),
+    [feature.name for feature in STEP_FUNCTION.input_features],
 )
 STEP_TARGETS = STEP_FUNCTION.target_feature.column
 
@@ -111,7 +114,7 @@ class TestTheTwoRoutesAgree:
         model = DecisionTreeClassifier()
         model._feature_names = ("flat",)
         model._n_classes = 2
-        rows = np.full((8, 1), 2.0)
+        rows = rows_of(np.full((8, 1), 2.0), ["flat"])
         targets = Column(
             np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]),
             ValueRole.TARGET_VALUES,
@@ -127,7 +130,10 @@ class TestTheTwoRoutesAgree:
 
         for _ in range(60):
             n_rows = int(generator.integers(4, 30))
-            rows = generator.integers(0, 4, size=(n_rows, 3)).astype(float)
+            rows = rows_of(
+                generator.integers(0, 4, size=(n_rows, 3)).astype(float),
+                ["first", "second", "third"],
+            )
             targets = Column(
                 generator.integers(0, 2, size=n_rows).astype(float),
                 ValueRole.TARGET_VALUES,
@@ -202,7 +208,7 @@ class TestWhatTheRecordHolds:
         search = unfitted_classifier().split_search(EXAM_ROWS, EXAM_TARGETS)
 
         for candidate in search:
-            column = EXAM_ROWS[:, candidate.split.feature_index]
+            column = EXAM_ROWS.column_at(candidate.split.feature_index)
             expected_left = int((column < candidate.split.threshold).sum())
 
             assert candidate.rows_left == expected_left

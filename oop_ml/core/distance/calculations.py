@@ -44,6 +44,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from oop_ml.core.data.row_block import RowBlock
 from oop_ml.core.types import FloatArray
 
 
@@ -53,9 +54,7 @@ class Distance(ABC):
     __slots__ = ()
 
     @abstractmethod
-    def between(
-        self, query_rows: FloatArray, remembered_rows: FloatArray
-    ) -> FloatArray:
+    def between(self, query_rows: RowBlock, remembered_rows: RowBlock) -> FloatArray:
         """Distance from every query row to every remembered row.
 
         Parameters
@@ -106,20 +105,18 @@ class BroadcastDistance(Distance):
             ``(block_size, n_remembered)``.
         """
 
-    def _queries_per_block(self, remembered_rows: FloatArray) -> int:
+    def _queries_per_block(self, remembered_rows: RowBlock) -> int:
         """How many queries fit in one block without exceeding the budget.
 
         At least one, always: a budget smaller than a single query's pairing
         array is a reason to use more memory, not a reason to return zero and
         loop forever.
         """
-        bytes_per_query = max(1, remembered_rows.size * 8)
+        bytes_per_query = max(1, remembered_rows.values.size * 8)
 
         return max(1, self.block_bytes // bytes_per_query)
 
-    def between(
-        self, query_rows: FloatArray, remembered_rows: FloatArray
-    ) -> FloatArray:
+    def between(self, query_rows: RowBlock, remembered_rows: RowBlock) -> FloatArray:
         """Distance from every query row to every remembered row, in blocks.
 
         Identical to computing the whole pairing array at once -- the block
@@ -127,14 +124,14 @@ class BroadcastDistance(Distance):
         agree bit for bit.
         """
         distances = np.empty(
-            (query_rows.shape[0], remembered_rows.shape[0]), dtype=np.float64
+            (query_rows.n_rows, remembered_rows.n_rows), dtype=np.float64
         )
         step = self._queries_per_block(remembered_rows)
 
-        for start in range(0, query_rows.shape[0], step):
+        for start in range(0, query_rows.n_rows, step):
             stop = start + step
             distances[start:stop] = self._between_block(
-                query_rows[start:stop], remembered_rows
+                query_rows.values[start:stop], remembered_rows.values
             )
 
         return distances
@@ -209,12 +206,10 @@ class EuclideanDistance(Distance):
 
     __slots__ = ()
 
-    def between(
-        self, query_rows: FloatArray, remembered_rows: FloatArray
-    ) -> FloatArray:
-        centre = remembered_rows.mean(axis=0)
-        centred_queries = query_rows - centre
-        centred_remembered = remembered_rows - centre
+    def between(self, query_rows: RowBlock, remembered_rows: RowBlock) -> FloatArray:
+        centre = remembered_rows.values.mean(axis=0)
+        centred_queries = query_rows.values - centre
+        centred_remembered = remembered_rows.values - centre
 
         # einsum("ij,ij->i") is the row-wise squared norm without building the
         # squared array first, which (rows * rows).sum(axis=1) would.
@@ -277,10 +272,11 @@ class CosineDistance(Distance):
 
         return rows / np.where(norms > 0.0, norms, 1.0)[:, None]
 
-    def between(
-        self, query_rows: FloatArray, remembered_rows: FloatArray
-    ) -> FloatArray:
-        similarities = self._unit_rows(query_rows) @ self._unit_rows(remembered_rows).T
+    def between(self, query_rows: RowBlock, remembered_rows: RowBlock) -> FloatArray:
+        similarities = (
+            self._unit_rows(query_rows.values)
+            @ self._unit_rows(remembered_rows.values).T
+        )
 
         # Rounding pushes a cosine a hair either side of 1, so a row against
         # itself lands within an epsilon or two of zero rather than on it. The

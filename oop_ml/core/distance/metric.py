@@ -48,6 +48,7 @@ from enum import StrEnum
 
 import numpy as np
 
+from oop_ml.core.data.row_block import RowBlock
 from oop_ml.core.distance.calculations import (
     CanberraDistance,
     CosineDistance,
@@ -167,9 +168,7 @@ class DistanceMetric(StrEnum):
         """
         return self._calculation
 
-    def between(
-        self, query_rows: FloatArray, remembered_rows: FloatArray
-    ) -> FloatArray:
+    def between(self, query_rows: RowBlock, remembered_rows: RowBlock) -> FloatArray:
         """Distance from every query row to every remembered row.
 
         Parameters

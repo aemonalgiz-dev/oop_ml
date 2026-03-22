@@ -31,6 +31,7 @@ import math
 import numpy as np
 import pytest
 
+from oop_ml.core.data.row_block import RowBlock
 from oop_ml.core.distance.calculations import (
     BroadcastDistance,
     CanberraDistance,
@@ -41,6 +42,19 @@ from oop_ml.core.distance.calculations import (
     MinkowskiDistance,
 )
 from oop_ml.core.distance.metric import DistanceMetric
+
+
+def block(values) -> RowBlock:
+    """These rows as the block every ``between`` now takes.
+
+    A :class:`~oop_ml.core.data.row_block.RowBlock` rather than a bare array,
+    because the orientation is the one thing a caller of a distance can get
+    silently wrong: queries down the rows, remembered rows down the other
+    argument, and a transposed matrix still multiplies.
+    """
+    array = np.asarray(values, dtype=float)
+
+    return RowBlock(array, [f"feature_{index}" for index in range(array.shape[1])])
 
 
 def euclidean_oracle(first_row, second_row):
@@ -102,11 +116,13 @@ class TestShape:
         queries = np.zeros((4, 3))
         remembered = np.ones((7, 3))
 
-        assert metric.between(queries, remembered).shape == (4, 7)
+        assert metric.between(block(queries), block(remembered)).shape == (4, 7)
 
     @pytest.mark.parametrize("metric", list(DistanceMetric))
     def test_a_single_query_still_returns_a_matrix(self, metric):
-        assert metric.between(np.zeros((1, 2)), np.ones((5, 2))).shape == (1, 5)
+        assert metric.between(
+            block(np.zeros((1, 2))), block(np.ones((5, 2)))
+        ).shape == (1, 5)
 
     @pytest.mark.parametrize("metric", list(DistanceMetric))
     def test_no_metric_ever_returns_a_negative_distance(self, metric):
@@ -114,7 +130,7 @@ class TestShape:
         queries = generator.normal(size=(6, 4))
         remembered = generator.normal(size=(9, 4))
 
-        assert (metric.between(queries, remembered) >= 0.0).all()
+        assert (metric.between(block(queries), block(remembered)) >= 0.0).all()
 
 
 class TestEuclidean:
@@ -122,7 +138,7 @@ class TestEuclidean:
         queries = np.array([[0.0, 0.0]])
         remembered = np.array([[3.0, 4.0], [1.0, 1.0], [0.0, 0.0]])
 
-        distances = DistanceMetric.EUCLIDEAN.between(queries, remembered)
+        distances = DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))
 
         assert distances[0] == pytest.approx([5.0, np.sqrt(2.0), 0.0])
 
@@ -133,14 +149,14 @@ class TestEuclidean:
         queries = generator.normal(size=(7, 5))
         remembered = generator.normal(size=(13, 5))
 
-        assert DistanceMetric.EUCLIDEAN.between(queries, remembered) == (
+        assert DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered)) == (
             pytest.approx(pairwise_oracle(queries, remembered, euclidean_oracle))
         )
 
     def test_a_row_is_zero_distance_from_itself(self):
         rows = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
 
-        distances = DistanceMetric.EUCLIDEAN.between(rows, rows)
+        distances = DistanceMetric.EUCLIDEAN.between(block(rows), block(rows))
 
         assert np.diag(distances) == pytest.approx(np.zeros(3))
 
@@ -148,8 +164,8 @@ class TestEuclidean:
         first = np.array([[1.0, 2.0]])
         second = np.array([[4.0, 6.0]])
 
-        forwards = DistanceMetric.EUCLIDEAN.between(first, second)
-        backwards = DistanceMetric.EUCLIDEAN.between(second, first)
+        forwards = DistanceMetric.EUCLIDEAN.between(block(first), block(second))
+        backwards = DistanceMetric.EUCLIDEAN.between(block(second), block(first))
 
         assert forwards[0, 0] == pytest.approx(backwards[0, 0])
 
@@ -165,7 +181,7 @@ class TestEuclideanPrecision:
         queries = np.array([[base, base]])
         remembered = np.array([[base + 1.0e-06, base], [base, base + 3.0e-06]])
 
-        distances = DistanceMetric.EUCLIDEAN.between(queries, remembered)
+        distances = DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))
         expected = pairwise_oracle(queries, remembered, euclidean_oracle)
 
         assert distances[0] == pytest.approx(expected[0], rel=1.0e-09)
@@ -177,7 +193,7 @@ class TestEuclideanPrecision:
         base = 1.0e06
         rows = np.array([[base, base], [base + 1.0e-06, base]])
 
-        distances = DistanceMetric.EUCLIDEAN.between(rows, rows)
+        distances = DistanceMetric.EUCLIDEAN.between(block(rows), block(rows))
 
         assert not np.isnan(distances).any()
         assert np.diag(distances) == pytest.approx(np.zeros(2))
@@ -187,8 +203,8 @@ class TestEuclideanPrecision:
         queries = generator.normal(size=(40, 12))
         remembered = generator.normal(size=(60, 12))
 
-        fast = EuclideanDistance().between(queries, remembered)
-        broadcast = MinkowskiDistance(2).between(queries, remembered)
+        fast = EuclideanDistance().between(block(queries), block(remembered))
+        broadcast = MinkowskiDistance(2).between(block(queries), block(remembered))
 
         assert fast == pytest.approx(broadcast, rel=1.0e-12, abs=1.0e-12)
 
@@ -198,7 +214,7 @@ class TestManhattan:
         queries = np.array([[0.0, 0.0]])
         remembered = np.array([[3.0, 4.0], [1.0, 1.0], [0.0, 0.0]])
 
-        distances = DistanceMetric.MANHATTAN.between(queries, remembered)
+        distances = DistanceMetric.MANHATTAN.between(block(queries), block(remembered))
 
         assert distances[0] == pytest.approx([7.0, 2.0, 0.0])
 
@@ -208,20 +224,20 @@ class TestManhattan:
         queries = np.array([[0.0, 0.0]])
 
         one_feature = np.array([[10.0, 0.0]])
-        assert DistanceMetric.EUCLIDEAN.between(queries, one_feature)[0, 0] == (
-            pytest.approx(10.0)
-        )
-        assert DistanceMetric.MANHATTAN.between(queries, one_feature)[0, 0] == (
-            pytest.approx(10.0)
-        )
+        assert DistanceMetric.EUCLIDEAN.between(block(queries), block(one_feature))[
+            0, 0
+        ] == (pytest.approx(10.0))
+        assert DistanceMetric.MANHATTAN.between(block(queries), block(one_feature))[
+            0, 0
+        ] == (pytest.approx(10.0))
 
         spread = np.array([[6.0, 8.0]])
-        assert DistanceMetric.EUCLIDEAN.between(queries, spread)[0, 0] == (
-            pytest.approx(10.0)
-        )
-        assert DistanceMetric.MANHATTAN.between(queries, spread)[0, 0] == (
-            pytest.approx(14.0)
-        )
+        assert DistanceMetric.EUCLIDEAN.between(block(queries), block(spread))[
+            0, 0
+        ] == (pytest.approx(10.0))
+        assert DistanceMetric.MANHATTAN.between(block(queries), block(spread))[
+            0, 0
+        ] == (pytest.approx(14.0))
 
 
 class TestChebyshev:
@@ -229,9 +245,9 @@ class TestChebyshev:
         queries = np.array([[0.0, 0.0, 0.0]])
         remembered = np.array([[4.0, 2.0, -6.0]])
 
-        assert DistanceMetric.CHEBYSHEV.between(queries, remembered)[0, 0] == (
-            pytest.approx(6.0)
-        )
+        assert DistanceMetric.CHEBYSHEV.between(block(queries), block(remembered))[
+            0, 0
+        ] == (pytest.approx(6.0))
 
     def test_adding_gaps_in_other_features_changes_nothing(self):
         # This is what "p at infinity" buys, and what makes it the right choice
@@ -240,8 +256,12 @@ class TestChebyshev:
         one_large = np.array([[6.0, 0.0, 0.0]])
         several = np.array([[6.0, 5.0, 5.0]])
 
-        assert DistanceMetric.CHEBYSHEV.between(queries, one_large)[0, 0] == (
-            pytest.approx(DistanceMetric.CHEBYSHEV.between(queries, several)[0, 0])
+        assert DistanceMetric.CHEBYSHEV.between(block(queries), block(one_large))[
+            0, 0
+        ] == (
+            pytest.approx(
+                DistanceMetric.CHEBYSHEV.between(block(queries), block(several))[0, 0]
+            )
         )
 
     def test_it_is_the_limit_the_p_norms_approach(self):
@@ -249,7 +269,7 @@ class TestChebyshev:
         origin = np.array([[0.0, 0.0, 0.0]])
 
         rising = [
-            MinkowskiDistance(order).between(origin, gap)[0, 0]
+            MinkowskiDistance(order).between(block(origin), block(gap))[0, 0]
             for order in (1, 2, 4, 10, 30)
         ]
 
@@ -262,7 +282,7 @@ class TestCosine:
         queries = np.array([[1.0, 1.0, 1.0]])
         remembered = np.array([[2.0, 2.0, 2.0], [100.0, 100.0, 100.0]])
 
-        distances = DistanceMetric.COSINE.between(queries, remembered)
+        distances = DistanceMetric.COSINE.between(block(queries), block(remembered))
 
         assert distances[0] == pytest.approx([0.0, 0.0])
 
@@ -272,16 +292,19 @@ class TestCosine:
         queries = np.array([[1.0, 1.0]])
         remembered = np.array([[100.0, 100.0]])
 
-        assert DistanceMetric.EUCLIDEAN.between(queries, remembered)[0, 0] > 100.0
-        assert DistanceMetric.COSINE.between(queries, remembered)[0, 0] == (
-            pytest.approx(0.0)
+        assert (
+            DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))[0, 0]
+            > 100.0
         )
+        assert DistanceMetric.COSINE.between(block(queries), block(remembered))[
+            0, 0
+        ] == (pytest.approx(0.0))
 
     def test_a_right_angle_is_one_and_opposite_is_two(self):
         queries = np.array([[1.0, 0.0]])
         remembered = np.array([[0.0, 1.0], [-1.0, 0.0]])
 
-        assert DistanceMetric.COSINE.between(queries, remembered)[0] == (
+        assert DistanceMetric.COSINE.between(block(queries), block(remembered))[0] == (
             pytest.approx([1.0, 2.0])
         )
 
@@ -293,7 +316,7 @@ class TestCosine:
         generator = np.random.default_rng(5)
         rows = generator.normal(size=(20, 8))
 
-        distances = DistanceMetric.COSINE.between(rows, rows)
+        distances = DistanceMetric.COSINE.between(block(rows), block(rows))
 
         assert np.diag(distances) == pytest.approx(np.zeros(20), abs=1.0e-12)
         assert (distances >= 0.0).all()
@@ -303,7 +326,7 @@ class TestCosine:
         queries = np.array([[0.0, 0.0]])
         remembered = np.array([[1.0, 0.0], [3.0, 4.0]])
 
-        assert DistanceMetric.COSINE.between(queries, remembered)[0] == (
+        assert DistanceMetric.COSINE.between(block(queries), block(remembered))[0] == (
             pytest.approx([1.0, 1.0])
         )
 
@@ -313,7 +336,7 @@ class TestHamming:
         queries = np.array([[1.0, 2.0, 3.0, 4.0]])
         remembered = np.array([[1.0, 2.0, 3.0, 4.0], [1.0, 2.0, 3.0, 9.0]])
 
-        assert DistanceMetric.HAMMING.between(queries, remembered)[0] == (
+        assert DistanceMetric.HAMMING.between(block(queries), block(remembered))[0] == (
             pytest.approx([0.0, 0.25])
         )
 
@@ -324,17 +347,19 @@ class TestHamming:
         near = np.array([[2.0, 1.0]])
         far = np.array([[900.0, 1.0]])
 
-        assert DistanceMetric.HAMMING.between(queries, near)[0, 0] == (
-            pytest.approx(DistanceMetric.HAMMING.between(queries, far)[0, 0])
+        assert DistanceMetric.HAMMING.between(block(queries), block(near))[0, 0] == (
+            pytest.approx(
+                DistanceMetric.HAMMING.between(block(queries), block(far))[0, 0]
+            )
         )
 
     def test_it_is_a_share_so_it_never_exceeds_one(self):
         queries = np.array([[1.0, 2.0, 3.0]])
         remembered = np.array([[9.0, 9.0, 9.0]])
 
-        assert DistanceMetric.HAMMING.between(queries, remembered)[0, 0] == (
-            pytest.approx(1.0)
-        )
+        assert DistanceMetric.HAMMING.between(block(queries), block(remembered))[
+            0, 0
+        ] == (pytest.approx(1.0))
 
 
 class TestCanberra:
@@ -343,15 +368,15 @@ class TestCanberra:
         queries = np.array([[1.0, 1.0, 1.0]])
         remembered = np.array([[2.0, 1.0, 1.0]])
 
-        assert DistanceMetric.CANBERRA.between(queries, remembered)[0, 0] == (
-            pytest.approx(1.0 / 3.0)
-        )
+        assert DistanceMetric.CANBERRA.between(block(queries), block(remembered))[
+            0, 0
+        ] == (pytest.approx(1.0 / 3.0))
 
     def test_two_zeros_agree_rather_than_dividing_by_zero(self):
         queries = np.array([[0.0, 5.0]])
         remembered = np.array([[0.0, 5.0]])
 
-        distances = DistanceMetric.CANBERRA.between(queries, remembered)
+        distances = DistanceMetric.CANBERRA.between(block(queries), block(remembered))
 
         assert not np.isnan(distances).any()
         assert distances[0, 0] == pytest.approx(0.0)
@@ -361,7 +386,10 @@ class TestCanberra:
         queries = np.array([[1.0, 1.0]])
         remembered = np.array([[1.0, 1000000.0]])
 
-        assert DistanceMetric.CANBERRA.between(queries, remembered)[0, 0] <= 2.0
+        assert (
+            DistanceMetric.CANBERRA.between(block(queries), block(remembered))[0, 0]
+            <= 2.0
+        )
 
     def test_it_is_most_sensitive_near_zero(self):
         # A doubling costs the same wherever it happens, which is the point on
@@ -369,10 +397,8 @@ class TestCanberra:
         queries = np.array([[0.001]])
         remembered = np.array([[0.002]])
 
-        small = DistanceMetric.CANBERRA.between(queries, remembered)[0, 0]
-        large = DistanceMetric.CANBERRA.between(np.array([[1.0]]), np.array([[2.0]]))[
-            0, 0
-        ]
+        small = DistanceMetric.CANBERRA.between(block(queries), block(remembered))[0, 0]
+        large = DistanceMetric.CANBERRA.between(block([[1.0]]), block([[2.0]]))[0, 0]
 
         assert small == pytest.approx(large)
 
@@ -387,8 +413,12 @@ class TestTheMetricsDisagree:
         queries = np.array([[0.0, 0.0]])
         remembered = np.array([[3.0, 3.0], [5.0, 0.0]])
 
-        euclidean = DistanceMetric.EUCLIDEAN.between(queries, remembered)[0]
-        manhattan = DistanceMetric.MANHATTAN.between(queries, remembered)[0]
+        euclidean = DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))[
+            0
+        ]
+        manhattan = DistanceMetric.MANHATTAN.between(block(queries), block(remembered))[
+            0
+        ]
 
         assert int(np.argmin(euclidean)) == 0
         assert int(np.argmin(manhattan)) == 1
@@ -399,8 +429,10 @@ class TestTheMetricsDisagree:
         queries = np.array([[1.0, 1.0]])
         remembered = np.array([[10.0, 10.0], [1.0, 0.0]])
 
-        euclidean = DistanceMetric.EUCLIDEAN.between(queries, remembered)[0]
-        cosine = DistanceMetric.COSINE.between(queries, remembered)[0]
+        euclidean = DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))[
+            0
+        ]
+        cosine = DistanceMetric.COSINE.between(block(queries), block(remembered))[0]
 
         assert int(np.argmin(euclidean)) == 1
         assert int(np.argmin(cosine)) == 0
@@ -410,8 +442,10 @@ class TestTheMetricsDisagree:
         queries = np.array([[0.0, 0.0, 0.0]])
         remembered = np.array([[50.0, 0.0, 0.0], [0.1, 0.1, 0.1]])
 
-        euclidean = DistanceMetric.EUCLIDEAN.between(queries, remembered)[0]
-        hamming = DistanceMetric.HAMMING.between(queries, remembered)[0]
+        euclidean = DistanceMetric.EUCLIDEAN.between(block(queries), block(remembered))[
+            0
+        ]
+        hamming = DistanceMetric.HAMMING.between(block(queries), block(remembered))[0]
 
         assert int(np.argmin(euclidean)) == 1
         assert int(np.argmin(hamming)) == 0
@@ -424,7 +458,7 @@ class TestScalingDecidesTheAnswer:
         query = np.array([[100.0, 3.0]])
         remembered = np.array([[96.0, 1.0], [118.0, 2.0]])
 
-        raw = DistanceMetric.EUCLIDEAN.between(query, remembered)[0]
+        raw = DistanceMetric.EUCLIDEAN.between(block(query), block(remembered))[0]
         assert int(np.argmin(raw)) == 0
 
         def standardise(matrix, centre, spread):
@@ -433,8 +467,8 @@ class TestScalingDecidesTheAnswer:
         centre = np.array([107.0, 1.5])
         spread = np.array([11.0, 0.5])
         scaled = DistanceMetric.EUCLIDEAN.between(
-            standardise(query, centre, spread),
-            standardise(remembered, centre, spread),
+            block(standardise(query, centre, spread)),
+            block(standardise(remembered, centre, spread)),
         )[0]
 
         assert int(np.argmin(scaled)) == 1
@@ -454,7 +488,7 @@ class TestScalingDecidesTheAnswer:
         query = np.array([[100.0, 3.0]])
         remembered = np.array([[96.0, 1.0], [118.0, 2.0]])
 
-        canberra = DistanceMetric.CANBERRA.between(query, remembered)[0]
+        canberra = DistanceMetric.CANBERRA.between(block(query), block(remembered))[0]
 
         assert int(np.argmin(canberra)) == 1
 
@@ -497,26 +531,31 @@ class TestBlocking:
         remembered = generator.normal(size=(31, 4))
 
         assert np.array_equal(
-            blocked.between(queries, remembered),
-            whole.between(queries, remembered),
+            blocked.between(block(queries), block(remembered)),
+            whole.between(block(queries), block(remembered)),
         )
 
     def test_a_budget_smaller_than_one_query_still_makes_progress(self):
         # max(1, ...) is what stops a zero step from looping forever.
-        assert OneRowAtATimeMinkowski(2)._queries_per_block(np.ones((1000, 50))) == 1
+        assert (
+            OneRowAtATimeMinkowski(2)._queries_per_block(block(np.ones((1000, 50))))
+            == 1
+        )
 
     def test_block_size_shrinks_as_the_remembered_set_grows(self):
         calculation = MinkowskiDistance(2)
 
-        small = calculation._queries_per_block(np.ones((100, 5)))
-        large = calculation._queries_per_block(np.ones((10000, 5)))
+        small = calculation._queries_per_block(block(np.ones((100, 5))))
+        large = calculation._queries_per_block(block(np.ones((10000, 5))))
 
         assert small > large
 
     def test_the_result_is_the_full_matrix_however_it_was_blocked(self):
         blocked = OneRowAtATimeMinkowski(1)
 
-        assert blocked.between(np.zeros((9, 3)), np.ones((4, 3))).shape == (9, 4)
+        assert blocked.between(
+            block(np.zeros((9, 3))), block(np.ones((4, 3)))
+        ).shape == (9, 4)
 
 
 class TestCustomCalculations:
@@ -528,9 +567,9 @@ class TestCustomCalculations:
 
         expected = (3.0**3 + 4.0**3) ** (1.0 / 3.0)
 
-        assert MinkowskiDistance(3).between(queries, remembered)[0, 0] == (
-            pytest.approx(expected)
-        )
+        assert MinkowskiDistance(3).between(block(queries), block(remembered))[
+            0, 0
+        ] == (pytest.approx(expected))
 
     def test_every_calculation_is_a_distance(self):
         for calculation in (
