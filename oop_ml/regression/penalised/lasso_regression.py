@@ -109,6 +109,7 @@ import numpy as np
 from pydantic import Field, PrivateAttr
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
@@ -192,7 +193,7 @@ class LassoRegression(LinearFeatureRegressor):
         return float(np.sign(value) * max(0.0, abs(value) - threshold))
 
     @staticmethod
-    def _column_norms(design_matrix: FloatArray) -> FloatArray:
+    def _column_norms(columns: FloatArray) -> FloatArray:
         """``sum(x_j ** 2)`` for every column, computed once for the whole solve.
 
         This is the denominator of every coordinate update, and it does not move
@@ -200,7 +201,7 @@ class LassoRegression(LinearFeatureRegressor):
         The ``einsum`` form gets the column-wise sum of squares without building
         a squared copy of the matrix as a temporary.
         """
-        return np.einsum("ij,ij->j", design_matrix, design_matrix)
+        return np.einsum("ij,ij->j", columns, columns)
 
     def _coordinate_optimum(
         self,
@@ -236,7 +237,7 @@ class LassoRegression(LinearFeatureRegressor):
         return correlation / column_norm
 
     def solver_path(
-        self, design_matrix: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, target_column: Column
     ) -> SolverPath:
         """Every sweep of the coordinate descent, rather than only its end.
 
@@ -258,7 +259,7 @@ class LassoRegression(LinearFeatureRegressor):
         SolverPath
             ``path.result`` is the same array :meth:`_solve` returns.
         """
-        columns = np.asfortranarray(design_matrix)
+        columns = np.asfortranarray(design_matrix.values)
         parameter_count = columns.shape[1]
 
         weights = np.zeros(parameter_count, dtype=np.float64)
@@ -298,7 +299,7 @@ class LassoRegression(LinearFeatureRegressor):
 
         return SolverPath(steps, weights, stopped)
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Sweep the coefficients to their own optima until they settle.
 
         Each sweep visits every column in turn and sets it to the value that
@@ -319,7 +320,7 @@ class LassoRegression(LinearFeatureRegressor):
         # Columns of a C-ordered matrix are strided, so every dot product below
         # would read memory with a gap between elements. One transpose up front
         # makes each column contiguous and pays for itself many sweeps over.
-        columns = np.asfortranarray(design_matrix)
+        columns = np.asfortranarray(design_matrix.values)
         parameter_count = columns.shape[1]
 
         weights = np.zeros(parameter_count, dtype=np.float64)

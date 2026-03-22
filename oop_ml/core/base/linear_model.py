@@ -40,6 +40,7 @@ from pydantic import PrivateAttr
 from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
@@ -95,7 +96,7 @@ class LinearModel(Fittable):
         return self._intercept
 
     @abstractmethod
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Return the coefficient vector for ``design_matrix`` against the target.
 
         The one thing a linear model has to answer for itself, and the only
@@ -175,7 +176,7 @@ class LinearModel(Fittable):
         """
         return feature_set.n_features + (1 if self.fit_intercept else 0)
 
-    def _design_matrix(self, feature_set: FeatureSet) -> FloatArray:
+    def _design_matrix(self, feature_set: FeatureSet) -> DesignMatrix:
         """``X``: the feature columns, with a leading ones column if wanted.
 
         Column-major, for the reason ``FeatureSet`` gives: the solvers here are
@@ -183,17 +184,24 @@ class LinearModel(Fittable):
         Allocating in that order costs nothing over ``column_stack``, whereas
         converting afterwards would cost more than the layout saves on a model
         that only reads the matrix once.
-        """
-        if not self.fit_intercept:
-            return feature_set.feature_matrix
 
-        design_matrix = np.empty(
+        Returns a :class:`~oop_ml.core.data.design_matrix.DesignMatrix` rather
+        than the array, so that whether column zero is the ones column travels
+        with the numbers instead of being re-derived from ``self.fit_intercept``
+        at every site that cares.
+        """
+        names = [feature.name for feature in feature_set]
+
+        if not self.fit_intercept:
+            return DesignMatrix(feature_set.feature_matrix, names, False)
+
+        values = np.empty(
             (feature_set.n_samples, feature_set.n_features + 1), order="F"
         )
-        design_matrix[:, 0] = 1.0
-        design_matrix[:, 1:] = feature_set.feature_matrix
+        values[:, 0] = 1.0
+        values[:, 1:] = feature_set.feature_matrix
 
-        return design_matrix
+        return DesignMatrix(values, names, True)
 
     def _store_solution(self, feature_set: FeatureSet, solution: FloatArray) -> None:
         """Split the intercept off the solution and pair the rest with names.

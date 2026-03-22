@@ -91,6 +91,7 @@ from pydantic import Field
 
 from oop_ml.core.base.iterative_solver import IterativeSolver
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -126,13 +127,13 @@ class GradientDescentRegression(IterativeSolver, LinearFeatureRegressor):
 
     @staticmethod
     def _compute_residuals(
-        design_matrix: FloatArray, weights: FloatArray, target_column: Column
+        design_matrix: DesignMatrix, weights: FloatArray, target_column: Column
     ) -> FloatArray:
         """What the current weights still fail to explain: ``y - X @ beta``."""
-        return target_column.values - design_matrix @ weights
+        return target_column.values - design_matrix.values @ weights
 
     def _compute_gradient(
-        self, design_matrix: FloatArray, weights: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, weights: FloatArray, target_column: Column
     ) -> FloatArray:
         """Uphill direction of the squared error at ``weights``.
 
@@ -146,11 +147,11 @@ class GradientDescentRegression(IterativeSolver, LinearFeatureRegressor):
         ``learning_rate`` meaningful across datasets of different sizes.
         """
         residuals = self._compute_residuals(design_matrix, weights, target_column)
-        return -(2 / target_column.n_samples) * design_matrix.T @ residuals
+        return -(2 / target_column.n_samples) * design_matrix.values.T @ residuals
 
     def _step(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_column: Column,
         weights: FloatArray,
     ) -> FloatArray:

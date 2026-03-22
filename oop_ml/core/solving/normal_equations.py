@@ -24,6 +24,7 @@ from collections.abc import Iterator
 
 import numpy as np
 
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.observation import Stage
 from oop_ml.core.types import FloatArray
 
@@ -55,7 +56,7 @@ class NormalEquations:
 
     def __init__(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         moment_matrix: FloatArray,
         target_moments: FloatArray,
         penalty_matrix: FloatArray | None,
@@ -73,7 +74,7 @@ class NormalEquations:
         return self._solution
 
     @property
-    def design_matrix(self) -> FloatArray:
+    def design_matrix(self) -> DesignMatrix:
         """``X``. Its first column is ones where an intercept was fitted."""
         return self._design_matrix
 
@@ -136,7 +137,7 @@ class NormalEquations:
     def __repr__(self) -> str:
         penalised = "" if self._penalty_matrix is None else ", penalised"
         return (
-            f"NormalEquations({self._design_matrix.shape[1]} parameters"
+            f"NormalEquations({self._design_matrix.n_columns} parameters"
             f"{penalised}, condition {self.condition_number:.3g})"
         )
 

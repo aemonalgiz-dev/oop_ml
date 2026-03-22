@@ -54,6 +54,7 @@ from pydantic import Field, PrivateAttr
 
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 
@@ -81,7 +82,7 @@ class IterativeSolver(LinearModel):
     @abstractmethod
     def _step(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_column: Column,
         weights: FloatArray,
     ) -> FloatArray:
@@ -151,7 +152,7 @@ class IterativeSolver(LinearModel):
         return bool(np.max(np.abs(step)) < self.tolerance)
 
     def solver_path(
-        self, design_matrix: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, target_column: Column
     ) -> SolverPath:
         """Every pass of the walk, rather than only where it ended.
 
@@ -177,7 +178,7 @@ class IterativeSolver(LinearModel):
             Iterable over the passes. ``path.result`` is the same array
             ``_solve`` returns, and a test asserts that.
         """
-        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
+        weights = np.zeros(design_matrix.n_columns, dtype=np.float64)
         steps: list[SolverStep] = []
         stopped = SolverStop.PASS_LIMIT_REACHED
 
@@ -192,7 +193,7 @@ class IterativeSolver(LinearModel):
 
         return SolverPath(steps, weights, stopped)
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Walk from zero until the steps stop mattering.
 
         Starts every coefficient at zero, then repeats :meth:`_step` until it
@@ -208,7 +209,7 @@ class IterativeSolver(LinearModel):
         Does not set ``_fitted``. ``fit`` owns that, and only once the weights
         have been paired with their feature names.
         """
-        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
+        weights = np.zeros(design_matrix.n_columns, dtype=np.float64)
 
         self._passes_run = 0
         self._converged = False

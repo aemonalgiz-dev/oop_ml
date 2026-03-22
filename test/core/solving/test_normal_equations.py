@@ -113,15 +113,17 @@ class TestWhatTheDerivationHolds:
 
         equations = model.normal_equations(design, column)
 
-        assert equations.moment_matrix == pytest.approx(design.T @ design)
-        assert equations.target_moments == pytest.approx(design.T @ column.values)
+        assert equations.moment_matrix == pytest.approx(design.values.T @ design.values)
+        assert equations.target_moments == pytest.approx(
+            design.values.T @ column.values
+        )
 
     def test_the_intercept_column_is_visible(self):
         with_intercept, design, _ = solved(MultipleLinearRegression())
         _, bare, _ = solved(MultipleLinearRegression(fit_intercept=False))
 
-        assert design[:, 0] == pytest.approx(np.ones(design.shape[0]))
-        assert bare.shape[1] == design.shape[1] - 1
+        assert design.values[:, 0] == pytest.approx(np.ones(design.n_rows))
+        assert bare.n_columns == design.n_columns - 1
 
     def test_an_unpenalised_fit_has_no_penalty_matrix(self):
         model, design, column = solved(MultipleLinearRegression())

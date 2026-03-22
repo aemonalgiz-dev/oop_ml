@@ -26,6 +26,7 @@ from typing import Self
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.types import FloatArray
 
@@ -110,13 +111,13 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
         return self._linear_predictor(input_values)
 
     @staticmethod
-    def _normal_equations_matrix(design_matrix: FloatArray) -> FloatArray:
+    def _normal_equations_matrix(design_matrix: DesignMatrix) -> FloatArray:
         """``X.T X``, the (parameter_count, parameter_count) system matrix."""
-        return design_matrix.T @ design_matrix
+        return design_matrix.values.T @ design_matrix.values
 
     @staticmethod
     def _normal_equations_vector(
-        design_matrix: FloatArray, target_column: Column
+        design_matrix: DesignMatrix, target_column: Column
     ) -> FloatArray:
         """``X.T y``, the right-hand side, carrying one entry per parameter."""
-        return design_matrix.T @ target_column.values
+        return design_matrix.values.T @ target_column.values

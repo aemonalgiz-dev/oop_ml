@@ -114,6 +114,7 @@ from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic import sigmoid
 from oop_ml.core.base.iterative_solver import IterativeSolver
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.exceptions import SingularHessianError
 from oop_ml.core.types import FloatArray
 
@@ -211,7 +212,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
 
     def _gradient(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_values: FloatArray,
         probabilities: FloatArray,
     ) -> FloatArray:
@@ -240,7 +241,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         """
 
         differences = target_values - probabilities
-        return design_matrix.T @ differences
+        return design_matrix.values.T @ differences
 
     @staticmethod
     def _variance_weights(probabilities: FloatArray) -> FloatArray:
@@ -268,7 +269,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
 
     @staticmethod
     def _hessian_matrix(
-        design_matrix: FloatArray, variance_weights: FloatArray
+        design_matrix: DesignMatrix, variance_weights: FloatArray
     ) -> FloatArray:
         """``X.T W X``, the negated Hessian of the log-likelihood.
 
@@ -295,11 +296,13 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         FloatArray
             A symmetric ``(parameter_count, parameter_count)`` matrix.
         """
-        return design_matrix.T @ (design_matrix * variance_weights[:, None])
+        return design_matrix.values.T @ (
+            design_matrix.values * variance_weights[:, None]
+        )
 
     def _step(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_column: Column,
         weights: FloatArray,
     ) -> FloatArray:
@@ -317,7 +320,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
             If the weights collapse far enough that the system has no unique
             solution, which is separation in its terminal form.
         """
-        probabilities = self._sigmoid(design_matrix @ weights)
+        probabilities = self._sigmoid(design_matrix.values @ weights)
         gradient = self._gradient(design_matrix, target_column.values, probabilities)
         hessian_matrix = self._hessian_matrix(
             design_matrix, self._variance_weights(probabilities)

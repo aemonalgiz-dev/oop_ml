@@ -95,6 +95,7 @@ import numpy as np
 from pydantic import Field
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.solving.normal_equations import NormalEquations
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
@@ -116,7 +117,7 @@ class RidgeRegression(LinearFeatureRegressor):
     penalty: float = Field(default=1.0, ge=0.0)
 
     def normal_equations(
-        self, design_matrix: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, target_column: Column
     ) -> NormalEquations:
         """The matrices behind the penalised solution, penalty included.
 
@@ -124,18 +125,19 @@ class RidgeRegression(LinearFeatureRegressor):
         separately from ``X.T X`` rather than pre-added, because the whole
         difference between this model and ordinary least squares is that one
         matrix, and because its ``[0, 0]`` entry is worth being able to look
-        at: zeroing it unconditionally exempts a real predictor whenever
-        ``fit_intercept`` is false, which is a bug this library shipped until
-        a test caught it.
+        at. It comes from
+        :meth:`~oop_ml.core.data.design_matrix.DesignMatrix.penalty_diagonal`
+        rather than being built here, since zeroing that entry unconditionally
+        exempts a real predictor whenever there is no intercept -- a bug this
+        library shipped until a test caught it, and one the matrix now answers
+        for itself.
 
         Returns
         -------
         NormalEquations
             ``equations.result`` is the same array :meth:`_solve` returns.
         """
-        penalty_matrix = np.eye(design_matrix.shape[1]) * self.penalty
-        if self.fit_intercept:
-            penalty_matrix[0, 0] = 0.0
+        penalty_matrix = design_matrix.penalty_diagonal(self.penalty)
 
         moment_matrix = self._normal_equations_matrix(design_matrix)
         target_moments = self._normal_equations_vector(design_matrix, target_column)
@@ -148,23 +150,21 @@ class RidgeRegression(LinearFeatureRegressor):
             np.linalg.solve(moment_matrix + penalty_matrix, target_moments),
         )
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Solve ``(X.T X + penalty * I) b = X.T y`` with the intercept exempt.
 
         Three steps. Form ``X.T X`` and ``X.T y`` exactly as the OLS case does;
-        build the penalty matrix, which is ``penalty`` down the diagonal with a
-        zero in the first slot whenever ``self.fit_intercept`` is set, since
-        that column is the ones column and must not be shrunk; then add the two
+        ask the design matrix for its penalty diagonal; then add the two
         together and solve.
-        """
-        i_penalty = np.eye(design_matrix.shape[1]) * self.penalty
 
-        # Only exempt column zero when it actually is the ones column. Without
-        # an intercept it is an ordinary feature and has to be penalised along
-        # with the rest, otherwise it alone escapes the shrinkage and quietly
-        # gets an advantage the other predictors do not.
-        if self.fit_intercept:
-            i_penalty[0, 0] = 0.0
+        The exemption used to be written out here, and again in
+        ``normal_equations``, each copy testing ``self.fit_intercept`` to find
+        out whether column zero was the ones column. One of those copies got it
+        wrong and shipped: zeroing ``[0, 0]`` unconditionally exempts a real
+        predictor whenever there is no intercept. The matrix knows whether it
+        has one, so it is the only thing that should be answering.
+        """
+        i_penalty = design_matrix.penalty_diagonal(self.penalty)
 
         # The single difference from ordinary least squares is the penalty
         # matrix added to X.T X. Everything past this point is the same solve.
