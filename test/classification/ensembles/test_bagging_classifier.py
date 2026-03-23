@@ -28,6 +28,7 @@ from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
@@ -158,12 +159,16 @@ class TestPredict:
         """
         member_predictions = np.array([[[0.49, 0.51]]] * 6 + [[[0.99, 0.01]]] * 4)
 
-        assert fitted._combine(member_predictions) == pytest.approx([0.0])
+        assert fitted._combine(MemberPredictions(member_predictions)) == pytest.approx(
+            [0.0]
+        )
 
     def test_ties_go_to_the_lowest_class(self, fitted: BaggingClassifier) -> None:
         member_predictions = np.array([[[0.5, 0.5]], [[0.5, 0.5]]])
 
-        assert fitted._combine(member_predictions) == pytest.approx([0.0])
+        assert fitted._combine(MemberPredictions(member_predictions)) == pytest.approx(
+            [0.0]
+        )
 
     def test_ignores_the_order_features_arrive_in(
         self, fitted: BaggingClassifier

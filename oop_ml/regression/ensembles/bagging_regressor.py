@@ -21,6 +21,7 @@ from typing import Self
 from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
@@ -52,7 +53,7 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
         assert isinstance(member, Regressor)
         return member.predict(input_values)
 
-    def _combine(self, member_predictions: FloatArray) -> FloatArray:
+    def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
         """The mean of what the members said.
 
         Every member counts equally. Weighting them by training performance is
@@ -69,7 +70,7 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
         FloatArray
             ``(n_queries,)``.
         """
-        return member_predictions.mean(axis=0)
+        return member_predictions.values.mean(axis=0)
 
     def out_of_bag_evaluate(self) -> RegressionEvaluation:
         """Score the fit against rows each member never drew.
