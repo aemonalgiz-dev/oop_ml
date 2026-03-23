@@ -56,7 +56,9 @@ passed to `fit`.
 **Columns carry their own names.** A model takes `Feature` objects, matches
 them by name when you call `predict`, and hands back coefficients indexed by
 name, so the order the columns arrive in does not matter and a mismatched set
-raises instead of quietly answering the wrong question.
+raises instead of quietly answering the wrong question. That holds all the way
+down: a tree's split routes rows by looking its feature up by name, not by the
+column position the search happened to record.
 
 ```python
 model.coefficients["bathrooms"]  # not coefficients[1]
@@ -74,6 +76,41 @@ evaluation.r_squared, evaluation.mean_squared_error, evaluation.residuals
 `NonEqualArrayLengthError`, `SingleClassError` and the rest all derive from
 `MLLibError`, so you can catch the category you actually care about rather than
 matching on a message.
+
+## Every Signature Says What It Takes
+
+`FloatArray` says "floats". It does not say whether an array is one row per
+observation or one per feature, whether column zero is an intercept, or whether
+anything is bounded. Each method here takes a type that does.
+
+```python
+def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> Weights:
+def _leaf(self, target_values: Column) -> LeafNode:
+def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
+def predict_probabilities(self, input_values) -> ClassScores:
+```
+
+Three of those types earn their place by making a past bug unwriteable.
+
+`Column` cannot be empty, so `Impurity.of` no longer has to define what an
+empty node means -- and it used to need thirty lines to do it, because Gini
+returns 1.0 on nothing while variance returns `nan`, and one `nan` makes every
+comparison false so a split search silently never picks that candidate.
+
+`DesignMatrix` knows whether its first column is the intercept, so
+`penalty_diagonal` is the only thing deciding what ridge exempts. That rule
+used to be written twice and one copy was wrong.
+
+`ClassScores` and `ProbabilityMatrix` are two types because a one-vs-rest
+wrapper's rows genuinely do not sum to one -- its K models were never asked to
+agree. It returns the weaker type and says so.
+
+Wrapping the outputs costs nothing to use, because they implement `__array__`:
+
+```python
+np.allclose(model.predict(rows), expected)  # works, it is array-like
+model.predict(rows).n_rows  # and it is also an object
+```
 
 ## A Second Route Through The Calculation
 
@@ -130,7 +167,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1326 tests
+pytest                  # 1366 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -144,8 +181,9 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1326 passing tests**, `ruff`
-and `pyright` clean, no stubs.
+Every supervised family is implemented and green: **1366 passing tests**, `ruff`
+and `pyright` clean. One body is still stubbed, `PermutationImportance.measure`,
+and its 8 specs are the only red in the suite.
 
 Not built yet, roughly in the order it will matter if you are putting this into
 an application:
