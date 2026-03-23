@@ -31,6 +31,8 @@ from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
+from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.types import FloatArray
@@ -95,7 +97,7 @@ class BaggingClassifier(
         self, member: AveragingMember, input_values: Sequence[Feature]
     ) -> FloatArray:
         assert isinstance(member, MultiClassClassifier)
-        return member.predict_probabilities(input_values)
+        return member.predict_probabilities(input_values).values
 
     def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
         """The class with the highest averaged probability, per query.
@@ -175,7 +177,7 @@ class BaggingClassifier(
 
         return self._fit_members(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The most probable class per row, averaged across members.
 
         Raises
@@ -185,9 +187,13 @@ class BaggingClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._combine(self._member_predictions(input_values))
+        return Predictions.already_checked(
+            self._combine(self._member_predictions(input_values))
+        )
 
-    def predict_probabilities(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probabilities(
+        self, input_values: Sequence[Feature]
+    ) -> ProbabilityMatrix:
         """The members' mean probability matrix, ``(n_queries, n_classes)``.
 
         Rows sum to 1, because each member's does and a mean of things that sum
@@ -200,4 +206,6 @@ class BaggingClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._member_predictions(input_values).values.mean(axis=0)
+        return ProbabilityMatrix(
+            self._member_predictions(input_values).values.mean(axis=0)
+        )

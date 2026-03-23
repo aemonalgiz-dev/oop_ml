@@ -54,10 +54,11 @@ from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
+from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import ClassificationLeaf, LeafNode
-from oop_ml.core.types import FloatArray
 
 
 class DecisionTreeClassifier(
@@ -210,7 +211,7 @@ class DecisionTreeClassifier(
 
         return self._fit_tree(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The majority class of the box each row falls in, as ``0.0 .. K-1``.
 
         Ties within a leaf break to the lowest class index.
@@ -224,12 +225,16 @@ class DecisionTreeClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return np.array(
-            [leaf.prediction for leaf in self._leaves_for(input_values)],
-            dtype=np.float64,
+        return Predictions.already_checked(
+            np.array(
+                [leaf.prediction for leaf in self._leaves_for(input_values)],
+                dtype=np.float64,
+            )
         )
 
-    def predict_probabilities(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probabilities(
+        self, input_values: Sequence[Feature]
+    ) -> ProbabilityMatrix:
         """Each class's share of the leaf's rows, ``(n_queries, K)``.
 
         Rows sum to 1. Read the module docstring before treating these as
@@ -255,4 +260,6 @@ class DecisionTreeClassifier(
             assert isinstance(leaf, ClassificationLeaf)
             shares.append(leaf.class_shares)
 
-        return np.array(shares, dtype=np.float64).reshape(len(leaves), self.n_classes)
+        return ProbabilityMatrix(
+            np.array(shares, dtype=np.float64).reshape(len(leaves), self.n_classes)
+        )

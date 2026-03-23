@@ -32,13 +32,14 @@ from typing import Generic, Self, TypeVar
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from oop_ml.core.data.column import ColumnSource
+from oop_ml.core.data.predictions import Predictions
+from oop_ml.core.data.probabilities import ClassScores, Probabilities
 from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
 )
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.exceptions import NotFittedError
-from oop_ml.core.types import FloatArray
 
 InputT = TypeVar("InputT")
 """What a model is fit and predicted *on*: raw values, or named features."""
@@ -124,7 +125,7 @@ class Regressor(Estimator[InputT, TargetT]):
     """
 
     @abstractmethod
-    def predict(self, input_values: InputT) -> FloatArray:
+    def predict(self, input_values: InputT) -> Predictions:
         """Return predictions. Must call ``_check_fitted()`` first."""
 
     def evaluate(
@@ -164,14 +165,14 @@ class Classifier(Estimator[InputT, TargetT]):
     """
 
     @abstractmethod
-    def predict(self, input_values: InputT) -> FloatArray:
+    def predict(self, input_values: InputT) -> Predictions:
         """Return one predicted label per observation, each 0.0 or 1.0.
 
         Must call ``_check_fitted()`` first.
         """
 
     @abstractmethod
-    def predict_probability(self, input_values: InputT) -> FloatArray:
+    def predict_probability(self, input_values: InputT) -> Probabilities:
         """Return P(class is 1) per observation, each in ``[0, 1]``.
 
         Must call ``_check_fitted()`` first.
@@ -214,14 +215,14 @@ class MultiClassClassifier(Estimator[InputT, TargetT]):
     """
 
     @abstractmethod
-    def predict(self, input_values: InputT) -> FloatArray:
+    def predict(self, input_values: InputT) -> Predictions:
         """Return one predicted class per observation, as ``0.0 .. K-1``.
 
         Must call ``_check_fitted()`` first.
         """
 
     @abstractmethod
-    def predict_probabilities(self, input_values: InputT) -> FloatArray:
+    def predict_probabilities(self, input_values: InputT) -> ClassScores:
         """Return an ``(n_samples, n_classes)`` matrix of probabilities.
 
         Column ``k`` is P(class is k). Whether the rows sum to 1 is a property

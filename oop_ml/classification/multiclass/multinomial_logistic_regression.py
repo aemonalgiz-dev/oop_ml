@@ -93,6 +93,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
@@ -547,7 +548,9 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         return tuple(coefficient.name for coefficient in self._coefficients[0])
 
-    def predict_probabilities(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probabilities(
+        self, input_values: Sequence[Feature]
+    ) -> ProbabilityMatrix:
         """P(class is k) for every row and class, as ``(n_samples, n_classes)``.
 
         Every row sums to 1 by construction, which is the property one-vs-rest
@@ -562,7 +565,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._probability_matrix(input_values).values
+        return self._probability_matrix(input_values)
 
     def _probability_matrix(self, input_values: Sequence[Feature]) -> ProbabilityMatrix:
         """The same distribution, still carrying its row-sum invariant.
@@ -593,7 +596,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         return self._probabilities(design_matrix, learned)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The most probable class per row, as ``0.0 .. K-1``.
 
         Ties go to the lower class index, which is what ``argmax`` does. Exact
@@ -609,4 +612,6 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._probability_matrix(input_values).most_likely
+        return Predictions.already_checked(
+            self._probability_matrix(input_values).most_likely
+        )

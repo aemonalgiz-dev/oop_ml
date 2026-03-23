@@ -43,6 +43,7 @@ from pydantic import Field
 from oop_ml.core.base.ensemble import BoostingEnsemble, BoostingMember
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
@@ -111,7 +112,7 @@ class GradientBoostingRegressor(
         """
         return self._fit_rounds(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The starting constant plus every round's shrunken contribution.
 
         Raises
@@ -125,6 +126,6 @@ class GradientBoostingRegressor(
 
         running = np.full(len(ordered[0]), self.initial_prediction, dtype=np.float64)
         for member in self.members:
-            running += self.learning_rate * member.predict(ordered)
+            running += self.learning_rate * member.predict(ordered).values
 
-        return running
+        return Predictions.already_checked(running)

@@ -28,6 +28,7 @@ from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.types import FloatArray
 
 
@@ -81,7 +82,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
         """
         return self._fit_linear_model(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """Evaluate the fitted hyperplane on the given features.
 
         Computes ``intercept + sum(coefficients[name] * values)`` over the
@@ -108,7 +109,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._linear_predictor(input_values)
+        return Predictions.already_checked(self._linear_predictor(input_values))
 
     @staticmethod
     def _normal_equations_matrix(design_matrix: DesignMatrix) -> FloatArray:

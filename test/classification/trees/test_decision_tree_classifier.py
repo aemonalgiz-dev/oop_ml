@@ -286,7 +286,7 @@ class TestProbabilities:
             query((3.0, 5.0), (2.0, 7.0), (6.0, 7.0))
         )
 
-        assert shares.sum(axis=1) == pytest.approx(np.ones(3))
+        assert shares.values.sum(axis=1) == pytest.approx(np.ones(3))
 
     def test_a_pure_leaf_claims_total_certainty(self):
         # Worth pinning because it is the honest weakness: five rows are enough

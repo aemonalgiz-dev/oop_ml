@@ -45,8 +45,9 @@ from oop_ml.classification.multiclass.one_vs_rest_fits import (
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.predictions import Predictions
+from oop_ml.core.data.probabilities import ClassScores
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.core.types import FloatArray
 
 
 class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
@@ -218,7 +219,7 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
         self._mark_fitted()
         return self
 
-    def predict_probabilities(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
         """Each class's own probability, as ``(n_samples, n_classes)``.
 
         **These rows do not sum to one**, and deliberately so. Column ``k`` is
@@ -241,11 +242,16 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
 
         # Each model answers for its own class and nothing normalises across
         # them, which is the whole difference from softmax.
-        return np.column_stack(
-            [model.predict_probability(input_values) for model in self._fitted_models]
+        return ClassScores(
+            np.column_stack(
+                [
+                    model.predict_probability(input_values).values
+                    for model in self._fitted_models
+                ]
+            )
         )
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The class whose own model was most confident, as ``0.0 .. K-1``.
 
         Comparing probabilities across models that were never jointly
@@ -264,8 +270,8 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return np.argmax(self.predict_probabilities(input_values), axis=1).astype(
-            np.float64
+        return Predictions.already_checked(
+            self.predict_probabilities(input_values).most_likely
         )
 
     def _validated_feature_set(self, input_values: Sequence[Feature]) -> FeatureSet:

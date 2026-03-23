@@ -9,6 +9,7 @@ imperfect fit.
 import numpy as np
 import pytest
 
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
@@ -139,8 +140,8 @@ class TestPredict:
     def test_evaluates_the_line(self, inputs, expected):
         np.testing.assert_allclose(fitted_model().predict(inputs), expected)
 
-    def test_returns_numpy_array(self):
-        assert isinstance(fitted_model().predict([1, 2, 3]), np.ndarray)
+    def test_returns_a_predictions_object(self):
+        assert isinstance(fitted_model().predict([1, 2, 3]), Predictions)
 
     def test_predict_empty_values_raises(self):
         with pytest.raises(EmptyValuesError):

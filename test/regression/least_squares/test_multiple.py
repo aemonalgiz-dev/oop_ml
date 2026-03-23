@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
@@ -135,10 +136,10 @@ class TestPredict:
 
         np.testing.assert_allclose(predictions, expected)
 
-    def test_returns_numpy_array(self):
+    def test_returns_a_predictions_object(self):
         predictions = fitted_model().predict([Feature("x1", [1]), Feature("x2", [1])])
 
-        assert isinstance(predictions, np.ndarray)
+        assert isinstance(predictions, Predictions)
 
     def test_predict_before_fit_raises(self):
         with pytest.raises(NotFittedError):

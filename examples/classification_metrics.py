@@ -84,7 +84,7 @@ def main() -> None:
     rows = []
     for threshold in THRESHOLDS:
         evaluation = ClassificationEvaluation(
-            actual, (probabilities >= threshold).astype(np.float64)
+            actual, (probabilities.values >= threshold).astype(np.float64)
         )
         matrix = evaluation.confusion_matrix
 

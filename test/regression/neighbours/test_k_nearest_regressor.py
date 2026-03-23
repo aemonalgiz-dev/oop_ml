@@ -225,8 +225,8 @@ class TestItCannotExtrapolate:
         model = fitted(n_neighbours=3)
         predictions = model.predict(query((-100.0, -100.0), (100.0, 100.0)))
 
-        assert predictions.min() >= min(NEIGHBOUR_GRID.quantity_values)
-        assert predictions.max() <= max(NEIGHBOUR_GRID.quantity_values)
+        assert predictions.values.min() >= min(NEIGHBOUR_GRID.quantity_values)
+        assert predictions.values.max() <= max(NEIGHBOUR_GRID.quantity_values)
 
 
 class TestTheMetricChangesTheAnswer:

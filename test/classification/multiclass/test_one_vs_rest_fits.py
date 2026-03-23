@@ -89,7 +89,9 @@ class TestWhatTheSubFitsShow:
     def test_the_probabilities_do_not_sum_to_one(self):
         # The consequence of K independent fits, made checkable.
         totals = (
-            fitted().predict_probabilities(THREE_CLASSES.input_features).sum(axis=1)
+            fitted()
+            .predict_probabilities(THREE_CLASSES.input_features)
+            .values.sum(axis=1)
         )
 
         assert not np.allclose(totals, 1.0)

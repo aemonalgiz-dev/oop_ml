@@ -104,6 +104,28 @@ class MemberPredictions:
 
         return MemberPredictions(self._values[members, query : query + 1])
 
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """The wrapped array's shape, so a caller can assert on it directly."""
+        return self._values.shape
+
+    @property
+    def dtype(self):
+        """The wrapped array's dtype."""
+        return self._values.dtype
+
+    def __array__(self, dtype=None, copy=None) -> FloatArray:
+        """Let numpy treat this as the array it wraps.
+
+        The object is array-like where arithmetic is wanted and a named type
+        where meaning is wanted, so wrapping a return value costs a caller
+        nothing.
+        """
+        return self._values if dtype is None else self._values.astype(dtype)
+
+    def __getitem__(self, index) -> FloatArray:
+        return self._values[index]
+
     def __len__(self) -> int:
         return self.n_members
 

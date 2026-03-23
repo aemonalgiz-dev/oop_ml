@@ -45,10 +45,10 @@ from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.tree.criterion import RegressionCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import LeafNode
-from oop_ml.core.types import FloatArray
 
 
 class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
@@ -119,7 +119,7 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
         """
         return self._fit_tree(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The mean of the box each row falls in, one value per row.
 
         A handful of comparisons per row and no reference to the training data,
@@ -134,7 +134,9 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return np.array(
-            [leaf.prediction for leaf in self._leaves_for(input_values)],
-            dtype=np.float64,
+        return Predictions.already_checked(
+            np.array(
+                [leaf.prediction for leaf in self._leaves_for(input_values)],
+                dtype=np.float64,
+            )
         )

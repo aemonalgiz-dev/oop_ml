@@ -25,8 +25,9 @@ from pydantic import PrivateAttr
 
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.solving.normal_equations import LeastSquaresLine
-from oop_ml.core.types import FloatArray, NumericInput
+from oop_ml.core.types import NumericInput
 from oop_ml.core.validation import ValueRole
 
 MINIMUM_SAMPLES = 2
@@ -129,10 +130,12 @@ class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
             float(target_column.mean - slope * input_column.mean),
         )
 
-    def predict(self, input_values: NumericInput) -> FloatArray:
+    def predict(self, input_values: NumericInput) -> Predictions:
         """Evaluate the fitted line at each input value."""
         self._check_fitted()
 
         input_column = Column.of(input_values, ValueRole.INPUT_VALUES)
 
-        return input_column.values * self.slope + self.intercept
+        return Predictions.already_checked(
+            input_column.values * self.slope + self.intercept
+        )

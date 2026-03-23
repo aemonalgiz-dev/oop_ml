@@ -217,14 +217,14 @@ class TestProbabilities:
             query((0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (0.5, 1.5))
         )
 
-        assert shares.sum(axis=1) == pytest.approx(np.ones(4))
+        assert shares.values.sum(axis=1) == pytest.approx(np.ones(4))
 
     def test_the_resolution_is_one_over_k(self):
         # Not calibrated confidence: with five neighbours, 0.53 is unreachable.
         shares = fitted(n_neighbours=5).predict_probabilities(
             query((0.0, 0.0), (1.0, 1.0), (2.0, 2.0), (0.5, 1.5))
         )
-        multiples = shares * 5.0
+        multiples = shares.values * 5.0
 
         assert multiples == pytest.approx(np.round(multiples))
 
@@ -285,8 +285,8 @@ class TestEveryMetricWorksEndToEnd:
 
         shares = model.predict_probabilities(query((0.4, 0.4), (2.0, 2.0)))
 
-        assert shares.sum(axis=1) == pytest.approx(np.ones(2))
-        assert (shares >= 0.0).all()
+        assert shares.values.sum(axis=1) == pytest.approx(np.ones(2))
+        assert (shares.values >= 0.0).all()
 
 
 class TestClassShares:
@@ -301,7 +301,7 @@ class TestClassShares:
         shares = model.predict_probabilities(query((0.0, 0.0)))
 
         assert shares.shape == (1, model.n_classes)
-        assert (shares == 0.0).sum() == model.n_classes - 1
+        assert (shares.values == 0.0).sum() == model.n_classes - 1
 
     def test_repeated_votes_accumulate_rather_than_overwrite(self):
         # The bug a plain indexed += would have: several neighbours voting the
@@ -310,7 +310,7 @@ class TestClassShares:
 
         shares = model.predict_probabilities(query((0.0, 0.0)))
 
-        assert shares.max() == pytest.approx(1.0)
+        assert shares.values.max() == pytest.approx(1.0)
 
     def test_the_tally_matches_a_plain_python_count(self):
         # An oracle written the obvious way, against the flattened bincount.

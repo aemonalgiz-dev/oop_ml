@@ -106,8 +106,8 @@ def main() -> None:
 
     softmax_probabilities = softmax_model.predict_probabilities(scaled)
     wrapper_probabilities = wrapper.predict_probabilities(scaled)
-    softmax_totals = softmax_probabilities.sum(axis=1)
-    wrapper_totals = wrapper_probabilities.sum(axis=1)
+    softmax_totals = softmax_probabilities.values.sum(axis=1)
+    wrapper_totals = wrapper_probabilities.values.sum(axis=1)
     worst = int(np.argmax(np.abs(wrapper_totals - 1.0)))
 
     report.table(
