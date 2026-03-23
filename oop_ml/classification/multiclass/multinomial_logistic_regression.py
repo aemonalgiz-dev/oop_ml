@@ -93,6 +93,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
@@ -184,7 +185,9 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         return self._intercepts.copy()
 
     @staticmethod
-    def _probabilities(design_matrix: DesignMatrix, learned: FloatArray) -> FloatArray:
+    def _probabilities(
+        design_matrix: DesignMatrix, learned: FloatArray
+    ) -> ProbabilityMatrix:
         return softmax(design_matrix.values @ learned.T)
 
     def coefficients_for(self, class_index: int) -> Coefficients:
@@ -233,7 +236,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         return DesignMatrix(values, names, True)
 
     @staticmethod
-    def _indicator_matrix(target_column: Column, n_classes: int) -> FloatArray:
+    def _indicator_matrix(target_column: Column, n_classes: int) -> ProbabilityMatrix:
         """One-hot the target: ``(n_samples, n_classes)``, one 1 per row.
 
         This is the ``1[y = k]`` of the gradient, built once rather than per
@@ -244,7 +247,11 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
             np.arange(target_column.n_samples), target_column.values.astype(np.int64)
         ] = 1.0
 
-        return indicator
+        # A one-hot row is bounded and sums to one, so it satisfies every
+        # invariant a probability matrix has. It is the degenerate belief that
+        # puts all its mass on the true class, which is exactly what the
+        # gradient subtracts the model's own belief from.
+        return ProbabilityMatrix(indicator)
 
     def _scores(self, design_matrix: DesignMatrix, weights: FloatArray) -> FloatArray:
         """The ``(n_samples, n_classes)`` score matrix, class 0 held at zero.
@@ -280,8 +287,8 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
     def _gradient(
         self,
         design_matrix: DesignMatrix,
-        indicator: FloatArray,
-        probabilities: FloatArray,
+        indicator: ProbabilityMatrix,
+        probabilities: ProbabilityMatrix,
     ) -> FloatArray:
         """``X.T (1[y = k] - p_k) / n`` for every learned class at once.
 
@@ -325,7 +332,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         FloatArray
             ``(n_classes - 1, parameter_count)``, matching the learned weights.
         """
-        differences = indicator - probabilities
+        differences = indicator.values - probabilities.values
         gradient = differences.T @ design_matrix.values / design_matrix.n_rows
 
         return gradient[1:]
@@ -555,6 +562,15 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
+        return self._probability_matrix(input_values).values
+
+    def _probability_matrix(self, input_values: Sequence[Feature]) -> ProbabilityMatrix:
+        """The same distribution, still carrying its row-sum invariant.
+
+        ``predict_probabilities`` hands out the array because that is what a
+        caller wants; ``predict`` wants the object, so the tie rule lives on
+        the type instead of being written out at every call site.
+        """
         design_matrix = self._matched_matrix(input_values)
 
         assert self._coefficients is not None
@@ -593,6 +609,4 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return np.argmax(self.predict_probabilities(input_values), axis=1).astype(
-            np.float64
-        )
+        return self._probability_matrix(input_values).most_likely

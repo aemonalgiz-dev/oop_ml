@@ -115,6 +115,7 @@ from oop_ml.classification.logistic import sigmoid
 from oop_ml.core.base.iterative_solver import IterativeSolver
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
+from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.exceptions import SingularHessianError
 from oop_ml.core.types import FloatArray
 
@@ -160,7 +161,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         return self._completed_passes
 
     @staticmethod
-    def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
+    def _sigmoid(linear_predictor: FloatArray) -> Probabilities:
         """Map the linear predictor onto a probability.
 
         Delegates to :func:`~oop_ml.classification.logistic.sigmoid`, shared
@@ -213,8 +214,8 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
     def _gradient(
         self,
         design_matrix: DesignMatrix,
-        target_values: FloatArray,
-        probabilities: FloatArray,
+        target_values: Column,
+        probabilities: Probabilities,
     ) -> FloatArray:
         """The gradient of the log-likelihood: ``X.T (y - p)``.
 
@@ -240,11 +241,11 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
             One partial derivative per parameter.
         """
 
-        differences = target_values - probabilities
+        differences = target_values.values - probabilities.values
         return design_matrix.values.T @ differences
 
     @staticmethod
-    def _variance_weights(probabilities: FloatArray) -> FloatArray:
+    def _variance_weights(probabilities: Probabilities) -> FloatArray:
         """The diagonal of ``W``: ``p (1 - p)``, one weight per observation.
 
         This is the variance of a Bernoulli trial at probability ``p``, and
@@ -264,8 +265,9 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
         FloatArray
             One non-negative weight per observation, at most 0.25.
         """
-        differences = 1 - probabilities
-        return probabilities * differences
+        chances = probabilities.values
+
+        return chances * (1.0 - chances)
 
     @staticmethod
     def _hessian_matrix(
@@ -321,7 +323,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
             solution, which is separation in its terminal form.
         """
         probabilities = self._sigmoid(design_matrix.values @ weights)
-        gradient = self._gradient(design_matrix, target_column.values, probabilities)
+        gradient = self._gradient(design_matrix, target_column, probabilities)
         hessian_matrix = self._hessian_matrix(
             design_matrix, self._variance_weights(probabilities)
         )

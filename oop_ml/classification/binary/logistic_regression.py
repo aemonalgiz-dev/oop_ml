@@ -127,6 +127,7 @@ from oop_ml.classification.logistic import sigmoid
 from oop_ml.core.base.iterative_solver import IterativeSolver
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
+from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.types import FloatArray
 
 
@@ -170,7 +171,7 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
         return self._completed_passes
 
     @staticmethod
-    def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
+    def _sigmoid(linear_predictor: FloatArray) -> Probabilities:
         """Map log-odds onto a probability: ``1 / (1 + exp(-z))``.
 
         Worth writing carefully rather than literally. In ``1 / (1 + exp(-z))``
@@ -202,7 +203,7 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
     def _gradient(
         self,
         design_matrix: DesignMatrix,
-        target_values: FloatArray,
+        target_values: Column,
         weights: FloatArray,
     ) -> FloatArray:
         """The gradient of the log-likelihood: ``X.T (y - p)``.
@@ -230,9 +231,9 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
             One partial derivative per parameter.
         """
         probabilities = self._sigmoid(design_matrix.values @ weights)
-        differences = target_values - probabilities
+        differences = target_values.values - probabilities.values
 
-        return design_matrix.values.T @ differences / len(target_values)
+        return design_matrix.values.T @ differences / target_values.n_samples
 
     def _step(
         self,
@@ -247,5 +248,5 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
         has to be supplied and why a badly chosen one diverges.
         """
         return self.learning_rate * self._gradient(
-            design_matrix, target_column.values, weights
+            design_matrix, target_column, weights
         )

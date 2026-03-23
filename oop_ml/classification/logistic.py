@@ -17,10 +17,11 @@ from __future__ import annotations
 
 import numpy as np
 
+from oop_ml.core.data.probabilities import Probabilities, ProbabilityMatrix
 from oop_ml.core.types import FloatArray
 
 
-def sigmoid(linear_predictor: FloatArray) -> FloatArray:
+def sigmoid(linear_predictor: FloatArray) -> Probabilities:
     """Map log-odds onto probabilities in ``[0, 1]``, without overflowing.
 
     Branch on the sign so the exponential is only ever handed a non-positive
@@ -36,14 +37,16 @@ def sigmoid(linear_predictor: FloatArray) -> FloatArray:
 
     Returns
     -------
-    FloatArray
-        Probabilities in ``[0, 1]``, the same shape as the input.
+    Probabilities
+        One chance per row, each in ``[0, 1]``. The type carries the bound the
+        formula guarantees, so nothing downstream has to re-establish it.
     """
     decay = np.exp(-np.abs(linear_predictor))
-    return np.where(linear_predictor >= 0.0, 1.0, decay) / (1.0 + decay)
+
+    return Probabilities(np.where(linear_predictor >= 0.0, 1.0, decay) / (1.0 + decay))
 
 
-def softmax(scores: FloatArray) -> FloatArray:
+def softmax(scores: FloatArray) -> ProbabilityMatrix:
     """Normalise each row of ``scores`` into a distribution over the columns.
 
     The multi-class generalisation of :func:`sigmoid`, and the same trap wearing
@@ -65,10 +68,14 @@ def softmax(scores: FloatArray) -> FloatArray:
 
     Returns
     -------
-    FloatArray
-        The same shape, every row non-negative and summing to 1.
+    ProbabilityMatrix
+        The same shape, every row non-negative and summing to 1. The row sum
+        is the whole point of the shift above, so the type is where it should
+        be recorded.
     """
     shifted = scores - np.max(scores, axis=1, keepdims=True)
     exponentiated = np.exp(shifted)
 
-    return exponentiated / np.sum(exponentiated, axis=1, keepdims=True)
+    return ProbabilityMatrix(
+        exponentiated / np.sum(exponentiated, axis=1, keepdims=True)
+    )
