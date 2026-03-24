@@ -27,6 +27,7 @@ from oop_ml.classification.neighbours.k_nearest_classifier import (
 from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import EmptyValuesError, InvalidValuesError
+from oop_ml.core.kernel.functions import RadialBasisKernel
 from oop_ml.model_selection.search import (
     Candidate,
     GridSearch,
@@ -36,6 +37,9 @@ from oop_ml.model_selection.search import (
     SearchSpace,
 )
 from oop_ml.model_selection.splitting import KFold
+from oop_ml.regression.kernels.kernel_ridge_regression import (
+    KernelRidgeRegression,
+)
 from oop_ml.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
@@ -208,6 +212,22 @@ class TestBuildingAModel:
         """
         with pytest.raises(ValidationError):
             Candidate({"penalty": -5.0}).applied_to(RidgeRegression())
+
+    def test_a_field_holding_another_model_survives(self) -> None:
+        """``model_dump()`` would have flattened it into a dict.
+
+        ``model_dump`` recurses, so a field holding a pydantic model comes back
+        as a plain dict, and rebuilding from that tries to instantiate the
+        field's *declared* type -- the abstract ``Kernel`` here. Reading the
+        unset fields with ``getattr`` keeps the configured object itself.
+        """
+        built = Candidate({"penalty": 2.0}).applied_to(
+            KernelRidgeRegression(kernel=RadialBasisKernel(gamma=0.5))
+        )
+
+        assert isinstance(built.kernel, RadialBasisKernel)
+        assert built.kernel.gamma == pytest.approx(0.5)
+        assert built.penalty == pytest.approx(2.0)
 
     def test_a_candidate_with_no_assignments_is_rejected(self) -> None:
         with pytest.raises(EmptyValuesError):
