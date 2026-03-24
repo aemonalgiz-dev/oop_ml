@@ -42,7 +42,7 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.core.types import FloatArray
+from oop_ml.core.types import FloatArray, array_for_protocol
 
 SYMMETRY_TOLERANCE = 1e-08
 """How far a square Gram matrix may stray from its own transpose.
@@ -216,11 +216,12 @@ class KernelMatrix:
         )
 
     def __array__(self, dtype=None, copy=None) -> FloatArray:
-        """Let numpy read this directly, the way every output type here does."""
-        if dtype is None:
-            return self._values.copy() if copy else self._values
+        """Hand numpy this wrapper, honouring the copy parameter.
 
-        return self._values.astype(dtype, copy=bool(copy))
+        See :func:`~oop_ml.core.types.array_for_protocol` for the
+        contract and the corruption it exists to prevent.
+        """
+        return array_for_protocol(self._values, dtype, copy)
 
     def __repr__(self) -> str:
         return f"KernelMatrix({self.n_left} by {self.n_right})"

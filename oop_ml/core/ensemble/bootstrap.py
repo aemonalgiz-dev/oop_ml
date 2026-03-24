@@ -39,7 +39,11 @@ class BootstrapSample:
     __slots__ = ("_drawn", "_n_rows")
 
     def __init__(self, drawn: IndexArray, n_rows: int) -> None:
-        self._drawn = drawn
+        # Frozen: in_bag and the out-of-bag grid are recomputed from these
+        # positions, so a write into them would silently change which rows
+        # count as held out.
+        self._drawn = drawn.copy()
+        self._drawn.setflags(write=False)
         self._n_rows = n_rows
 
     @classmethod
@@ -68,7 +72,12 @@ class BootstrapSample:
 
     @property
     def drawn(self) -> IndexArray:
-        """The positions drawn, with repeats, in draw order."""
+        """The positions drawn, with repeats, in draw order.
+
+        The buffer is frozen at construction: ``in_bag`` and the out-of-bag
+        grid are recomputed from these positions, so a caller writing into
+        them would silently change which rows count as held out.
+        """
         return self._drawn
 
     @property

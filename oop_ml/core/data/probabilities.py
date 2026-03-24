@@ -24,7 +24,7 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.exceptions import EmptyValuesError, InvalidValuesError
-from oop_ml.core.types import FloatArray
+from oop_ml.core.types import FloatArray, array_for_protocol
 
 ROW_SUM_TOLERANCE = 1e-9
 """Rows come from a softmax or a mean, so they land near one rather than on it."""
@@ -62,6 +62,13 @@ class Probabilities:
             raise EmptyValuesError("At least one probability is required")
         if not np.all((values >= 0.0) & (values <= 1.0)):
             raise InvalidValuesError("Every probability must lie in [0, 1]")
+
+        # Stored as a frozen copy: the caller keeps their own array, and what
+        # the bounds check just validated cannot be un-validated later --
+        # neither through the caller's reference nor through a view handed
+        # back out.
+        values = values.copy()
+        values.setflags(write=False)
 
         self._values = values
 
@@ -103,13 +110,12 @@ class Probabilities:
         return self._values.dtype
 
     def __array__(self, dtype=None, copy=None) -> FloatArray:
-        """Let numpy treat this as the array it wraps.
+        """Hand numpy this wrapper, honouring the copy parameter.
 
-        The object is array-like where arithmetic is wanted and a named type
-        where meaning is wanted, so wrapping a return value costs a caller
-        nothing.
+        See :func:`~oop_ml.core.types.array_for_protocol` for the
+        contract and the corruption it exists to prevent.
         """
-        return self._values if dtype is None else self._values.astype(dtype)
+        return array_for_protocol(self._values, dtype, copy)
 
     def __getitem__(self, index) -> FloatArray:
         return self._values[index]
@@ -161,6 +167,13 @@ class ClassScores:
         if not np.all((values >= 0.0) & (values <= 1.0)):
             raise InvalidValuesError("Every probability must lie in [0, 1]")
 
+        # Stored as a frozen copy: the caller keeps their own array, and what
+        # the bounds check just validated cannot be un-validated later --
+        # neither through the caller's reference nor through a view handed
+        # back out.
+        values = values.copy()
+        values.setflags(write=False)
+
         self._values = values
 
     @property
@@ -211,13 +224,12 @@ class ClassScores:
         return self._values.shape
 
     def __array__(self, dtype=None, copy=None) -> FloatArray:
-        """Let numpy treat this as the array it wraps.
+        """Hand numpy this wrapper, honouring the copy parameter.
 
-        The object is array-like where arithmetic is wanted and a named type
-        where meaning is wanted, so wrapping a return value costs a caller
-        nothing.
+        See :func:`~oop_ml.core.types.array_for_protocol` for the
+        contract and the corruption it exists to prevent.
         """
-        return self._values if dtype is None else self._values.astype(dtype)
+        return array_for_protocol(self._values, dtype, copy)
 
     def __getitem__(self, index) -> FloatArray:
         return self._values[index]

@@ -58,6 +58,10 @@ class RegressionEvaluation:
         self._actual_column.check_equal_length(self._predicted_column)
 
         self._residuals = self._actual_column.values - self._predicted_column.values
+        # Frozen: every metric on this object derives from the residuals,
+        # and the property hands the buffer out. A caller writing into it
+        # would silently change RSS, MSE and R^2 afterwards.
+        self._residuals.setflags(write=False)
 
     @property
     def actual_values(self) -> FloatArray:

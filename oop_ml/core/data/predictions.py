@@ -28,7 +28,7 @@ from collections.abc import Iterator
 import numpy as np
 
 from oop_ml.core.data.column import Column
-from oop_ml.core.types import FloatArray
+from oop_ml.core.types import FloatArray, array_for_protocol
 from oop_ml.core.validation import ValueRole
 
 
@@ -107,16 +107,12 @@ class Predictions:
         return self._column.values.dtype
 
     def __array__(self, dtype=None, copy=None) -> FloatArray:
-        """Let numpy treat this as the array it wraps.
+        """Hand numpy this wrapper, honouring the copy parameter.
 
-        Without this, wrapping the return type of ``predict`` would break every
-        ``np.allclose(model.predict(rows), expected)`` in existence for no gain
-        at all. With it, the object is array-like where arithmetic is wanted
-        and a named type where meaning is wanted.
+        See :func:`~oop_ml.core.types.array_for_protocol` for the
+        contract and the corruption it exists to prevent.
         """
-        values = self._column.values
-
-        return values if dtype is None else values.astype(dtype)
+        return array_for_protocol(self._column.values, dtype, copy)
 
     def __getitem__(self, index) -> FloatArray:
         return self._column.values[index]
