@@ -44,7 +44,7 @@ Python 3.11 or later.
 | **Ensembles** | bagging, random forest, gradient boosting, out-of-bag scoring |
 | **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
-| **Model selection** | train/test split, k-fold, cross-validation |
+| **Model selection** | train/test split, k-fold, stratified folds, cross-validation |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
 
 ## Four Conventions I Held To
@@ -168,7 +168,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1375 tests
+pytest                  # 1410 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -182,7 +182,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1375 passing tests**, `ruff`
+Every supervised family is implemented and green: **1410 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -192,12 +192,10 @@ an application:
    to fit at start-up rather than load a trained artifact.
 2. **`Pipeline`.** A transformer fitted outside a cross-validation loop can
    leak across the split, and the serving path has to re-apply it by hand.
-3. **Cross-validated classification.** `CrossValidation` scores with R², so it
-   only speaks to regressors, and fixing that needs stratified folds as well.
-4. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
+3. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
    first and cutting back on what a subtree turned out to be worth.
-5. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
+4. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
    searches a space of them.
-6. **Unsupervised learning and kernels.** Both absent entirely. Every base
+5. **Unsupervised learning and kernels.** Both absent entirely. Every base
    class here takes a target, so k-means and PCA need new frames rather than
    new models.

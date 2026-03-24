@@ -146,8 +146,9 @@ from oop_ml.core.types import (
     NumericValues,
 )
 from oop_ml.model_selection.cross_validation import (
+    ClassificationCrossValidationResult,
     CrossValidation,
-    CrossValidationResult,
+    RegressionCrossValidationResult,
 )
 from oop_ml.model_selection.dataset import DataSplit
 from oop_ml.model_selection.splitting import (
@@ -300,7 +301,8 @@ __all__ = [
     "KFold",
     "Splits",
     "CrossValidation",
-    "CrossValidationResult",
+    "ClassificationCrossValidationResult",
+    "RegressionCrossValidationResult",
     # Errors, all of which derive from MLLibError
     "MLLibError",
     "NotFittedError",

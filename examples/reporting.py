@@ -38,9 +38,9 @@ from collections.abc import Callable, Iterable, Sequence
 from oop_ml import (
     ClassificationEvaluation,
     Coefficients,
-    CrossValidationResult,
     MLLibError,
     MultiClassEvaluation,
+    RegressionCrossValidationResult,
     RegressionEvaluation,
     UndefinedMetricError,
 )
@@ -261,7 +261,9 @@ class Report:
             ],
         )
 
-    def cross_validation(self, label: str, result: CrossValidationResult) -> None:
+    def cross_validation(
+        self, label: str, result: RegressionCrossValidationResult
+    ) -> None:
         """Mean and spread together -- the mean alone is half the story."""
         self.line(
             f"{label}: mean R2={result.mean_r2_score:.4f}  "

@@ -107,6 +107,31 @@ class TestValidation:
         with pytest.raises(SingleClassError):
             MultiClassEvaluation([0, 0, 2, 2], [0, 0, 2, 2])
 
+    def test_stating_the_width_allows_the_gap(self):
+        # The same rows the test above refuses, accepted because the caller has
+        # said how wide the table is. Inferring the width from a gapped column
+        # would put class 2 in column 1; being told it is a three-class problem
+        # settles that, and a held-out fold missing the middle class is
+        # ordinary rather than suspect.
+        result = MultiClassEvaluation([0, 0, 2, 2], [0, 0, 2, 2], n_classes=3)
+
+        assert result.confusion_matrix.counts[2][2] == 2
+        assert result.confusion_matrix.counts[1].sum() == 0
+
+    def test_stating_the_width_does_not_allow_a_class_outside_it(self):
+        # The looser guard is looser about which classes appear, not about
+        # which classes exist.
+        with pytest.raises(InvalidValuesError):
+            MultiClassEvaluation([0, 1, 3], [0, 1, 1], n_classes=3)
+
+    def test_a_single_class_is_allowed_once_the_width_is_stated(self):
+        # A fold can come out this way and it is still countable: three rows on
+        # one diagonal cell. The two-class rule guards a fit, which has nothing
+        # to learn from one class, not a count of what happened.
+        result = MultiClassEvaluation([1, 1, 1], [1, 1, 0], n_classes=2)
+
+        assert result.accuracy == pytest.approx(2 / 3)
+
     def test_a_predicted_class_outside_the_problem_is_rejected(self):
         with pytest.raises(InvalidValuesError):
             MultiClassEvaluation([0, 1, 2], [0, 1, 5])
