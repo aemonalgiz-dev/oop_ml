@@ -411,7 +411,13 @@ class KernelPrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
         InvalidValuesError
             If the supplied features are not exactly the fitted ones.
         """
-        raise NotImplementedError
+        centred = self.query_matrix(input_values)
+        coordinates = centred.values @ self.components.coefficients.T
+
+        return [
+            Feature(component.name, coordinates[:, position])
+            for position, component in enumerate(self.components)
+        ]
 
     def _solve(self, centred: KernelMatrix) -> KernelComponents:
         """Eigendecompose the centred Gram matrix.
@@ -472,7 +478,31 @@ class KernelPrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
         KernelComponents
             The kept directions. Do not set ``_fitted`` here.
         """
-        raise NotImplementedError
+        centred.check_square()
+        eigenvalues, eigenvectors = np.linalg.eigh(centred.values)
+
+        raw = np.maximum(eigenvalues[::-1], 0.0)
+        directions = eigenvectors[:, ::-1]
+
+        variances = raw / (centred.n_left - 1)
+        total_variance = float(np.sum(variances))
+        kept = self.n_components or centred.n_left
+
+        components = []
+
+        for position in range(kept):
+            if raw[position] < MINIMUM_COMPONENT_VARIANCE:
+                break
+
+            components.append(
+                KernelComponent(
+                    self.name_for(position),
+                    directions[:, position] / np.sqrt(raw[position]),
+                    float(variances[position]),
+                )
+            )
+
+        return KernelComponents(components, total_variance)
 
     def _as_rows(self, feature_set: FeatureSet, names: tuple[str, ...]) -> RowBlock:
         """The features as a row block, in the given order."""

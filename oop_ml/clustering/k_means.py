@@ -302,7 +302,7 @@ class KMeans(Clusterer[Sequence[Feature]]):
         IndexArray
             One whole group position per row, shape ``(n_rows,)``.
         """
-        raise NotImplementedError
+        return np.argmin(centroids.squared_distances_to(rows), axis=1)
 
     def _updated_positions(
         self, rows: RowBlock, labels: IndexArray, current: FloatArray
@@ -339,7 +339,15 @@ class KMeans(Clusterer[Sequence[Feature]]):
         FloatArray
             The new centres, shape ``(n_clusters, n_features)``.
         """
-        raise NotImplementedError
+        moved = current.copy()
+
+        for position in range(current.shape[0]):
+            members = rows.values[labels == position]
+
+            if members.size:
+                moved[position] = np.mean(members, axis=0)
+
+        return moved
 
     def _seeded_positions(
         self, rows: RowBlock, generator: np.random.Generator
@@ -386,7 +394,21 @@ class KMeans(Clusterer[Sequence[Feature]]):
             ``n_clusters`` starting centres, shape
             ``(n_clusters, n_features)``.
         """
-        raise NotImplementedError
+        values = rows.values
+        chosen = [values[generator.integers(values.shape[0])]]
+
+        while len(chosen) < self.n_clusters:
+            gaps = values[:, None, :] - np.array(chosen)[None, :, :]
+            nearest = np.min(np.sum(gaps * gaps, axis=2), axis=1)
+            total = float(np.sum(nearest))
+
+            if total <= 0.0:
+                chosen.append(values[generator.integers(values.shape[0])])
+                continue
+
+            chosen.append(values[generator.choice(values.shape[0], p=nearest / total)])
+
+        return np.array(chosen, dtype=np.float64)
 
     def _one_initialisation(
         self, rows: RowBlock, generator: np.random.Generator

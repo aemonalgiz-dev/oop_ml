@@ -433,7 +433,12 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied features are not exactly the fitted ones.
         """
-        raise NotImplementedError
+        against_training = self.query_matrix(input_values)
+
+        assert self._multipliers is not None
+        assert self._signed_labels is not None
+
+        return against_training.values @ (self._multipliers * self._signed_labels)
 
     def _ascend(
         self, kernel_matrix: KernelMatrix, signed_labels: FloatArray

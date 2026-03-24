@@ -212,7 +212,15 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied features are not exactly the fitted ones.
         """
-        raise NotImplementedError
+        queries = self._query_rows(input_values)
+        assert self._training_rows is not None
+        assert self._dual_weights is not None
+
+        against_training = self.kernel.between(queries, self._training_rows)
+
+        return Predictions.already_checked(
+            against_training.values @ self._dual_weights + self._target_mean
+        )
 
     def _solve(self, kernel_matrix: KernelMatrix, target_column: Column) -> FloatArray:
         """Solve ``(K + penalty I) a = y`` for the dual weights.
@@ -247,7 +255,11 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
             The dual weights, shape ``(n_training_rows,)``. Do not set
             ``_fitted`` here.
         """
-        raise NotImplementedError
+        kernel_matrix.check_square()
+
+        system = kernel_matrix.values + self.penalty * np.eye(kernel_matrix.n_left)
+
+        return np.linalg.solve(system, target_column.values)
 
     def _as_rows(self, feature_set: FeatureSet, names: tuple[str, ...]) -> RowBlock:
         """The features as a row block, in the given order."""
