@@ -45,6 +45,7 @@ Python 3.11 or later.
 | **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, stratified folds, cross-validation |
+| **Decomposition** | principal component analysis, explained variance, loadings |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
 
 ## Four Conventions I Held To
@@ -168,7 +169,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1410 tests
+pytest                  # 1479 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -182,7 +183,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1410 passing tests**, `ruff`
+Every supervised family is implemented and green: **1479 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -196,6 +197,6 @@ an application:
    first and cutting back on what a subtree turned out to be worth.
 4. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
    searches a space of them.
-5. **Unsupervised learning and kernels.** Both absent entirely. Every base
-   class here takes a target, so k-means and PCA need new frames rather than
-   new models.
+5. **Clustering and kernels.** PCA is in; clustering is not, and it is the
+   part that genuinely needs a new frame, since the answer is a label per row
+   rather than a rewriting of the columns.
