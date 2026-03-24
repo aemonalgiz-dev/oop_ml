@@ -164,6 +164,11 @@ class ClassScores:
             )
         if values.shape[0] == 0:
             raise EmptyValuesError("At least one row is required")
+        if values.shape[1] == 0:
+            # A (n, 0) matrix passes the [0, 1] bound vacuously and then
+            # crashes most_likely with a bare numpy error; there is no
+            # zero-class problem for it to describe.
+            raise EmptyValuesError("At least one class column is required")
         if not np.all((values >= 0.0) & (values <= 1.0)):
             raise InvalidValuesError("Every probability must lie in [0, 1]")
 

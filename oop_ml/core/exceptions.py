@@ -58,6 +58,17 @@ class CollinearFeaturesError(MLLibError):
     """
 
 
+class DivergenceError(MLLibError):
+    """Raised when an iterative fit's weights overflow to non-finite values.
+
+    A learning rate too large for the data makes every step bigger than the
+    last, and the walk overflows to inf and then nan without numpy raising
+    anything -- a fit that "completes" and then answers nan to every question.
+    Raised at the source so the failure names its cause (lower the learning
+    rate) instead of surfacing as nan predictions three calls later.
+    """
+
+
 class SingularHessianError(MLLibError):
     """Raised when a second-order solver's Hessian has no unique solution.
 

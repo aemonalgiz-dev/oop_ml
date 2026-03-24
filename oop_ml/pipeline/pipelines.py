@@ -87,7 +87,34 @@ from oop_ml.core.base.estimator import (
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import ClassScores
-from oop_ml.pipeline.steps import PipelineSteps
+from oop_ml.pipeline.steps import PipelineStep, PipelineSteps
+
+
+class FittedChain:
+    """What fitting the step chain produced: the fitted steps and their output.
+
+    A pairing object for the reason every pairing here exists -- a method
+    reaching for ``return steps, transformed`` is this class unwritten -- and
+    for one more: ``fit`` must commit nothing to the pipeline until every part
+    has succeeded, so the chain's results have to travel together as a value
+    before either lands on ``self``.
+    """
+
+    __slots__ = ("_steps", "_transformed")
+
+    def __init__(self, steps: PipelineSteps, transformed: list[Feature]) -> None:
+        self._steps = steps
+        self._transformed = transformed
+
+    @property
+    def steps(self) -> PipelineSteps:
+        """The transformers, fitted, in running order."""
+        return self._steps
+
+    @property
+    def transformed(self) -> list[Feature]:
+        """What the last step produced, which is what the model fits on."""
+        return self._transformed
 
 
 class Pipeline(Fittable):
@@ -127,7 +154,7 @@ class Pipeline(Fittable):
         assert self._fitted_steps is not None
         return self._fitted_steps
 
-    def _fit_steps(self, input_values: Sequence[Feature]) -> list[Feature]:
+    def _fitted_chain(self, input_values: Sequence[Feature]) -> FittedChain:
         """Fit each transformer on what the one before it produced.
 
         The whole point of the class, in five lines. Each transformer is fitted
@@ -141,6 +168,10 @@ class Pipeline(Fittable):
         ``PipelineSteps`` to candidate after candidate, and a fit that mutated
         them in place would leave each candidate starting from the previous
         one's learned state.
+
+        Returns the result rather than committing it: ``fit`` assigns nothing
+        to the pipeline until the model has fitted too, so a refit that fails
+        anywhere leaves the previous fit intact instead of half-replaced.
         """
         fitted = []
         carried = list(input_values)
@@ -148,11 +179,9 @@ class Pipeline(Fittable):
         for step in self.steps:
             transformer = deepcopy(step.transformer)
             carried = list(transformer.fit_transform(carried))
-            fitted.append(type(step)(step.name, transformer))
+            fitted.append(PipelineStep(step.name, transformer))
 
-        self._fitted_steps = PipelineSteps(fitted)
-
-        return carried
+        return FittedChain(PipelineSteps(fitted), carried)
 
     def _apply_steps(self, input_values: Sequence[Feature]) -> list[Feature]:
         """Run the already-fitted transformers, learning nothing.
@@ -224,8 +253,15 @@ class RegressionPipeline(Pipeline, Regressor[Sequence[Feature], Feature]):
         a pipeline safe inside a fold: there is no state to carry over, so
         handing the same pipeline to five folds gives five independent fits.
         """
-        self._fitted_model = deepcopy(self.model)
-        self._fitted_model.fit(self._fit_steps(input_values), target_values)
+        # Compute everything, then commit everything: a refit that fails in
+        # a step or in the model leaves the previous fit intact rather than
+        # holding a new unfitted model beside old fitted steps.
+        chain = self._fitted_chain(input_values)
+        fitted_model = deepcopy(self.model)
+        fitted_model.fit(chain.transformed, target_values)
+
+        self._fitted_steps = chain.steps
+        self._fitted_model = fitted_model
         self._mark_fitted()
 
         return self
@@ -292,8 +328,15 @@ class ClassificationPipeline(
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit every step on the training rows, then the classifier on the result."""
-        self._fitted_model = deepcopy(self.model)
-        self._fitted_model.fit(self._fit_steps(input_values), target_values)
+        # Compute everything, then commit everything: a refit that fails in
+        # a step or in the model leaves the previous fit intact rather than
+        # holding a new unfitted model beside old fitted steps.
+        chain = self._fitted_chain(input_values)
+        fitted_model = deepcopy(self.model)
+        fitted_model.fit(chain.transformed, target_values)
+
+        self._fitted_steps = chain.steps
+        self._fitted_model = fitted_model
         self._mark_fitted()
 
         return self

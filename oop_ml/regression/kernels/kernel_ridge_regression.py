@@ -95,8 +95,9 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
 
     Raises
     ------
-    InvalidValuesError
-        If ``penalty`` is not positive.
+    pydantic.ValidationError
+        If ``penalty`` is not positive. Field bounds are pydantic's to
+        enforce, so the error is pydantic's too.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
@@ -176,18 +177,24 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
         raw_rows = self._as_rows(feature_set, names)
         target_column = Column.of(target_values, ValueRole.TARGET_VALUES)
 
-        self._feature_means = np.mean(raw_rows.values, axis=0)
-        rows = rows_of(raw_rows.values - self._feature_means, names)
-
-        self._training_rows = rows
-        self._target_mean = float(np.mean(target_column.values))
+        # Everything is computed into locals and committed together at the
+        # end. A refit that fails in _solve -- an invalid kernel making the
+        # system singular -- used to leave a still-fitted model holding the
+        # NEW rows and means beside the OLD dual weights, which predicts
+        # fluent nonsense.
+        feature_means = np.mean(raw_rows.values, axis=0)
+        rows = rows_of(raw_rows.values - feature_means, names)
+        target_mean = float(np.mean(target_column.values))
 
         centred_target = Column.selecting(
-            target_column.values - self._target_mean, ValueRole.TARGET_VALUES
+            target_column.values - target_mean, ValueRole.TARGET_VALUES
         )
-        self._dual_weights = self._solve(
-            self.kernel.between(rows, rows), centred_target
-        )
+        dual_weights = self._solve(self.kernel.between(rows, rows), centred_target)
+
+        self._feature_means = feature_means
+        self._training_rows = rows
+        self._target_mean = target_mean
+        self._dual_weights = dual_weights
         self._mark_fitted()
 
         return self

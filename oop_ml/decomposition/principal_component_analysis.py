@@ -127,8 +127,9 @@ class PrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
 
     Raises
     ------
-    InvalidValuesError
-        If ``n_components`` is given and is less than 1.
+    pydantic.ValidationError
+        If ``n_components`` is given and is less than 1. Field bounds are
+        pydantic's to enforce, so the error is pydantic's too.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")

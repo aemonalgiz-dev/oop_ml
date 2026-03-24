@@ -19,9 +19,12 @@ a direction -- and a forest of one tree is strictly worse than a lone tree.
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Self
+
+from pydantic import Field, model_validator
 
 from oop_ml.core.base.ensemble import AveragingMember
+from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
@@ -46,6 +49,27 @@ class RandomForestRegressor(BaggingRegressor):
     max_depth: int | None = Field(default=None, ge=1)
     min_samples_split: int = Field(default=2, ge=2)
     min_samples_leaf: int = Field(default=1, ge=1)
+
+    @model_validator(mode="after")
+    def _refuse_a_configured_base_model(self) -> Self:
+        """Raise if a caller configured the one field a forest ignores.
+
+        The field is inherited from bagging, but a forest is specifically
+        bagged *trees* -- ``_prototype`` builds its own restricted tree and
+        never reads ``base_model``. Accepting a configured one silently is the
+        wrong-value-is-a-plausible-number failure ``extra="forbid"`` exists to
+        stop: the caller's carefully tuned prototype would simply not be the
+        model that fits. The default passes, so a search rebuilding candidates
+        field-by-field is unaffected.
+        """
+        if self.base_model != type(self).model_fields["base_model"].default:
+            raise InvalidValuesError(
+                "a forest builds its own trees and ignores base_model; "
+                "configure max_depth, min_samples_split, min_samples_leaf and "
+                "max_features on the forest itself"
+            )
+
+        return self
 
     def _prototype(self, position: int) -> AveragingMember:
         """A tree configured to restrict its features.

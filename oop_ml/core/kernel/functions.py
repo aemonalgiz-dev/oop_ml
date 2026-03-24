@@ -194,10 +194,11 @@ class PolynomialKernel(Kernel):
 
     Raises
     ------
-    InvalidValuesError
+    pydantic.ValidationError
         If ``degree`` is below 1, if ``gamma`` is not positive, or if
         ``constant`` is negative -- a negative constant can make the Gram
-        matrix indefinite, so the function stops being a kernel.
+        matrix indefinite, so the function stops being a kernel. Field bounds
+        are pydantic's to enforce, so the error is pydantic's too.
     """
 
     degree: int = Field(default=3, ge=1)
@@ -238,7 +239,7 @@ class RadialBasisKernel(Kernel):
 
     Raises
     ------
-    InvalidValuesError
+    pydantic.ValidationError
         If ``gamma`` is not positive. At zero every pair has kernel value 1 and
         the Gram matrix is rank one, so there is nothing to fit.
     """

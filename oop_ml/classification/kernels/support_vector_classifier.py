@@ -299,8 +299,9 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
 
     Raises
     ------
-    InvalidValuesError
-        If any parameter is outside its range.
+    pydantic.ValidationError
+        If any parameter is outside its range. Field bounds are pydantic's
+        to enforce, so the error is pydantic's too.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")

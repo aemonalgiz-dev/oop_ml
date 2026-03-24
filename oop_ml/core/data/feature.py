@@ -109,8 +109,11 @@ class Feature:
         return self._name == other._name and np.array_equal(self.values, other.values)
 
     def __hash__(self) -> int:
-        # Values are frozen, so a content hash is stable for the object's life.
-        return hash((self._name, self.values.tobytes()))
+        # Values are frozen, so a content hash is stable for the object's
+        # life. Adding 0.0 first normalises -0.0 to +0.0: __eq__ goes through
+        # array_equal, which calls the two zeros equal, so their bytes must
+        # hash equal too or the hash contract breaks in a set.
+        return hash((self._name, (self.values + 0.0).tobytes()))
 
     def __repr__(self) -> str:
         return f"Feature(name={self._name!r}, n_samples={self.n_samples})"
