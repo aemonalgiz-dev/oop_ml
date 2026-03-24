@@ -69,6 +69,36 @@ class Splits:
 
         self._splits = tuple(splits)
 
+    def classes_missing_from_a_fold(self) -> int:
+        """How many folds hold no example of some class the whole set has.
+
+        The thing a mean over folds cannot tell you about itself. Recall on a
+        fold with no positives is ``0/0``, so the fold contributes a ``nan`` or
+        a convention rather than a measurement, and the average is quietly over
+        fewer folds than it claims.
+
+        Stratifying reduces this to zero wherever it can, and cannot always:
+        four positives dealt round eight folds leaves four folds without one,
+        and no arrangement fixes that. So the count is reported rather than
+        assumed away.
+
+        Returns
+        -------
+        int
+            How many held-out halves are missing at least one class. Zero when
+            every fold saw every class, which is what a stratified split of an
+            adequately sized set gives.
+        """
+        every_class = set()
+        for split in self._splits:
+            every_class.update(split.training.target_feature.values.tolist())
+            every_class.update(split.testing.target_feature.values.tolist())
+
+        return sum(
+            not every_class.issubset(set(split.testing.target_feature.values.tolist()))
+            for split in self._splits
+        )
+
     @property
     def n_splits(self) -> int:
         """How many partitions there are."""
@@ -204,6 +234,19 @@ class KFold(BaseModel):
         every fold needs at least one row to score on.
     shuffle, random_seed:
         Passed through to :class:`RowShuffler`.
+    stratified:
+        Keep each class's share of the rows the same in every fold. Off by
+        default, because it is meaningless on a continuous target and the
+        splitter is not told which task it is serving.
+
+        On a classification target it is close to mandatory. Cutting a shuffled
+        order into blocks lets a rare class clump: measured on 200 rows with 5%
+        positives, plain ten-fold left *three* folds holding no positive at all.
+        Recall on such a fold is ``0/0`` -- undefined rather than low -- so an
+        average over ten folds is an average over seven real numbers and three
+        that are ``nan``, or worse, silently reported as 0.0 or 1.0 depending
+        on the convention. Accuracy survives and lies: a fold with no positives
+        scores 95% for a model that always answers "no".
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
@@ -211,6 +254,7 @@ class KFold(BaseModel):
     n_folds: int = Field(default=5, ge=2)
     shuffle: bool = True
     random_seed: int | None = None
+    stratified: bool = False
 
     def _index_blocks(self, row_order: IndexArray) -> list[IndexArray]:
         """Cut the row order into ``n_folds`` near-equal blocks.
@@ -221,6 +265,62 @@ class KFold(BaseModel):
         ``split``, since the latter refuses to divide unevenly at all.
         """
         return np.array_split(row_order, self.n_folds)
+
+    def _stratified_blocks(self, dataset: Dataset) -> list[IndexArray]:
+        """Cut the rows so every fold holds each class in the same proportion.
+
+        Deal the rows out like cards. Split the deck into one pile per class,
+        shuffle each pile on its own, then deal each pile round the folds in
+        turn. Randomness still decides *which* row of a class lands in fold
+        two; it no longer decides *how many* do.
+
+        Notice where the shuffle moved to. ``_index_blocks`` shuffles the whole
+        deck and then cuts, which is what lets a rare class clump. This
+        shuffles within a pile, so the cut cannot.
+
+        It distributes what exists and cannot manufacture a rare class: four
+        positives dealt round eight folds still leaves four folds without one.
+        :meth:`Splits.classes_missing_from_a_fold` is what reports that,
+        because a caller reading a mean over folds needs to know some of them
+        could not contribute.
+        """
+        classes = dataset.target_feature.values
+        generator = np.random.default_rng(self.random_seed)
+        fold_of = np.empty(dataset.n_samples, dtype=np.intp)
+
+        # The deal carries on where the last pile left off rather than
+        # restarting at fold zero. Restarting looks equivalent and is not: a
+        # class holding fewer rows than there are folds would always be dealt
+        # into the low-numbered ones, so with enough small classes fold zero
+        # takes everything. A continuous target is that case at its worst --
+        # every value its own class of one -- and restarting put all forty rows
+        # in fold zero and left three folds empty enough to raise.
+        dealt = 0
+        for value in np.unique(classes):
+            rows = np.flatnonzero(classes == value)
+            if self.shuffle:
+                rows = generator.permutation(rows)
+
+            fold_of[rows] = (dealt + np.arange(rows.size)) % self.n_folds
+            dealt += rows.size
+
+        return [np.flatnonzero(fold_of == fold) for fold in range(self.n_folds)]
+
+    def _blocks(self, dataset: Dataset) -> list[IndexArray]:
+        """Whichever cut ``stratified`` asked for.
+
+        The only thing the two ways of folding disagree about. Everything after
+        this -- hold one block out, join the rest back together, pair them --
+        is identical, and writing it twice is how the two would drift apart.
+        """
+        if self.stratified:
+            return self._stratified_blocks(dataset)
+
+        return self._index_blocks(
+            RowShuffler(shuffle=self.shuffle, random_seed=self.random_seed).row_order(
+                dataset.n_samples
+            )
+        )
 
     def split(self, dataset: Dataset) -> Splits:
         """Produce one :class:`~oop_ml.model_selection.dataset.DataSplit` per fold.
@@ -251,11 +351,7 @@ class KFold(BaseModel):
                 f"each one something to score on, got {dataset.n_samples}"
             )
 
-        blocks = self._index_blocks(
-            RowShuffler(shuffle=self.shuffle, random_seed=self.random_seed).row_order(
-                dataset.n_samples
-            )
-        )
+        blocks = self._blocks(dataset)
 
         splits = []
         for held_out_position, testing_indices in enumerate(blocks):
