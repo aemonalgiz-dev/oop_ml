@@ -25,6 +25,7 @@ from collections.abc import Iterator
 import numpy as np
 
 from oop_ml.core.data.design_matrix import DesignMatrix
+from oop_ml.core.exceptions import CollinearFeaturesError
 from oop_ml.core.observation import Stage
 from oop_ml.core.types import FloatArray
 
@@ -246,3 +247,38 @@ class LeastSquaresLine:
             f"LeastSquaresLine(slope {self._slope:.4f}, "
             f"intercept {self._intercept:.4f})"
         )
+
+
+def solved_normal_equations(
+    system_matrix: FloatArray, target_vector: FloatArray
+) -> FloatArray:
+    """The unique solution of ``system_matrix @ coefficients = target_vector``.
+
+    A thin wrapper around ``numpy.linalg.solve`` whose whole job is the failure
+    path, written once so that the four call sites -- ordinary least squares
+    and ridge, each with an efficient and an observed route -- cannot drift
+    apart about what a singular system means. That is the same argument
+    ``penalty_diagonal`` records: a rule written twice is a rule one copy gets
+    wrong.
+
+    Raises
+    ------
+    CollinearFeaturesError
+        If the system is singular. For normal equations that means the
+        features are collinear: some column is (nearly) a linear combination
+        of the others, so infinitely many coefficient vectors fit equally
+        well. The condition number is included because it is the diagnosis --
+        and the message points at ridge, because a positive penalty is the
+        standard way out.
+    """
+    try:
+        return np.linalg.solve(system_matrix, target_vector)
+    except np.linalg.LinAlgError as error:
+        raise CollinearFeaturesError(
+            f"the features are collinear -- some column is (nearly) a linear "
+            f"combination of the others -- so the normal equations have no "
+            f"unique solution (condition number "
+            f"{float(np.linalg.cond(system_matrix)):.3g}). Remove or combine "
+            f"the duplicated columns, or use RidgeRegression, whose penalty "
+            f"makes the system solvable"
+        ) from error

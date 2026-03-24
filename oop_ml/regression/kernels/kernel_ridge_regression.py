@@ -259,7 +259,17 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
 
         system = kernel_matrix.values + self.penalty * np.eye(kernel_matrix.n_left)
 
-        return np.linalg.solve(system, target_column.values)
+        try:
+            return np.linalg.solve(system, target_column.values)
+        except np.linalg.LinAlgError as error:
+            raise InvalidValuesError(
+                f"the system K + penalty I is singular, which a valid kernel "
+                f"cannot produce -- a positive semi-definite Gram matrix plus "
+                f"a positive penalty is always invertible. This kernel "
+                f"({self.kernel!r}) failed Mercer's condition on this data; "
+                f"the sigmoid kernel with a negative constant is the usual way "
+                f"to get here"
+            ) from error
 
     def _as_rows(self, feature_set: FeatureSet, names: tuple[str, ...]) -> RowBlock:
         """The features as a row block, in the given order."""

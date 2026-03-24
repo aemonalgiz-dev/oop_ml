@@ -93,11 +93,12 @@ Intercept 1, coefficients 2 and 3, residuals all zero. A new point
 
 from __future__ import annotations
 
-import numpy as np
-
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
-from oop_ml.core.solving.normal_equations import NormalEquations
+from oop_ml.core.solving.normal_equations import (
+    NormalEquations,
+    solved_normal_equations,
+)
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -139,7 +140,7 @@ class MultipleLinearRegression(LinearFeatureRegressor):
             moment_matrix,
             target_moments,
             None,
-            np.linalg.solve(moment_matrix, target_moments),
+            solved_normal_equations(moment_matrix, target_moments),
         )
 
     def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
@@ -151,7 +152,7 @@ class MultipleLinearRegression(LinearFeatureRegressor):
         ``np.linalg.lstsq(design_matrix, y)`` avoids both problems, although it
         does so at the cost of no longer mirroring the maths on the page.
         """
-        return np.linalg.solve(
+        return solved_normal_equations(
             self._normal_equations_matrix(design_matrix),
             self._normal_equations_vector(design_matrix, target_column),
         )

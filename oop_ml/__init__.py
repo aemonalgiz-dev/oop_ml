@@ -107,6 +107,7 @@ from oop_ml.core.evaluation.multiclass import (
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.exceptions import (
     AllSameValuesError,
+    CollinearFeaturesError,
     EmptyValuesError,
     InvalidValuesError,
     MLLibError,
@@ -348,6 +349,7 @@ __all__ = [
     "CrossValidation",
     "ClassificationCrossValidationResult",
     "Candidate",
+    "CollinearFeaturesError",
     "Centroid",
     "ClassificationPipeline",
     "Centroids",

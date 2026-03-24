@@ -91,12 +91,14 @@ absorb whatever they no longer explain.
 
 from __future__ import annotations
 
-import numpy as np
 from pydantic import Field
 
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
-from oop_ml.core.solving.normal_equations import NormalEquations
+from oop_ml.core.solving.normal_equations import (
+    NormalEquations,
+    solved_normal_equations,
+)
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -147,7 +149,7 @@ class RidgeRegression(LinearFeatureRegressor):
             moment_matrix,
             target_moments,
             penalty_matrix,
-            np.linalg.solve(moment_matrix + penalty_matrix, target_moments),
+            solved_normal_equations(moment_matrix + penalty_matrix, target_moments),
         )
 
     def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
@@ -175,4 +177,4 @@ class RidgeRegression(LinearFeatureRegressor):
             design_matrix, target_column
         )
 
-        return np.linalg.solve(normal_equations_matrix, normal_equations_vector)
+        return solved_normal_equations(normal_equations_matrix, normal_equations_vector)
