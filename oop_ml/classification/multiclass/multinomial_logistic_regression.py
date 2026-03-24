@@ -95,7 +95,7 @@ from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import ProbabilityMatrix
-from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.exceptions import InvalidValuesError, NonUniqueFeaturesError
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 
@@ -360,6 +360,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         SolverPath
             ``path.result`` is the same array :meth:`_solve` returns.
         """
+        self._check_fitted()
         assert self._n_classes is not None
 
         indicator = self._indicator_matrix(target_column, self._n_classes)
@@ -527,6 +528,14 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         fitted_names = self._fitted_feature_names
         by_name = {feature.name: feature for feature in input_values}
+
+        # Before the set comparison, because the dict just deduplicated: a
+        # feature supplied twice would otherwise sail through with one copy
+        # silently chosen.
+        if len(by_name) != len(input_values):
+            raise NonUniqueFeaturesError(
+                "each feature may be supplied once; a name appears more than once"
+            )
 
         if set(by_name) != set(fitted_names):
             raise InvalidValuesError(

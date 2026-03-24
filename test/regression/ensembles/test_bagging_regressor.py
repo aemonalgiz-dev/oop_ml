@@ -184,7 +184,7 @@ class TestPredict:
 class TestUnfitted:
     """Nothing is readable before a fit."""
 
-    @pytest.mark.parametrize("attribute", ["members"])
+    @pytest.mark.parametrize("attribute", ["members", "feature_importances"])
     def test_reading_a_learned_attribute_raises(self, attribute: str) -> None:
         with pytest.raises(NotFittedError):
             getattr(BaggingRegressor(), attribute)

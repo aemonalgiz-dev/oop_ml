@@ -23,6 +23,7 @@ from oop_ml.classification.kernels.support_vector_classifier import (
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     InvalidValuesError,
+    NonBinaryLabelsError,
     NotFittedError,
     SingleClassError,
 )
@@ -202,6 +203,49 @@ class TestPredicting:
         )
 
 
+class TestTheIntercept:
+    """The absorbed constant, which for a while existed only in prose.
+
+    The module docstring justifies dropping the dual's equality constraint by
+    absorbing the intercept -- adding a constant to every kernel value, which
+    is appending an always-one feature. The first implementation never added
+    it, so the boundary was forced through the origin in the implied space:
+    with a linear kernel on x = [1, 2, 3, 4], y = [0, 0, 1, 1] -- trivially
+    separable with any offset line -- it predicted all ones and scored 0.5.
+    """
+
+    def test_a_separable_offset_boundary_is_found(self) -> None:
+        """One feature, split at 2.5. No through-origin line can do this.
+
+        Capacity 10 rather than the default 1, because the absorbed offset is
+        shrunk like any other weight -- a documented cost of the trick -- and
+        four points at C=1 cannot push it to the midpoint.
+        """
+        model = SupportVectorClassifier(
+            kernel=LinearKernel(), capacity=10.0, learning_rate=0.01, max_epochs=20000
+        ).fit(
+            [Feature("first", [1.0, 2.0, 3.0, 4.0])],
+            Feature("outcome", [0.0, 0.0, 1.0, 1.0]),
+        )
+
+        predicted = np.asarray(model.predict([Feature("first", [1.0, 2.0, 3.0, 4.0])]))
+
+        assert list(predicted) == [0.0, 0.0, 1.0, 1.0]
+
+    def test_the_offset_shifts_the_decision_values(self) -> None:
+        """Through the origin, the decision at x=0 would be exactly zero."""
+        model = SupportVectorClassifier(
+            kernel=LinearKernel(), capacity=10.0, learning_rate=0.01, max_epochs=20000
+        ).fit(
+            [Feature("first", [1.0, 2.0, 3.0, 4.0])],
+            Feature("outcome", [0.0, 0.0, 1.0, 1.0]),
+        )
+
+        at_zero = model.decision_values([Feature("first", [0.0])])
+
+        assert float(at_zero[0]) < 0.0
+
+
 class TestTheValueObjects:
     """What a support vector is allowed to be."""
 
@@ -250,6 +294,20 @@ class TestWhatItRefuses:
             SupportVectorClassifier().fit(
                 [Feature("first", [1.0, 2.0, 3.0]), Feature("second", [1.0, 1.0, 1.0])],
                 Feature("outcome", [1.0, 1.0, 1.0]),
+            )
+
+    def test_a_non_binary_target_is_rejected(self) -> None:
+        """A margin between two classes; a third cannot be silently recoded.
+
+        The first version checked only that both 0 and 1 appeared, so a
+        three-class target passed and every 2 was folded into class 1 by the
+        signed-label conversion -- a model that fits, predicts, and answers a
+        question nobody asked.
+        """
+        with pytest.raises(NonBinaryLabelsError):
+            SupportVectorClassifier().fit(
+                [Feature("first", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])],
+                Feature("outcome", [0.0, 1.0, 2.0, 0.0, 1.0, 2.0]),
             )
 
     def test_a_non_positive_capacity_is_rejected(self) -> None:

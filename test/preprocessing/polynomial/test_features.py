@@ -225,3 +225,27 @@ class TestFittingACurve:
         )
 
         assert "x1^2" in model.coefficients
+
+
+class TestMismatchedLengths:
+    """transform validates alignment the way fit always has.
+
+    fit routes its input through FeatureSet, which enforces equal lengths;
+    transform used to skip that, so unequal columns escaped as a bare numpy
+    broadcast ValueError from inside a term's product -- outside the
+    MLLibError hierarchy, with a shapes message pointing at nothing a caller
+    wrote.
+    """
+
+    def test_unequal_feature_lengths_raise_a_typed_error(self) -> None:
+        model = PolynomialFeatures(degree=2).fit(
+            [Feature("first", [1.0, 2.0, 3.0]), Feature("second", [4.0, 5.0, 6.0])]
+        )
+
+        with pytest.raises(NonEqualArrayLengthError):
+            model.transform(
+                [
+                    Feature("first", [1.0, 2.0, 3.0]),
+                    Feature("second", [4.0, 5.0, 6.0, 7.0]),
+                ]
+            )

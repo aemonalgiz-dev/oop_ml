@@ -172,6 +172,7 @@ class AveragingEnsemble(Fittable):
             :class:`~oop_ml.core.importance.permutation.PermutationImportance`
             there, which does not care what it is measuring.
         """
+        self._check_fitted()
         assert self._feature_names is not None
         contributions = []
 

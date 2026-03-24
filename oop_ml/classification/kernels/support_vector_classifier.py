@@ -104,6 +104,29 @@ from oop_ml.core.kernel.matrix import KernelMatrix
 from oop_ml.core.types import FloatArray
 from oop_ml.core.validation import ValueRole
 
+INTERCEPT_OFFSET = 1.0
+"""The constant added to every kernel value, which is the absorbed intercept.
+
+Adding a constant to ``K(a, b)`` is exactly appending an always-one feature to
+every row -- ``K(a, b) + 1`` is the inner product in the implied space with one
+extra dimension that every point shares. That dimension's weight is the
+boundary's offset, which is what licenses dropping the dual's equality
+constraint ``sum a_i y_i = 0``: the constraint exists to service a separate
+intercept term, and there no longer is one.
+
+One honest cost comes with the trick: the absorbed offset is a weight like any
+other, so it is shrunk by the margin objective, where a separate intercept term
+would be free. A small ``capacity`` therefore holds the boundary nearer the
+origin than the data alone would put it; raising ``capacity`` releases it.
+Measured on x = [1, 2, 3, 4] labelled [0, 0, 1, 1]: at C=1 the boundary sits
+between rows one and two, at C=10 it sits at the true midpoint.
+
+The first implementation promised this in the module docstring and never added
+the constant, which forced the boundary through the origin of the implied
+space. On that same fixture -- separable by any offset line -- it predicted
+all ones at every capacity.
+"""
+
 SUPPORT_VECTOR_THRESHOLD = 1e-08
 """Above this multiplier, a training row counts as a support vector.
 
@@ -356,6 +379,9 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
             If no features are supplied.
         NonEqualArrayLengthError
             If the features and target are different lengths.
+        NonBinaryLabelsError
+            If the target holds anything besides 0 and 1. A margin separates
+            two classes; a third would be silently recoded, not learned.
         SingleClassError
             If the target does not hold both classes, since there is then no
             boundary to place.
@@ -364,6 +390,10 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
         feature_set.check_aligned_with(target_values)
 
         target_column = Column.of(target_values, ValueRole.TARGET_VALUES)
+        # Binary first: check_has_both_classes alone would pass a three-class
+        # target, and the signed-label conversion below would silently fold
+        # every class above zero into +1.
+        target_column.check_is_binary()
         target_column.check_has_both_classes()
 
         names = tuple(feature.name for feature in feature_set)
@@ -372,7 +402,8 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
         self._training_rows = rows
         self._signed_labels = np.where(target_column.values > 0.5, 1.0, -1.0)
         self._multipliers = self._ascend(
-            self.kernel.between(rows, rows), self._signed_labels
+            self._with_intercept(self.kernel.between(rows, rows)),
+            self._signed_labels,
         )
         self._mark_fitted()
 
@@ -433,7 +464,7 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied features are not exactly the fitted ones.
         """
-        against_training = self.query_matrix(input_values)
+        against_training = self._with_intercept(self.query_matrix(input_values))
 
         assert self._multipliers is not None
         assert self._signed_labels is not None
@@ -509,6 +540,18 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
                 break
 
         return multipliers
+
+    @staticmethod
+    def _with_intercept(kernel_matrix: KernelMatrix) -> KernelMatrix:
+        """The same pairing with the absorbed intercept added to every value.
+
+        Applied to the training Gram matrix in ``fit`` and to the query matrix
+        in ``decision_values`` -- both, because the offset is a dimension of
+        the implied space and every inner product taken in that space has to
+        include it. Offsetting one side and not the other would train one
+        model and consult another.
+        """
+        return KernelMatrix(kernel_matrix.values + INTERCEPT_OFFSET)
 
     def _as_rows(self, feature_set: FeatureSet, names: tuple[str, ...]) -> RowBlock:
         """The features as a row block, in the given order."""

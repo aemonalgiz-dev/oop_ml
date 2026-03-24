@@ -43,7 +43,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
-from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.exceptions import InvalidValuesError, NonUniqueFeaturesError
 from oop_ml.core.types import FloatArray
 
 
@@ -230,8 +230,26 @@ class LinearModel(Fittable):
         )
 
     def _check_names_match_the_fit(self, input_values: Sequence[Feature]) -> None:
-        """Raise unless exactly the fitted feature names were supplied."""
+        """Raise unless exactly the fitted feature names were supplied, once each.
+
+        The duplicate check comes first and is not cosmetic: the set
+        comparison alone would pass a list holding one feature twice, and the
+        linear predictor then adds that coefficient's contribution once per
+        copy -- a silently doubled effect, which is a plausible number rather
+        than an error.
+        """
         supplied_names = {feature.name for feature in input_values}
+
+        if len(supplied_names) != len(input_values):
+            counted: dict[str, int] = {}
+            for feature in input_values:
+                counted[feature.name] = counted.get(feature.name, 0) + 1
+            repeated = sorted(name for name, count in counted.items() if count > 1)
+            raise NonUniqueFeaturesError(
+                f"each feature may be supplied once; got {', '.join(repeated)} "
+                f"more than once"
+            )
+
         fitted_names = {coefficient.name for coefficient in self.coefficients}
 
         if supplied_names != fitted_names:

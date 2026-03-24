@@ -33,6 +33,7 @@ import numpy as np
 from oop_ml.core.types import FloatArray, NumericInput
 from oop_ml.core.validation import (
     ValueRole,
+    check_are_class_positions,
     check_equal_length,
     check_has_both_classes,
     check_has_variance,
@@ -234,6 +235,15 @@ class Column:
         needs it rather than enforced on every column that happens to exist.
         """
         check_is_binary(self._values, self._role)
+
+    def check_are_class_positions(self, n_classes: int) -> None:
+        """Raise unless the values are whole class positions inside ``n_classes``.
+
+        The stated-width counterpart of :meth:`check_is_label_encoded`; see
+        :func:`~oop_ml.core.validation.check_are_class_positions` for when each
+        applies.
+        """
+        check_are_class_positions(self._values, n_classes, self._role)
 
     def check_is_label_encoded(self) -> None:
         """Raise unless the values are whole class positions ``0 .. n - 1``.
