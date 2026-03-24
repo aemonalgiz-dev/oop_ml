@@ -42,6 +42,7 @@ Python 3.11 or later.
 | **Neighbours** | k-nearest for both tasks, six distance metrics |
 | **Trees** | decision tree for both tasks, Gini / entropy / variance |
 | **Ensembles** | bagging, random forest, gradient boosting, out-of-bag scoring |
+| **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, cross-validation |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
@@ -167,7 +168,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1366 tests
+pytest                  # 1375 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -181,9 +182,8 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1366 passing tests**, `ruff`
-and `pyright` clean. One body is still stubbed, `PermutationImportance.measure`,
-and its 8 specs are the only red in the suite.
+Every supervised family is implemented and green: **1375 passing tests**, `ruff`
+and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
 an application:

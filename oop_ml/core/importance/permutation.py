@@ -53,7 +53,10 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from oop_ml.core.data.feature import Feature
-from oop_ml.core.importance.importances import FeatureImportances
+from oop_ml.core.importance.importances import (
+    FeatureContribution,
+    FeatureImportances,
+)
 
 
 @runtime_checkable
@@ -140,7 +143,26 @@ class PermutationImportance(BaseModel):
             If no feature earned anything, which means the model scored no
             worse with every column broken in turn than it did intact.
         """
-        raise NotImplementedError
+        model_score = model.score(
+            input_values=input_values,
+            target_values=target_values,
+        )
+
+        generator = np.random.default_rng(self.random_seed)
+        feature_contributions: list[FeatureContribution] = []
+
+        for index, feature in enumerate(input_values):
+            drops = []
+
+            for _ in range(self.n_repeats):
+                shuffled = self._shuffled(input_values, index, generator)
+                drops.append(model_score - model.score(shuffled, target_values))
+
+            feature_contributions.append(
+                FeatureContribution(feature.name, max(0.0, sum(drops) / len(drops)))
+            )
+
+        return FeatureImportances.from_contributions(feature_contributions)
 
     def _shuffled(
         self,

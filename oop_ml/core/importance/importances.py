@@ -261,8 +261,8 @@ class FeatureImportances:
     @classmethod
     def from_contributions(
         cls,
-        names: Sequence[str],
         contributions: Iterable[FeatureContribution],
+        names: Sequence[str] | None = None,
     ) -> FeatureImportances:
         """Total the contributions by name, then normalise.
 
@@ -274,27 +274,40 @@ class FeatureImportances:
 
         Parameters
         ----------
-        names:
-            Every feature the model was fitted on, in the order it saw them.
-            Supplied separately from the contributions because a feature that
-            never earned anything contributes nothing and would otherwise be
-            missing entirely, and a zero is a finding rather than an absence.
         contributions:
             Any number per feature, in any order.
+        names:
+            Every feature the model was fitted on, in the order it saw them.
+            Only needed by a producer whose contributions can be *incomplete*.
+            A tree walk is exactly that: a feature winning no splits appends
+            nothing, so without the names it would be missing from the result
+            entirely, and a zero is a finding rather than an absence.
+
+            A producer that emits one contribution per feature -- permutation
+            importance does -- knows the set is complete and should leave this
+            out, since repeating the names it has just supplied inside the
+            contributions buys nothing.
 
         Raises
         ------
         EmptyValuesError
-            If no names are supplied.
+            If there are no contributions and no names.
         InvalidValuesError
             If a contribution names a feature not in ``names``, or if they
             total zero.
         """
+        collected = list(contributions)
+
+        if names is None:
+            # Order of first appearance, which for a complete set is the order
+            # the caller walked its features in.
+            names = list(dict.fromkeys(one.name for one in collected))
+
         if not names:
             raise EmptyValuesError("At least one feature name is required")
 
         totals = dict.fromkeys(names, 0.0)
-        for contribution in contributions:
+        for contribution in collected:
             if contribution.name not in totals:
                 known = ", ".join(names)
                 raise InvalidValuesError(

@@ -168,7 +168,7 @@ class TreeModel(Fittable):
         contributions: list[FeatureContribution] = []
         self._credit_splits(self.root, contributions)
 
-        return FeatureImportances.from_contributions(self._feature_names, contributions)
+        return FeatureImportances.from_contributions(contributions, self._feature_names)
 
     @property
     def root(self) -> TreeNode:
