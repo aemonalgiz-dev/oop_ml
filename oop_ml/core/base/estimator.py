@@ -268,6 +268,53 @@ class MultiClassClassifier(Estimator[InputT, TargetT]):
         return self.evaluate(input_values, target_values).accuracy
 
 
+class Clusterer(Fittable, Generic[InputT]):
+    """Base class for models that group rows without being told the groups.
+
+    The third frame, and the one unsupervised learning still lacked. A
+    :class:`Transformer` takes no target and answers by *rewriting the
+    columns*; a clusterer takes no target and answers with *a label per row*.
+    Neither shape covers the other, which is why this is a sibling of both
+    rather than a special case of either.
+
+    What makes the labels different from a classifier's
+    ---------------------------------------------------
+    They look identical -- whole numbers, one per row -- and they mean
+    something entirely different. A classifier's label 0 means the class the
+    training data called 0, and it means that in every fit, on every dataset,
+    forever. A clusterer's label 0 means "the first group this particular fit
+    happened to number 0", and refitting on the same rows with a different seed
+    can hand you the same grouping under different numbers.
+
+    So the labels are not comparable across fits, and accuracy against a set of
+    true classes is not defined without first solving a matching problem. That
+    is not a limitation of any implementation. There was no target, so nothing
+    ever told the model which group deserved which number.
+    """
+
+    @abstractmethod
+    def fit(self, input_values: InputT) -> Self:
+        """Learn the groups from ``input_values`` and return ``self``."""
+
+    @abstractmethod
+    def predict(self, input_values: InputT) -> Predictions:
+        """Return the group each row belongs to, as ``0.0 .. n_clusters - 1``.
+
+        Must call ``_check_fitted()`` first. Rows the fit never saw are
+        allowed: they are assigned to whichever learned group they fall in,
+        which is what makes a clusterer usable on new data at all.
+        """
+
+    def fit_predict(self, input_values: InputT) -> Predictions:
+        """Fit on ``input_values`` and immediately label them.
+
+        The counterpart of ``Transformer.fit_transform``, and unlike that one
+        it carries no leakage warning -- there is no held-out set to leak from,
+        because there is no target to score against.
+        """
+        return self.fit(input_values).predict(input_values)
+
+
 class Transformer(Fittable, Generic[InputT]):
     """Base class for things that learn a reshaping of the inputs themselves.
 

@@ -26,6 +26,11 @@ from oop_ml.classification.ensembles.bagging_classifier import BaggingClassifier
 from oop_ml.classification.ensembles.random_forest_classifier import (
     RandomForestClassifier,
 )
+from oop_ml.classification.kernels.support_vector_classifier import (
+    SupportVector,
+    SupportVectorClassifier,
+    SupportVectors,
+)
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
@@ -41,6 +46,7 @@ from oop_ml.classification.neighbours.k_nearest_classifier import (
 from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
+from oop_ml.clustering.k_means import KMeans
 from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
     Classifier,
@@ -53,6 +59,8 @@ from oop_ml.core.base.estimator import (
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.base.tree_model import TreeModel
+from oop_ml.core.clustering.centroids import Centroid, Centroids
+from oop_ml.core.clustering.clustering import Clustering, InitialisationAttempt
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.dataset import Dataset
@@ -116,6 +124,14 @@ from oop_ml.core.importance.importances import (
     FeatureImportances,
 )
 from oop_ml.core.importance.permutation import PermutationImportance
+from oop_ml.core.kernel.functions import (
+    Kernel,
+    LinearKernel,
+    PolynomialKernel,
+    RadialBasisKernel,
+    SigmoidKernel,
+)
+from oop_ml.core.kernel.matrix import KernelMatrix
 from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
 from oop_ml.core.observation import Observation, Stage
 from oop_ml.core.solving.normal_equations import (
@@ -149,6 +165,11 @@ from oop_ml.core.types import (
     NumericInput,
     NumericValues,
 )
+from oop_ml.decomposition.kernel_principal_component_analysis import (
+    KernelComponent,
+    KernelComponents,
+    KernelPrincipalComponentAnalysis,
+)
 from oop_ml.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
@@ -174,6 +195,9 @@ from oop_ml.regression.ensembles.gradient_boosting_regressor import (
 )
 from oop_ml.regression.ensembles.random_forest_regressor import (
     RandomForestRegressor,
+)
+from oop_ml.regression.kernels.kernel_ridge_regression import (
+    KernelRidgeRegression,
 )
 from oop_ml.regression.least_squares.gradient_descent_regression import (
     GradientDescentRegression,
@@ -309,10 +333,28 @@ __all__ = [
     "Splits",
     "CrossValidation",
     "ClassificationCrossValidationResult",
+    "Centroid",
+    "Centroids",
+    "Clustering",
+    "InitialisationAttempt",
+    "KMeans",
+    "Kernel",
+    "KernelComponent",
+    "KernelComponents",
+    "KernelMatrix",
+    "KernelPrincipalComponentAnalysis",
+    "KernelRidgeRegression",
+    "LinearKernel",
+    "PolynomialKernel",
     "PrincipalComponent",
     "PrincipalComponentAnalysis",
     "PrincipalComponents",
+    "RadialBasisKernel",
     "RegressionCrossValidationResult",
+    "SigmoidKernel",
+    "SupportVector",
+    "SupportVectorClassifier",
+    "SupportVectors",
     # Errors, all of which derive from MLLibError
     "MLLibError",
     "NotFittedError",

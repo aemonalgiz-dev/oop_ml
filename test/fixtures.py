@@ -18,7 +18,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from oop_ml.core.data.feature import Feature
-from oop_ml.core.types import NumericValues
+from oop_ml.core.types import IndexArray, NumericValues
 
 FIRST_PREDICTOR: NumericValues = [1, 1, 2, 0, 3]
 SECOND_PREDICTOR: NumericValues = [1, 2, 2, 1, 0]
@@ -941,3 +941,230 @@ MISMATCHED_UNITS = DecompositionFixture(
 # 0.001. Standardized, the two columns become identical and the loading splits
 # evenly at 1/sqrt(2).
 MISMATCHED_UNITS_RAW_SMALL_LOADING_CEILING = 0.01
+
+
+class ClusterFixture:
+    """Two features holding groups that are known before any fit runs.
+
+    Parameters
+    ----------
+    first, second:
+        The two columns, named ``first`` and ``second``.
+    true_groups:
+        Which group each row was generated from. Never handed to a clusterer --
+        it exists so a test can ask whether the fit recovered the structure,
+        and it has to be compared by *partition* rather than by label, since
+        nothing ever told the model which group deserved which number.
+    """
+
+    __slots__ = ("_first", "_second", "_true_groups")
+
+    def __init__(
+        self,
+        first: Sequence[float],
+        second: Sequence[float],
+        true_groups: Sequence[int],
+    ) -> None:
+        self._first = list(first)
+        self._second = list(second)
+        self._true_groups = list(true_groups)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two columns, in the order a fit sees them."""
+        return [Feature("first", self._first), Feature("second", self._second)]
+
+    @property
+    def true_groups(self) -> list[int]:
+        """The generating groups, for checking a partition rather than labels."""
+        return list(self._true_groups)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows the fixture holds."""
+        return len(self._first)
+
+
+def same_partition(
+    left: Sequence[int] | IndexArray, right: Sequence[int] | IndexArray
+) -> bool:
+    """Whether two labellings group the rows identically, ignoring the numbers.
+
+    The comparison every clustering test needs. Cluster labels carry no meaning
+    across fits -- a run that puts rows 0-3 together and rows 4-7 together has
+    found the same structure whether it called them (0, 1) or (1, 0). What has
+    to match is which rows share a label, not what the label is.
+
+    Two rows agree when they are together in both labellings or apart in both,
+    so comparing every pair settles it without solving a matching problem.
+    """
+    first = np.asarray(left)
+    second = np.asarray(right)
+
+    together_in_first = first[:, None] == first[None, :]
+    together_in_second = second[:, None] == second[None, :]
+
+    return bool(np.array_equal(together_in_first, together_in_second))
+
+
+# Three tight blobs, far enough apart that the grouping is not a judgement
+# call: within a blob the rows sit within 1.0 of each other, and the blobs'
+# centres are 10 apart. Any correct k-means at k=3 recovers exactly this
+# partition from any seeding, which is what makes it a fixture rather than a
+# measurement.
+#
+# The centres are (1, 1), (11, 1) and (6, 11), so they are also checkable by
+# hand: each blob is four rows symmetric about its centre.
+THREE_BLOBS = ClusterFixture(
+    [
+        0.5,
+        1.5,
+        1.0,
+        1.0,
+        10.5,
+        11.5,
+        11.0,
+        11.0,
+        5.5,
+        6.5,
+        6.0,
+        6.0,
+    ],
+    [
+        1.0,
+        1.0,
+        0.5,
+        1.5,
+        1.0,
+        1.0,
+        0.5,
+        1.5,
+        11.0,
+        11.0,
+        10.5,
+        11.5,
+    ],
+    [0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2],
+)
+
+THREE_BLOBS_CENTRES = ((1.0, 1.0), (11.0, 1.0), (6.0, 11.0))
+THREE_BLOBS_SIZES = (4, 4, 4)
+
+# Each blob contributes four rows at distance 0.5 from its centre, so every
+# row's squared distance is 0.25 and the total is 12 * 0.25.
+THREE_BLOBS_INERTIA = 3.0
+
+
+# Two concentric rings: the inner one is a tight blob, the outer a circle of
+# radius 5 around it. The structure is obvious to a person and invisible to
+# k-means, because no pair of centres can carve a ring out of a ring. This is
+# not a hard case -- it is outside what "closest centre" can express.
+def _ring(n_points: int, radius: float) -> tuple[list[float], list[float]]:
+    angles = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=False)
+
+    return (
+        [float(radius * np.cos(angle)) for angle in angles],
+        [float(radius * np.sin(angle)) for angle in angles],
+    )
+
+
+_INNER_FIRST, _INNER_SECOND = _ring(12, 1.0)
+_OUTER_FIRST, _OUTER_SECOND = _ring(12, 5.0)
+
+CONCENTRIC_RINGS = ClusterFixture(
+    _INNER_FIRST + _OUTER_FIRST,
+    _INNER_SECOND + _OUTER_SECOND,
+    [0] * 12 + [1] * 12,
+)
+
+
+class KernelFixture:
+    """Two features and a target whose relationship no straight line can hold.
+
+    Parameters
+    ----------
+    first, second:
+        The predictor columns.
+    target:
+        What the model is asked to reproduce -- a class for the classifier
+        fixtures, a quantity for the regression one.
+    """
+
+    __slots__ = ("_first", "_second", "_target")
+
+    def __init__(
+        self,
+        first: Sequence[float],
+        second: Sequence[float],
+        target: Sequence[float],
+    ) -> None:
+        self._first = list(first)
+        self._second = list(second)
+        self._target = list(target)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two predictors, in the order a fit sees them."""
+        return [Feature("first", self._first), Feature("second", self._second)]
+
+    @property
+    def target_feature(self) -> Feature:
+        """What the model is fitted against."""
+        return Feature("outcome", self._target)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows the fixture holds."""
+        return len(self._first)
+
+
+# Points on a circle of radius 2 labelled 1, points on a circle of radius 5
+# labelled 0. No line separates them -- the inner class is surrounded -- so a
+# linear kernel cannot do better than chance-ish, and an RBF kernel separates
+# them perfectly. That gap is the whole demonstration.
+def _circle(n_points: int, radius: float) -> tuple[list[float], list[float]]:
+    angles = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=False)
+
+    return (
+        [float(radius * np.cos(angle)) for angle in angles],
+        [float(radius * np.sin(angle)) for angle in angles],
+    )
+
+
+_TIGHT_FIRST, _TIGHT_SECOND = _circle(16, 2.0)
+_WIDE_FIRST, _WIDE_SECOND = _circle(16, 5.0)
+
+SURROUNDED_CLASS = KernelFixture(
+    _TIGHT_FIRST + _WIDE_FIRST,
+    _TIGHT_SECOND + _WIDE_SECOND,
+    [1.0] * 16 + [0.0] * 16,
+)
+
+# A linear boundary cannot beat this on the surrounded fixture; an RBF one
+# reaches 1.0. Measured across gammas from 0.05 to 0.5.
+SURROUNDED_LINEAR_CEILING = 0.85
+SURROUNDED_RADIAL_FLOOR = 0.99
+
+# y = first ** 2, exactly. A straight line through it is wrong everywhere, a
+# degree-2 polynomial kernel reproduces it to floating point, and the second
+# column is pure noise so a fit that leans on it has found something that is
+# not there.
+_QUADRATIC_FIRST = [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, -2.5, 2.5, 1.5]
+
+QUADRATIC_CURVE = KernelFixture(
+    _QUADRATIC_FIRST,
+    [0.1, -0.2, 0.3, -0.1, 0.2, -0.3, 0.1, 0.0, -0.2, 0.3],
+    [value * value for value in _QUADRATIC_FIRST],
+)
+
+# Held-out R^2 a linear kernel cannot exceed on the curve, and one a
+# degree-2 polynomial kernel comfortably clears.
+QUADRATIC_LINEAR_CEILING = 0.5
+QUADRATIC_POLYNOMIAL_FLOOR = 0.99
+
+# Four rows whose Gram matrix under a linear kernel is small enough to write
+# out, for pinning the kernel arithmetic itself rather than a model's use of it.
+KERNEL_PAIR_LEFT = (1.0, 2.0)
+KERNEL_PAIR_RIGHT = (3.0, 4.0)
+KERNEL_PAIR_INNER_PRODUCT = 11.0
+KERNEL_PAIR_DEGREE_TWO = 121.0
