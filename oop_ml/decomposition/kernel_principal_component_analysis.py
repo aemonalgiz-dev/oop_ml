@@ -56,7 +56,7 @@ statistics rather than relearning them.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -332,6 +332,12 @@ class KernelPrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
 
     kernel: Kernel = LinearKernel()
     n_components: int | None = Field(default=None, ge=1)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_components",
+        "_training_rows",
+        "_training_matrix",
+    )
 
     _components: KernelComponents | None = PrivateAttr(default=None)
     _training_rows: RowBlock | None = PrivateAttr(default=None)

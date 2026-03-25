@@ -32,7 +32,7 @@ not.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, PrivateAttr
@@ -65,6 +65,11 @@ class OneVsRestClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     binary_model: LinearClassifier
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_n_classes",
+        "_fitted_models",
+    )
 
     _n_classes: int | None = PrivateAttr(default=None)
     _fitted_models: tuple[LinearClassifier, ...] | None = PrivateAttr(default=None)

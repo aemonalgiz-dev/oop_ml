@@ -64,7 +64,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Sequence
 from itertools import combinations_with_replacement
-from typing import Self
+from typing import ClassVar, Self
 
 from pydantic import Field, PrivateAttr
 
@@ -90,6 +90,8 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
 
     degree: int = Field(default=2, ge=1)
     include_interactions: bool = True
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_terms",)
 
     _terms: PolynomialTerms | None = PrivateAttr(default=None)
 

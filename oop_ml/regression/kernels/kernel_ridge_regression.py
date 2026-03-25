@@ -60,7 +60,7 @@ optional for ordinary least squares.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -104,6 +104,13 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
 
     kernel: Kernel = LinearKernel()
     penalty: float = Field(default=1.0, gt=0.0)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_dual_weights",
+        "_training_rows",
+        "_feature_means",
+        "_target_mean",
+    )
 
     _dual_weights: FloatArray | None = PrivateAttr(default=None)
     _training_rows: RowBlock | None = PrivateAttr(default=None)

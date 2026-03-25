@@ -48,6 +48,7 @@ fifth iterative model turns up and not obviously worth it for one.
 from __future__ import annotations
 
 from abc import abstractmethod
+from typing import ClassVar
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -71,6 +72,12 @@ class IterativeSolver(LinearModel):
     """
 
     tolerance: float = Field(default=1e-8, gt=0.0)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        *LinearModel.LEARNED_STATE,
+        "_passes_run",
+        "_converged",
+    )
 
     _passes_run: int | None = PrivateAttr(default=None)
     _converged: bool | None = PrivateAttr(default=None)

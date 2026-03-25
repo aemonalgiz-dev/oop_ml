@@ -19,7 +19,7 @@ boundary, so this
   identically.
 """
 
-from typing import Self
+from typing import ClassVar, Self
 
 from pydantic import PrivateAttr
 
@@ -39,6 +39,8 @@ class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
 
     Predicts ``intercept + slope * input_value`` for each observation.
     """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_slope", "_intercept")
 
     _slope: float | None = PrivateAttr(default=None)
     _intercept: float | None = PrivateAttr(default=None)

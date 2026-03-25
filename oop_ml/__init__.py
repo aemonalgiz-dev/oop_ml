@@ -111,6 +111,7 @@ from oop_ml.core.exceptions import (
     CollinearFeaturesError,
     DivergenceError,
     EmptyValuesError,
+    InvalidDocumentError,
     InvalidValuesError,
     MLLibError,
     NonBinaryLabelsError,
@@ -195,6 +196,13 @@ from oop_ml.model_selection.splitting import (
     RowShuffler,
     Splits,
     TrainTestSplitter,
+)
+from oop_ml.persistence.document import ModelDocument
+from oop_ml.persistence.store import (
+    build_model,
+    load_model,
+    model_document,
+    save_model,
 )
 from oop_ml.pipeline.pipelines import (
     ClassificationPipeline,
@@ -386,12 +394,18 @@ __all__ = [
     "SupportVector",
     "SupportVectorClassifier",
     "SupportVectors",
+    "build_model",
+    "load_model",
+    "model_document",
+    "save_model",
     # Errors, all of which derive from MLLibError
     "MLLibError",
+    "ModelDocument",
     "NotFittedError",
     "EmptyValuesError",
     "TooFewValuesError",
     "NonEqualArrayLengthError",
+    "InvalidDocumentError",
     "InvalidValuesError",
     "AllSameValuesError",
     "UndefinedMetricError",

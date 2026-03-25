@@ -56,7 +56,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import Self, TypeAlias
+from typing import ClassVar, Self, TypeAlias
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -118,6 +118,16 @@ class AveragingEnsemble(Fittable):
 
     n_members: int = Field(default=100, ge=1)
     random_seed: int | None = None
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_members",
+        "_samples",
+        "_training",
+    )
+    """The training rows are part of the fitted self here on purpose: the
+    out-of-bag score is computed against them, so a restored ensemble that
+    dropped them would silently lose a public method."""
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _members: tuple[AveragingMember, ...] | None = PrivateAttr(default=None)
@@ -494,6 +504,12 @@ class BoostingEnsemble(Fittable):
 
     n_rounds: int = Field(default=100, ge=1)
     learning_rate: float = Field(default=0.1, gt=0.0, le=1.0)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_members",
+        "_initial_prediction",
+    )
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _members: tuple[BoostingMember, ...] | None = PrivateAttr(default=None)

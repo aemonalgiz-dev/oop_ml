@@ -116,6 +116,11 @@ class PolynomialTerm:
         self._powers = dict(powers)
 
     @property
+    def powers(self) -> dict[str, int]:
+        """Which feature is raised to what, as a copy."""
+        return dict(self._powers)
+
+    @property
     def name(self) -> str:
         """The column name this term produces, e.g. ``"x1^2*x2"``.
 

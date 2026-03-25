@@ -105,9 +105,12 @@ feature selection, and no ridge fit at any finite penalty can produce it.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import numpy as np
 from pydantic import Field, PrivateAttr
 
+from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
@@ -136,6 +139,12 @@ class LassoRegression(LinearFeatureRegressor):
     penalty: float = Field(default=1.0, ge=0.0)
     max_iterations: int = Field(default=1_000, gt=0)
     tolerance: float = Field(default=1e-10, gt=0.0)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        *LinearModel.LEARNED_STATE,
+        "_iterations_run",
+        "_converged",
+    )
 
     _iterations_run: int | None = PrivateAttr(default=None)
     _converged: bool | None = PrivateAttr(default=None)

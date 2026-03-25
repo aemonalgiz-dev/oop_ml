@@ -45,7 +45,7 @@ and deterministic is the property that matters.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -96,6 +96,11 @@ class DecisionTreeClassifier(
 
     criterion: ClassificationCriterion = ClassificationCriterion.GINI
     n_known_classes: int | None = Field(default=None, ge=2)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        *TreeModel.LEARNED_STATE,
+        "_n_classes",
+    )
 
     _n_classes: int | None = PrivateAttr(default=None)
 

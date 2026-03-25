@@ -75,7 +75,7 @@ rather than hypothetical.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -136,6 +136,12 @@ class PrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
 
     n_components: int | None = Field(default=None, ge=1)
     standardize: bool = False
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_components",
+        "_feature_means",
+        "_standardizer",
+    )
 
     _components: PrincipalComponents | None = PrivateAttr(default=None)
     _feature_means: dict[str, float] = PrivateAttr(default_factory=dict)
