@@ -274,11 +274,18 @@ class TestEveryModelRoundTrips:
     @pytest.mark.parametrize("model_name", sorted(ROUND_TRIPS))
     def test_the_rebuilt_model_answers_identically(self, model_name: str) -> None:
         """Exactly equal, not approximately: the rebuilt model holds the same
-        numbers and runs the same arithmetic, so any drift is a codec bug."""
+        numbers and runs the same arithmetic, so any drift is a codec bug.
+
+        The trip goes all the way through ``to_json`` and ``from_json``, not
+        just ``model_document`` / ``build_model``, because that is where an
+        order-bearing mapping would be reordered by key sorting -- the failure
+        an in-memory round trip cannot see.
+        """
         build, answer = ROUND_TRIPS[model_name]
         fitted = build()
 
-        rebuilt = build_model(model_document(fitted))
+        text = model_document(fitted).to_json()
+        rebuilt = build_model(ModelDocument.from_json(text))
 
         assert np.array_equal(answer(fitted), answer(rebuilt))
 

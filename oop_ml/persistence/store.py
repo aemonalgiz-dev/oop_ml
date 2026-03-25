@@ -135,6 +135,30 @@ from oop_ml.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
+PERSISTABLE_ARRAY_DTYPES: dict[str, np.dtype] = {
+    str(np.dtype(kind)): np.dtype(kind) for kind in ("float64", "int64", "intp", "bool")
+}
+"""The only array dtypes a document may name.
+
+The library learns float64 values, integer positions, and boolean masks and
+nothing else, so the decoder allowlists exactly those. This is what closes the
+object-dtype smuggle: a document naming ``object`` would otherwise land arbitrary
+Python objects -- strings, dicts -- inside a float array with every finiteness
+guard bypassed, and the model would report itself fitted until the first predict
+died on a bare TypeError. An unparseable or unlisted dtype is a typed refusal.
+"""
+
+MAX_DOCUMENT_DEPTH = 200
+"""How deeply a document may nest before it is refused.
+
+Every codec that recurses -- tuples, mappings, tree nodes, nested fitted
+models -- counts a level here. Without the bound a document nesting a few
+hundred tuple tags overflows the interpreter stack with a bare RecursionError,
+which a serving process turns into a 500 rather than a 4xx. The real trees and
+ensembles this library builds are nowhere near this deep, so the bound rejects
+only attacks and corruption, never a legitimate save.
+"""
+
 PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
     persistable.__name__: persistable
     for persistable in (
@@ -224,6 +248,12 @@ def build_model(document: ModelDocument) -> Any:
         value violates its invariants -- the same refusal the equivalent bad
         data would meet anywhere else in the library.
     """
+    return _build_model(document, 0)
+
+
+def _build_model(document: ModelDocument, depth: int) -> Any:
+    """The recursive core of :func:`build_model`, tracking nesting depth."""
+    _check_depth(depth)
     document.check_readable()
 
     model_type = _registered_type(document.model_type)
@@ -242,7 +272,17 @@ def build_model(document: ModelDocument) -> Any:
                 f"the document for {document.model_type} is missing the "
                 f"learned part {name!r}"
             )
-        setattr(model, name, _decoded(learned[name]))
+        restored = _decoded(learned[name], depth + 1)
+
+        # Learned state is read-only after fit, and a bare-array part frozen at
+        # fit time (a neighbour model's remembered targets, say) must come back
+        # frozen too -- otherwise a loaded model is mutable where the original
+        # refused a write. Value-object parts re-freeze in their own
+        # constructors; only the top-level bare arrays need it here.
+        if isinstance(restored, np.ndarray):
+            restored.setflags(write=False)
+
+        setattr(model, name, restored)
 
     model._mark_fitted()
 
@@ -344,9 +384,15 @@ def _encoded(value: Any) -> Any:
         return {"__kind__": "tuple", "items": [_encoded(item) for item in value]}
 
     if isinstance(value, dict):
+        # A list of pairs, not a nested object, because to_json sorts keys and
+        # some mappings are order-bearing -- PrincipalComponentAnalysis keeps
+        # its fitted feature order in the insertion order of _feature_means,
+        # and an alphabetised reload centres and stacks the columns in the
+        # wrong order while the loadings stay put, transforming silently wrong.
+        # A list is immune to key sorting.
         return {
             "__kind__": "mapping",
-            "items": {name: _encoded(item) for name, item in value.items()},
+            "items": [[name, _encoded(item)] for name, item in value.items()],
         }
 
     if isinstance(value, Coefficients):
@@ -467,8 +513,10 @@ def _encoded(value: Any) -> Any:
     )
 
 
-def _decoded(value: Any) -> Any:
+def _decoded(value: Any, depth: int) -> Any:
     """One plain-data payload back into the value it encodes, revalidated."""
+    _check_depth(depth)
+
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
 
@@ -481,13 +529,16 @@ def _decoded(value: Any) -> Any:
     kind = value["__kind__"]
 
     if kind == "array":
-        return np.array(value["values"], dtype=np.dtype(value["dtype"]))
+        return _decoded_array(value)
 
     if kind == "tuple":
-        return tuple(_decoded(item) for item in value["items"])
+        return tuple(_decoded(item, depth + 1) for item in _expect_list(value, "items"))
 
     if kind == "mapping":
-        return {name: _decoded(item) for name, item in value["items"].items()}
+        return {
+            _expect_pair(pair)[0]: _decoded(_expect_pair(pair)[1], depth + 1)
+            for pair in _expect_list(value, "items")
+        }
 
     if kind == "Coefficients":
         return Coefficients(
@@ -495,23 +546,25 @@ def _decoded(value: Any) -> Any:
         )
 
     if kind == "RowBlock":
-        return rows_of(_decoded(value["values"]), tuple(value["feature_names"]))
+        return rows_of(
+            _decoded(value["values"], depth + 1), tuple(value["feature_names"])
+        )
 
     if kind == "KernelMatrix":
-        return KernelMatrix(_decoded(value["values"]))
+        return KernelMatrix(_decoded(value["values"], depth + 1))
 
     if kind == "BootstrapSample":
-        return BootstrapSample(_decoded(value["drawn"]), value["n_rows"])
+        return BootstrapSample(_decoded(value["drawn"], depth + 1), value["n_rows"])
 
     if kind == "Dataset":
         return Dataset(
             [
-                Feature(one["name"], _decoded(one["values"]))
+                Feature(one["name"], _decoded(one["values"], depth + 1))
                 for one in value["input_features"]
             ],
             Feature(
                 value["target_feature"]["name"],
-                _decoded(value["target_feature"]["values"]),
+                _decoded(value["target_feature"]["values"], depth + 1),
             ),
         )
 
@@ -532,7 +585,7 @@ def _decoded(value: Any) -> Any:
         return PrincipalComponents(
             [
                 PrincipalComponent(
-                    one["name"], _decoded(one["loadings"]), one["variance"]
+                    one["name"], _decoded(one["loadings"], depth + 1), one["variance"]
                 )
                 for one in value["components"]
             ],
@@ -543,7 +596,9 @@ def _decoded(value: Any) -> Any:
         return KernelComponents(
             [
                 KernelComponent(
-                    one["name"], _decoded(one["row_coefficients"]), one["variance"]
+                    one["name"],
+                    _decoded(one["row_coefficients"], depth + 1),
+                    one["variance"],
                 )
                 for one in value["components"]
             ],
@@ -552,12 +607,12 @@ def _decoded(value: Any) -> Any:
 
     if kind == "Clustering":
         return Clustering(
-            _decoded(value["labels"]),
+            _decoded(value["labels"], depth + 1),
             Centroids(
                 [
                     Centroid(
                         one["name"],
-                        _decoded(one["coordinates"]),
+                        _decoded(one["coordinates"], depth + 1),
                         tuple(one["feature_names"]),
                     )
                     for one in value["centroids"]
@@ -567,20 +622,78 @@ def _decoded(value: Any) -> Any:
         )
 
     if kind == "TreeNode":
-        return _decoded_node(value["node"])
+        return _decoded_node(value["node"], depth + 1)
 
     if kind == "fitted_steps":
         return PipelineSteps(
             [
-                PipelineStep(step["name"], build_model(_document_of(step["document"])))
+                PipelineStep(
+                    step["name"],
+                    _build_model(_document_of(step["document"]), depth + 1),
+                )
                 for step in value["steps"]
             ]
         )
 
     if kind == "fitted_model":
-        return build_model(_document_of(value["document"]))
+        return _build_model(_document_of(value["document"]), depth + 1)
 
     raise InvalidDocumentError(f"unknown learned-value kind {kind!r}")
+
+
+def _decoded_array(value: dict[str, Any]) -> np.ndarray:
+    """A tagged array back to numpy, refusing any dtype the library never uses.
+
+    The dtype is document-controlled, so it is looked up in an allowlist rather
+    than passed to ``np.dtype``: ``object`` would smuggle arbitrary Python
+    objects into a float array, and an unparseable string would raise a bare
+    numpy ``TypeError`` outside the hierarchy. Both become a typed refusal.
+    """
+    dtype_name = value.get("dtype")
+
+    if dtype_name not in PERSISTABLE_ARRAY_DTYPES:
+        raise InvalidDocumentError(
+            f"an array dtype must be one of "
+            f"{sorted(PERSISTABLE_ARRAY_DTYPES)}; got {dtype_name!r}"
+        )
+
+    try:
+        return np.array(value["values"], dtype=PERSISTABLE_ARRAY_DTYPES[dtype_name])
+    except (ValueError, TypeError) as error:
+        raise InvalidDocumentError(
+            f"an array payload was malformed for dtype {dtype_name}: {error}"
+        ) from error
+
+
+def _check_depth(depth: int) -> None:
+    """Raise before a document nests deep enough to overflow the stack."""
+    if depth > MAX_DOCUMENT_DEPTH:
+        raise InvalidDocumentError(
+            f"the document nests deeper than {MAX_DOCUMENT_DEPTH} levels, which "
+            f"no model this library builds reaches; refusing it"
+        )
+
+
+def _expect_list(value: dict[str, Any], key: str) -> list:
+    """The list at ``key``, or a typed refusal if it is any other shape."""
+    items = value.get(key)
+
+    if not isinstance(items, list):
+        raise InvalidDocumentError(
+            f"expected a list at {key!r}; got {type(items).__name__}"
+        )
+
+    return items
+
+
+def _expect_pair(pair: Any) -> list:
+    """A ``[name, value]`` pair, or a typed refusal."""
+    if not isinstance(pair, list) or len(pair) != 2 or not isinstance(pair[0], str):
+        raise InvalidDocumentError(
+            "a mapping entry must be a [name, value] pair with a string name"
+        )
+
+    return pair
 
 
 # ---------------------------------------------------------------------------
@@ -624,7 +737,14 @@ def _encoded_node(node: TreeNode) -> dict[str, Any]:
     raise InvalidDocumentError(f"no codec knows how to persist a {type(node).__name__}")
 
 
-def _decoded_node(payload: dict[str, Any]) -> TreeNode:
+def _decoded_node(payload: dict[str, Any], depth: int) -> TreeNode:
+    _check_depth(depth)
+
+    if not isinstance(payload, dict):
+        raise InvalidDocumentError(
+            f"a tree node is an object; got {type(payload).__name__}"
+        )
+
     node_type = payload.get("node_type")
 
     if node_type == "decision":
@@ -637,8 +757,8 @@ def _decoded_node(payload: dict[str, Any]) -> TreeNode:
                 split["threshold"],
                 split["gain"],
             ),
-            _decoded_node(payload["left"]),
-            _decoded_node(payload["right"]),
+            _decoded_node(payload["left"], depth + 1),
+            _decoded_node(payload["right"], depth + 1),
             payload["n_samples"],
             payload["impurity"],
         )
@@ -646,7 +766,7 @@ def _decoded_node(payload: dict[str, Any]) -> TreeNode:
     if node_type == "classification_leaf":
         return ClassificationLeaf(
             payload["prediction"],
-            _decoded(payload["class_shares"]),
+            _decoded(payload["class_shares"], depth + 1),
             payload["n_samples"],
             payload["impurity"],
         )
