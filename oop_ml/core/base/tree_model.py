@@ -699,7 +699,16 @@ class TreeModel(Fittable):
         assert self._root is not None
         root = self._root
 
-        return [root.leaf_for(row) for row in rows]
+        # Batched traversal: partition row indices at each split and recurse,
+        # so the tree is walked in O(depth) numpy comparisons rather than one
+        # Python recursion per row. leaf_for stays for the single-row route.
+        row_values = rows.values
+        leaves: list[LeafNode] = [root] * row_values.shape[0]
+        root.assign_leaves(
+            row_values, np.arange(row_values.shape[0], dtype=np.intp), leaves
+        )
+
+        return leaves
 
     def _validated_target(self, target_values: Feature) -> Column:
         """The target as a column, checked against whatever the task requires.

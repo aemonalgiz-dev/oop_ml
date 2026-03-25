@@ -117,6 +117,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.exceptions import SingularHessianError
+from oop_ml.core.solving.positive_definite import solve_positive_definite
 from oop_ml.core.types import FloatArray
 
 
@@ -202,7 +203,7 @@ class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
             in its terminal form.
         """
         try:
-            return np.linalg.solve(hessian_matrix, gradient)
+            return solve_positive_definite(hessian_matrix, gradient)
         except np.linalg.LinAlgError as error:
             raise SingularHessianError(
                 "the Hessian is singular, so there is no unique Newton step. "
