@@ -36,6 +36,7 @@ class ValueRole(StrEnum):
     PREDICTED_VALUES = "predicted_values"
     FEATURE_VALUES = "feature_values"
     LABEL_VALUES = "label_values"
+    WEIGHT_VALUES = "weight_values"
 
 
 def to_float_array(values: NumericInput, role: ValueRole) -> FloatArray:
