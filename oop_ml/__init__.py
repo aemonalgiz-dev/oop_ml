@@ -182,9 +182,18 @@ from oop_ml.core.network.normalisation import (
     NormalisationResponse,
 )
 from oop_ml.core.network.pooling import AveragePool2d, MaxPool2d, Pool2d
+from oop_ml.core.network.row_normalisation import (
+    LayerNormalization,
+    RMSNormalization,
+    WithinRowNormalization,
+)
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.network.stack import LayerStack, StackResponse
+from oop_ml.core.network.weight_normalisation import (
+    ReparameterisedGradient,
+    WeightNormalization,
+)
 from oop_ml.core.observation import Observation, Stage
 from oop_ml.core.schedule import (
     ConstantSchedule,
@@ -487,6 +496,11 @@ __all__ = [
     "BatchNormalization",
     "BatchStatistics",
     "NormalisationResponse",
+    "WithinRowNormalization",
+    "LayerNormalization",
+    "RMSNormalization",
+    "WeightNormalization",
+    "ReparameterisedGradient",
     "AbsoluteError",
     "BackwardPass",
     "BinaryCrossEntropy",
