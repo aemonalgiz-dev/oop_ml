@@ -47,6 +47,7 @@ from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
 from oop_ml.clustering.k_means import KMeans
+from oop_ml.core.base.convergent_fit import ConvergentFit
 from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
     Classifier,
@@ -170,6 +171,12 @@ from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.network.stack import LayerStack, StackResponse
 from oop_ml.core.observation import Observation, Stage
+from oop_ml.core.schedule import (
+    ConstantSchedule,
+    ExponentialDecaySchedule,
+    LinearDecaySchedule,
+    Schedule,
+)
 from oop_ml.core.solving.normal_equations import (
     LeastSquaresLine,
     NormalEquations,
@@ -465,6 +472,12 @@ __all__ = [
     "SquaredError",
     "LayerStack",
     "StackResponse",
+    # Learning without a gradient, the rules that predate backpropagation
+    "ConvergentFit",
+    "Schedule",
+    "ConstantSchedule",
+    "LinearDecaySchedule",
+    "ExponentialDecaySchedule",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
