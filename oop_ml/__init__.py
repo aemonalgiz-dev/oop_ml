@@ -56,6 +56,12 @@ from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
 from oop_ml.clustering.k_means import KMeans
+from oop_ml.clustering.self_organising_map import (
+    GridPosition,
+    MapUnit,
+    SelfOrganisingMap,
+    UnitGrid,
+)
 from oop_ml.core.base.convergent_fit import ConvergentFit
 from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
@@ -494,6 +500,10 @@ __all__ = [
     "RecallWalk",
     "RecallStop",
     "UpdateRule",
+    "SelfOrganisingMap",
+    "UnitGrid",
+    "MapUnit",
+    "GridPosition",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
