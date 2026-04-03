@@ -1208,7 +1208,14 @@ class RestrictedBoltzmannMachine(Transformer[Sequence[Feature]], ConvergentFit):
         Note that the rate scales all three changes identically. It is a single
         number for the whole step, not one per layer.
         """
-        raise NotImplementedError
+        return ContrastiveDivergenceUpdate(
+            weight_change=learning_rate
+            * (positive.correlations - negative.correlations),
+            visible_bias_change=learning_rate
+            * (positive.visible_means - negative.visible_means),
+            hidden_bias_change=learning_rate
+            * (positive.hidden_means - negative.hidden_means),
+        )
 
     def _chain_end(
         self,

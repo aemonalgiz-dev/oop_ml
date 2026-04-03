@@ -907,7 +907,12 @@ class SelfOrganisingMap(Clusterer[Sequence[Feature]], ConvergentFit):
           argument makes every epoch report a movement of zero and the first one
           report convergence.
         """
-        raise NotImplementedError
+        neighbourhood = self._neighbourhood_at(winner, radius)
+        gap = presented_row - weights
+
+        step = rate * neighbourhood[:, None] * gap
+
+        return weights + step
 
     def _winner_for(self, presented_row: FloatArray, weights: FloatArray) -> int:
         """Which unit's weights are nearest one row.

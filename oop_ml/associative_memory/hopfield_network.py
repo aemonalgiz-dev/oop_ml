@@ -1353,7 +1353,15 @@ class HopfieldNetwork(Transformer[Sequence[Feature]]):
 
         A plain double loop over the units is a perfectly good answer here.
         """
-        raise NotImplementedError
+        n_units = patterns[0].n_units
+        output_matrix = np.zeros(shape=(n_units, n_units))
+
+        for pattern in patterns:
+            weights = np.outer(pattern.values, pattern.values)
+            output_matrix += weights / n_units
+
+        np.fill_diagonal(output_matrix, 0)
+        return output_matrix
 
     def _one_pass(
         self,
