@@ -50,6 +50,25 @@ value, the root mean square scaler answering ``0.3015`` where standardizing
 answers ``-1.4142``, and the whole of that difference is the level that one
 removes and the other keeps.
 
+**Sign against magnitude.** Every column above is non-negative, and on a
+non-negative column a value and its magnitude are the same number, so four
+readings coincide with four others there. Measured, a ``MinMaxScaler`` centring
+on the smallest *magnitude* rather than the smallest value passed all 147 of the
+claims this file first made, without one failure, and so did one dividing by the
+range of the magnitudes. ``[-10, -2, 1, 2, 4]`` separates them: the centre is
+-10.0 against a smallest magnitude of 1.0, the spread is 14.0 against a range of
+magnitudes of 9.0, the largest magnitude is 10.0 and belongs to the negative
+value where the largest value is 4.0, and the mean of -1.0 sits on the far side
+of zero from the median of 1.0.
+
+**Where a quartile falls between two values.** Both fixture columns hold five
+values, so the quartile positions are 1 and 3 exactly and every interpolation
+rule agrees on them, and the median lands on a value rather than between two.
+Measured, a robust scaler using numpy's ``midpoint`` rule instead of the linear
+one passed both readings. ``[2, 4, 5, 9, 10, 20]`` puts the positions at 1.25
+and 3.75, so linear gives 4.25 and 9.75 against midpoint's 4.5 and 9.5, and the
+median is 7.0, which the column does not contain.
+
 **The robust zero-spread case.** A column can vary and still have an
 interquartile range of zero, which is the failure mode no other member has. Both
 quartiles land inside a single repeated run once about three quarters of the
@@ -71,37 +90,65 @@ calls the numpy function the implementation calls.
 
 That this spec discriminates, measured rather than assumed
 ----------------------------------------------------------
-Four breaks were installed over the real classes from outside the repository and
-the whole file was run against each. Failing tests out of 147, none of the four
-passing clean.
+Breaks were installed over the real classes from outside the repository and the
+whole file was run against each. Failing tests out of 169, none of them passing
+clean. The two that once did are the reason two of the fixtures exist, and they
+are the more useful entries in the table.
 
-``RobustScaler`` centring on the mean instead of the median, 8. Three of those
-are the outlier measurements, two are the readings checked against the plain
-Python definitions, and three fall out of the shared contract because the
-hand-worked centre of 21.0 is parametrized over the whole family. Every claim
-about the round trip, the by-name matching and the refusals passes under it,
-because a mean is a perfectly good centre for an invertible affine map. Nothing
-structural can see this break at all.
+``MinMaxScaler`` centring on ``min(|value|)``, 3, **and 0 before
+``TestColumnsThatCrossZero`` was added**. Dividing by
+``max(|value|) - min(|value|)``, the same, 3 and **0** before. Both were wholly
+invisible, because every column the file fitted was non-negative and on such a
+column a value and its magnitude are the same number. Neither break touches a
+round trip, a refusal, a name or a bound, so nothing structural could ever have
+seen them; only a stated reading on a column that crosses zero does.
 
-``MaxAbsScaler`` centring on the mean, 9. It stops keeping structural zeros at
-zero, stops preserving sign, stops reaching either bound of ``[-1, 1]``, and
-starts refusing the constant column of sevens it is supposed to accept.
+``RobustScaler`` reading its quartiles by numpy's ``midpoint`` rule, 2, and by
+its ``lower`` rule, 3. Before the two tests added to ``TestTheRobustReadings``
+those were 1 and 2, and in both cases the failure was the zero-spread boundary
+rather than the reading test that claims to check the interpolation -- which it
+could not, since the fixture column's quartile positions are 1 and 3 exactly and
+every rule agrees there.
 
-``MinMaxScaler`` dividing by the maximum rather than the range, 8. The largest
-value no longer lands on 1.0, the constant column of sevens is no longer refused
-since its maximum is 7.0 rather than a range of zero, and the outlier movement
-falls from 0.7440 to 0.5940. That last one is caught by the measurement and
-*not* by the ordering assertion, which still holds at 0.0 < 0.5940 < 1.1996.
-Stating the number is what catches it and ranking the three is not.
+``RobustScaler`` centring on the mean instead of the median, 12, of which 8 are
+older than the two fixtures above. Three of those eight are the outlier
+measurements, two are the readings checked against the plain Python definitions,
+and three fall out of the shared contract because the hand-worked centre of 21.0
+is parametrized over the whole family. Every claim about the round trip, the
+by-name matching and the refusals passes under it, because a mean is a perfectly
+good centre for an invertible affine map. Nothing structural can see this break
+at all.
+
+``MaxAbsScaler`` centring on the mean, 12, of which 9 are older. It stops keeping
+structural zeros at zero, stops preserving sign, stops reaching either bound of
+``[-1, 1]``, and starts refusing the constant column of sevens it is supposed to
+accept.
+
+``MinMaxScaler`` dividing by the maximum rather than the range, 11, of which 8
+are older. The largest value no longer lands on 1.0, the constant column of
+sevens is no longer refused since its maximum is 7.0 rather than a range of zero,
+and the outlier movement falls from 0.7440 to 0.5940. That last one is caught by
+the measurement and *not* by the ordering assertion, which still holds at
+0.0 < 0.5940 < 1.1996. Stating the number is what catches it and ranking the
+three is not.
 
 ``AffineScaling.restore`` multiplying and adding in the wrong order, 4. That is
-the quietest of the four rather than the loudest, and the reason is worth
-keeping. ``(scaled + centre) * spread`` and ``scaled * spread + centre`` are the
-same expression whenever the centre is zero, and two of the four members
-deliberately have a centre of zero. So the round trip catches this break for
-``MinMaxScaler`` and ``RobustScaler`` and is blind to it for ``MaxAbsScaler``
-and ``RootMeanSquareScaler``, correctly, because for those two it is not a break.
-A family claim discriminates only over the members whose numbers differ.
+the quietest break here rather than the loudest, and the reason is worth keeping.
+``(scaled + centre) * spread`` and ``scaled * spread + centre`` are the same
+expression whenever the centre is zero, and two of the four members deliberately
+have a centre of zero. So the round trip catches this break for ``MinMaxScaler``
+and ``RobustScaler`` and is blind to it for ``MaxAbsScaler`` and
+``RootMeanSquareScaler``, correctly, because for those two it is not a break. A
+family claim discriminates only over the members whose numbers differ.
+
+Six more were installed and all six are caught, which is recorded because a table
+of only the breaks that were interesting is a table chosen after the fact.
+``AffineScaling.scale`` dividing before centring, 15. ``FeatureScaler.fit``
+committing one column at a time, 12. ``transform`` recomputing the statistics
+from the column handed to it, 12. ``transform`` pairing by position, 8. A zero
+spread substituted with a one, which is what established libraries do, 25.
+``RootMeanSquareScaler`` centring before measuring magnitude, and the same class
+copying ``MaxAbsScaler``'s reading, 8 each.
 """
 
 from __future__ import annotations
@@ -122,6 +169,8 @@ from oop_ml.core.exceptions import (
     NotFittedError,
 )
 from oop_ml.preprocessing.rescaling.affine import (
+    AffineScaling,
+    AffineScalings,
     FeatureScaler,
     MaxAbsScaler,
     MinMaxScaler,
@@ -400,6 +449,23 @@ class TestTheAffineFamilyContract:
             fitted(scaler).inverse_transform([Feature("pressure", TEMPERATURES)])
 
     @pytest.mark.parametrize("scaler", SCALERS)
+    def test_duplicate_names_are_refused_by_transform_too(
+        self, scaler: type[FeatureScaler]
+    ) -> None:
+        """The refusal ``transform`` documents, which ``fit`` documents separately.
+
+        Two columns under one name would both be scaled by the one scaling that
+        name has, and the answer would be a list with a repeated name in it.
+        """
+        with pytest.raises(NonUniqueFeaturesError):
+            fitted(scaler).transform(
+                [
+                    Feature("temperature", TEMPERATURES),
+                    Feature("temperature", HUMIDITIES),
+                ]
+            )
+
+    @pytest.mark.parametrize("scaler", SCALERS)
     def test_uses_the_training_statistics_and_not_the_new_column(
         self, scaler: type[FeatureScaler]
     ) -> None:
@@ -492,6 +558,57 @@ class TestTheAffineFamilyContract:
             scaled_by_hand(TEMPERATURES, expected_centre, expected_spread),
             atol=1e-6,
         )
+
+
+class TestTheScalingsThemselves:
+    """The two value objects, which the family contract reaches only indirectly.
+
+    Everything above goes through a fitted scaler, so a scaling is only ever
+    seen through the numbers it answers with. These are the claims the objects
+    make on their own account, including the one refusal
+    :class:`~oop_ml.preprocessing.rescaling.affine.AffineScalings` documents and
+    no fit can reach, since a duplicate name is refused a layer earlier.
+    """
+
+    def test_asking_for_a_name_that_was_never_learned_raises(self) -> None:
+        """The ``KeyError`` the collection's docstring promises."""
+        scalings = fitted(MinMaxScaler).scalings
+
+        with pytest.raises(KeyError):
+            scalings.scaling_for("pressure")
+
+    def test_two_scalings_under_one_name_are_refused(self) -> None:
+        """Unreachable through ``fit``, and still the collection's own rule.
+
+        The second would shadow the first, so the collection would quietly
+        describe one column twice and the other not at all.
+        """
+        with pytest.raises(NonUniqueFeaturesError):
+            AffineScalings([AffineScaling("a", 0.0, 1.0), AffineScaling("a", 5.0, 2.0)])
+
+    def test_a_spread_that_is_negative_is_refused_like_a_spread_of_zero(self) -> None:
+        """Nothing here produces one, and the constructor is the guarantee.
+
+        A subclass reading its spread backwards would hand over a negative
+        number, and dividing by it would flip the column over rather than fail.
+        """
+        with pytest.raises(AllSameValuesError):
+            AffineScaling("backwards", 0.0, -3.0)
+
+    def test_a_scaling_compares_on_all_three_of_its_parts(self) -> None:
+        one = AffineScaling("temperature", 18.0, 10.0)
+
+        assert one == AffineScaling("temperature", 18.0, 10.0)
+        assert one != AffineScaling("humidity", 18.0, 10.0)
+        assert one != AffineScaling("temperature", 19.0, 10.0)
+        assert one != AffineScaling("temperature", 18.0, 11.0)
+        assert one != "temperature"
+
+    def test_equal_scalings_hash_alike(self) -> None:
+        """So a set of them collapses duplicates rather than keeping both."""
+        one = AffineScaling("temperature", 18.0, 10.0)
+
+        assert len({one, AffineScaling("temperature", 18.0, 10.0)}) == 1
 
 
 class TestAFailedFitLeavesTheOldOneIntact:
@@ -822,9 +939,9 @@ class TestColumnsThatCrossZero:
         The smallest value is -10.0 and it lands on 0.0, which a scaler
         subtracting the smallest magnitude of 1.0 could not manage.
         """
-        rescaled = MinMaxScaler().fit_transform([Feature("signed", CROSSES_ZERO)])[
-            0
-        ].values
+        rescaled = (
+            MinMaxScaler().fit_transform([Feature("signed", CROSSES_ZERO)])[0].values
+        )
 
         assert float(np.min(rescaled)) == 0.0
         assert float(np.max(rescaled)) == 1.0
@@ -835,9 +952,9 @@ class TestColumnsThatCrossZero:
         A scaler dividing by the largest *value* would divide by 4.0 and answer
         -2.5, which is outside the range the class promises.
         """
-        rescaled = MaxAbsScaler().fit_transform([Feature("signed", CROSSES_ZERO)])[
-            0
-        ].values
+        rescaled = (
+            MaxAbsScaler().fit_transform([Feature("signed", CROSSES_ZERO)])[0].values
+        )
 
         assert float(np.min(rescaled)) == -1.0
         assert np.all(rescaled >= -1.0)
@@ -1115,3 +1232,45 @@ class TestTheRobustReadings:
         assert fitted(RobustScaler).scalings["temperature"].centre == pytest.approx(
             21.0
         )
+
+    def test_the_quartiles_interpolate_when_they_fall_between_two_values(self) -> None:
+        """Which the fixture column deliberately cannot say.
+
+        Measured: a robust scaler reaching for numpy's ``midpoint`` rule rather
+        than the linear one passes every reading checked above, because at five
+        values the quartile positions are 1 and 3 exactly and every rule agrees.
+        At six the positions are 1.25 and 3.75 and the rules part, linear giving
+        4.25 and 9.75 against midpoint's 4.5 and 9.5, so 5.5 against 5.0.
+        """
+        first = quantile_of(self.EVEN_LENGTH, 0.25)
+        third = quantile_of(self.EVEN_LENGTH, 0.75)
+
+        assert first == pytest.approx(4.25)
+        assert third == pytest.approx(9.75)
+
+        spread = (
+            RobustScaler()
+            .fit([Feature("uneven", self.EVEN_LENGTH)])
+            .scalings["uneven"]
+            .spread
+        )
+
+        assert spread == pytest.approx(third - first)
+        assert spread == pytest.approx(5.5)
+
+    def test_the_median_of_an_even_length_column_is_the_middle_pair(self) -> None:
+        """7.0 here, and it is a number the column does not contain.
+
+        Both fixture columns have an odd length, so their median lands on a
+        value and a scaler taking either middle element instead of averaging the
+        two would answer correctly on both.
+        """
+        centre = (
+            RobustScaler()
+            .fit([Feature("uneven", self.EVEN_LENGTH)])
+            .scalings["uneven"]
+            .centre
+        )
+
+        assert centre == pytest.approx(7.0)
+        assert 7.0 not in self.EVEN_LENGTH

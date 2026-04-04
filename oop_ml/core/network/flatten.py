@@ -66,85 +66,32 @@ At its own boundary, coercing the block it is handed and scanning it for
 non-finite entries: at 256 by 8 by 13 by 13 that measured 479 us for the
 coercion and 58 us for the scan, against 0.174 us for the reshape they guard.
 The whole cost of this layer is establishing that its input is trustworthy.
-That is the trade :func:`~oop_ml.core.network.layer._check_finite` records, and
-it is paid here for a sharper reason: a relabelling propagates a ``nan``
-perfectly, so a flatten that skipped the scan would launder a poisoned block
-into the dense half of the network without a word.
+That is the trade :mod:`~oop_ml.core.network.blocks` records, and it is paid
+here for a sharper reason: a relabelling propagates a ``nan`` perfectly, so a
+flatten that skipped the scan would launder a poisoned block into the dense
+half of the network without a word.
 
-The coercion and the scan mirror the pair in
-:mod:`~oop_ml.core.network.layer` rather than importing them. Two private
-helpers in a sibling module are not an interface, and reaching across for them
-would make a rename over there a break over here; the duplication is four
-lines and it is the cheaper of the two couplings.
+The coercion and the scan used to be copied here rather than imported, on the
+argument that two private helpers in a sibling module are not an interface.
+That held while there were two copies. By the time there were three of one and
+two of the other, all byte-identical, the copies had become the interface in
+everything but name, and :mod:`~oop_ml.core.network.blocks` is that interface
+said out loud.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 
-import numpy as np
-
 from oop_ml.core.exceptions import (
-    InvalidValuesError,
     ShapeMismatchError,
 )
+from oop_ml.core.network.blocks import as_block
 from oop_ml.core.network.gradient import LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import Layer, LayerResponse
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.types import FloatArray
-
-
-def _as_block(values: object, role: str) -> FloatArray:
-    """Read ``values`` as a float array, refusing in the library's own words.
-
-    Every entry point here reaches straight for ``.ndim`` and ``.shape``, which
-    would turn an ordinary mistake, such as handing in a nested list, into a
-    bare ``AttributeError`` from numpy rather than a typed refusal. Coercing
-    first keeps every failure inside the ``MLLibError`` hierarchy, and it lets
-    a plain nested list work, which is what a caller writing a small example by
-    hand expects.
-
-    Parameters
-    ----------
-    values:
-        Anything numpy can read as a block of floats.
-    role:
-        What the block is, for the message.
-
-    Returns
-    -------
-    FloatArray
-        A private copy, safe to freeze and hand onward.
-
-    Raises
-    ------
-    InvalidValuesError
-        If the values cannot be read as a float array.
-    """
-    try:
-        return np.array(values, dtype=np.float64, copy=True)
-    except (TypeError, ValueError) as error:
-        raise InvalidValuesError(f"{role} must be readable as a float array") from error
-
-
-def _check_finite(values: FloatArray, role: str) -> None:
-    """Refuse a block carrying a non-finite entry.
-
-    Parameters
-    ----------
-    values:
-        The already coerced block.
-    role:
-        What the block is, for the message.
-
-    Raises
-    ------
-    InvalidValuesError
-        If any entry is not finite.
-    """
-    if not np.isfinite(values).all():
-        raise InvalidValuesError(f"{role} must contain only finite values")
 
 
 class Flatten(Layer):
@@ -279,7 +226,7 @@ class Flatten(Layer):
         """
         arriving = self._checked_arriving(response, arriving)
 
-        arriving_block = _as_block(arriving, "a flattening layer's arriving slopes")
+        arriving_block = as_block(arriving, "a flattening layer's arriving slopes")
 
         expected = (response.n_rows, self._shape.n_outputs)
         if arriving_block.shape != expected:

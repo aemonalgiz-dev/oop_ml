@@ -129,6 +129,7 @@ from oop_ml.core.exceptions import (
     ShapeMismatchError,
 )
 from oop_ml.core.network.activation import Activation
+from oop_ml.core.network.blocks import as_block
 from oop_ml.core.network.gradient import LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import Layer, LayerResponse
 from oop_ml.core.network.purpose import PassPurpose
@@ -137,37 +138,6 @@ from oop_ml.core.types import FloatArray
 
 #: How many extents describe one picture: channels, height, width.
 SPATIAL_EXTENTS = 3
-
-
-def _as_block(values: object, role: str) -> FloatArray:
-    """Read ``values`` as a float array, refusing in the library's own words.
-
-    Every entry point here reaches straight for ``.shape``, which would turn an
-    ordinary mistake -- handing in a list of pictures -- into a bare
-    ``AttributeError`` from numpy rather than a typed refusal. Coercing first
-    keeps every failure inside the ``MLLibError`` hierarchy.
-
-    Parameters
-    ----------
-    values:
-        Anything numpy can read as a float array.
-    role:
-        What the block is, for the message.
-
-    Returns
-    -------
-    FloatArray
-        A private copy, safe to freeze or to write into.
-
-    Raises
-    ------
-    InvalidValuesError
-        If numpy cannot read the value as a float array at all.
-    """
-    try:
-        return np.array(values, dtype=np.float64, copy=True)
-    except (TypeError, ValueError) as error:
-        raise InvalidValuesError(f"{role} must be readable as a float array") from error
 
 
 def _checked_setting(value: int, least: int, role: str) -> int:
@@ -509,8 +479,8 @@ class Conv2d(Layer):
         InvalidValuesError
             If either block cannot be read as a float array.
         """
-        kernel_block = _as_block(kernels, "kernels")
-        bias_block = _as_block(biases, "biases")
+        kernel_block = as_block(kernels, "kernels")
+        bias_block = as_block(biases, "biases")
 
         expected = (
             self._n_filters,

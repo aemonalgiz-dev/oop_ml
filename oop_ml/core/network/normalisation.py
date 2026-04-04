@@ -108,51 +108,12 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.exceptions import InvalidValuesError, ShapeMismatchError
+from oop_ml.core.network.blocks import as_per_feature
 from oop_ml.core.network.gradient import LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import Layer, LayerResponse
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.types import FloatArray
-
-
-def _as_per_feature(values: object, n_features: int, role: str) -> FloatArray:
-    """Read one per-feature vector, refusing in the library's own words.
-
-    Parameters
-    ----------
-    values:
-        The candidate vector.
-    n_features:
-        How many entries it must have.
-    role:
-        What it is, for the message.
-
-    Returns
-    -------
-    FloatArray
-        A private, frozen float64 copy.
-
-    Raises
-    ------
-    InvalidValuesError
-        If it cannot be read as a float array, or carries a non-finite entry.
-    ShapeMismatchError
-        If it is not one-dimensional with exactly ``n_features`` entries.
-    """
-    try:
-        block = np.array(values, dtype=np.float64, copy=True)
-    except (TypeError, ValueError) as error:
-        raise InvalidValuesError(f"{role} must be readable as a float array") from error
-
-    if block.ndim != 1 or block.shape[0] != n_features:
-        raise ShapeMismatchError(
-            f"{role} is one value per feature, so ({n_features},), got {block.shape}"
-        )
-    if not np.isfinite(block).all():
-        raise InvalidValuesError(f"{role} must contain only finite values")
-
-    block.setflags(write=False)
-    return block
 
 
 class BatchStatistics(LayerGradient):
@@ -212,8 +173,8 @@ class BatchStatistics(LayerGradient):
     ) -> None:
         super().__init__(weights=weights, biases=biases)
         n_features = self.biases.shape[0]
-        self._batch_mean = _as_per_feature(batch_mean, n_features, "a batch mean")
-        self._batch_variance = _as_per_feature(
+        self._batch_mean = as_per_feature(batch_mean, n_features, "a batch mean")
+        self._batch_variance = as_per_feature(
             batch_variance, n_features, "a batch variance"
         )
         if (self._batch_variance < 0.0).any():
@@ -455,18 +416,18 @@ class BatchNormalization(Layer):
 
         self._momentum = keep
         self._epsilon = floor
-        self._scale = _as_per_feature(
+        self._scale = as_per_feature(
             np.ones(width) if scale is None else scale, width, "a scale"
         )
-        self._shift = _as_per_feature(
+        self._shift = as_per_feature(
             np.zeros(width) if shift is None else shift, width, "a shift"
         )
-        self._running_mean = _as_per_feature(
+        self._running_mean = as_per_feature(
             np.zeros(width) if running_mean is None else running_mean,
             width,
             "a running mean",
         )
-        self._running_variance = _as_per_feature(
+        self._running_variance = as_per_feature(
             np.ones(width) if running_variance is None else running_variance,
             width,
             "a running variance",
