@@ -19,13 +19,13 @@ mostly chosen to divide badly.
 import numpy as np
 import pytest
 
-from oop_ml.classification.neighbours.k_nearest_classifier import (
-    KNearestNeighboursClassifier,
-)
 from oop_ml.core.base import neighbour_model
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.distance.metric import DistanceMetric
-from oop_ml.regression.neighbours.k_nearest_regressor import (
+from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
+    KNearestNeighboursClassifier,
+)
+from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
 

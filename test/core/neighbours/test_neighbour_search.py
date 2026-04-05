@@ -15,14 +15,14 @@ little separates nearest from farthest once there are many features.
 import numpy as np
 import pytest
 
-from oop_ml.classification.neighbours.k_nearest_classifier import (
-    KNearestNeighboursClassifier,
-)
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.neighbours.search import NeighbourSearch
 from oop_ml.core.observation import Observation
-from oop_ml.regression.neighbours.k_nearest_regressor import (
+from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
+    KNearestNeighboursClassifier,
+)
+from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
 from test.fixtures import NEIGHBOUR_GRID

@@ -132,7 +132,7 @@ class ClassScores:
 
     What a multi-class classifier believes, without claiming the rows add up.
     That is the weaker of the two guarantees here and it is the honest one for
-    a :class:`~oop_ml.classification.multiclass.one_vs_rest.OneVsRestClassifier`,
+    a :class:`~oop_ml.numpy.classification.multiclass.one_vs_rest.OneVsRestClassifier`,
     whose K models were fitted separately and never asked to agree. Its rows
     genuinely do not sum to one, and its own spec asserts as much rather than
     hiding it.

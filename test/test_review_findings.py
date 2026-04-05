@@ -12,15 +12,6 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from oop_ml.classification.ensembles.random_forest_classifier import (
-    RandomForestClassifier,
-)
-from oop_ml.classification.neighbours.k_nearest_classifier import (
-    KNearestNeighboursClassifier,
-)
-from oop_ml.classification.trees.decision_tree_classifier import (
-    DecisionTreeClassifier,
-)
 from oop_ml.core.clustering.centroids import Centroid, Centroids
 from oop_ml.core.clustering.clustering import Clustering
 from oop_ml.core.data.dataset import Dataset
@@ -33,19 +24,28 @@ from oop_ml.core.exceptions import (
     InvalidValuesError,
     NonEqualArrayLengthError,
 )
-from oop_ml.model_selection.splitting import KFold
-from oop_ml.pipeline.pipelines import RegressionPipeline
-from oop_ml.pipeline.steps import PipelineSteps
-from oop_ml.preprocessing.standardization.standardizer import Standardizer
-from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
-from oop_ml.regression.ensembles.random_forest_regressor import (
+from oop_ml.core.model_selection.splitting import KFold
+from oop_ml.core.pipeline.pipelines import RegressionPipeline
+from oop_ml.core.pipeline.steps import PipelineSteps
+from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
+    RandomForestClassifier,
+)
+from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
+    KNearestNeighboursClassifier,
+)
+from oop_ml.numpy.classification.trees.decision_tree_classifier import (
+    DecisionTreeClassifier,
+)
+from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
+from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
+from oop_ml.numpy.regression.ensembles.random_forest_regressor import (
     RandomForestRegressor,
 )
-from oop_ml.regression.least_squares.gradient_descent_regression import (
+from oop_ml.numpy.regression.least_squares.gradient_descent_regression import (
     GradientDescentRegression,
 )
-from oop_ml.regression.penalised.ridge_regression import RidgeRegression
-from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
+from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import THREE_CLASSES
 
 

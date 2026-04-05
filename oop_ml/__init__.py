@@ -13,55 +13,12 @@ import::
     model.coefficients["area"]
 
 The full paths still work and are what the library itself uses internally, so
-reach for ``from oop_ml.regression.penalised.ridge_regression import RidgeRegression``
+reach for ``from oop_ml.numpy.regression.penalised.ridge_regression import
+RidgeRegression``
 whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
 
-from oop_ml.associative_memory.hopfield_network import (
-    BipolarPattern,
-    HebbianWeights,
-    HopfieldNetwork,
-    RecallPass,
-    RecallStop,
-    RecallWalk,
-    UpdateRule,
-)
-from oop_ml.classification.binary.logistic_regression import LogisticRegression
-from oop_ml.classification.binary.newton_logistic_regression import (
-    NewtonLogisticRegression,
-)
-from oop_ml.classification.ensembles.bagging_classifier import BaggingClassifier
-from oop_ml.classification.ensembles.random_forest_classifier import (
-    RandomForestClassifier,
-)
-from oop_ml.classification.kernels.support_vector_classifier import (
-    SupportVector,
-    SupportVectorClassifier,
-    SupportVectors,
-)
-from oop_ml.classification.linear_classifier import LinearClassifier
-from oop_ml.classification.multiclass.multinomial_logistic_regression import (
-    MultinomialLogisticRegression,
-)
-from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
-from oop_ml.classification.multiclass.one_vs_rest_fits import (
-    ClassFit,
-    OneVsRestFits,
-)
-from oop_ml.classification.neighbours.k_nearest_classifier import (
-    KNearestNeighboursClassifier,
-)
-from oop_ml.classification.trees.decision_tree_classifier import (
-    DecisionTreeClassifier,
-)
-from oop_ml.clustering.k_means import KMeans
-from oop_ml.clustering.self_organising_map import (
-    GridPosition,
-    MapUnit,
-    SelfOrganisingMap,
-    UnitGrid,
-)
 from oop_ml.core.base.convergent_fit import ConvergentFit
 from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
@@ -153,6 +110,26 @@ from oop_ml.core.kernel.functions import (
     SigmoidKernel,
 )
 from oop_ml.core.kernel.matrix import KernelMatrix
+from oop_ml.core.model_selection.cross_validation import (
+    ClassificationCrossValidationResult,
+    CrossValidation,
+    RegressionCrossValidationResult,
+)
+from oop_ml.core.model_selection.dataset import DataSplit
+from oop_ml.core.model_selection.search import (
+    Candidate,
+    GridSearch,
+    ParameterRange,
+    ScoredCandidate,
+    SearchResult,
+    SearchSpace,
+)
+from oop_ml.core.model_selection.splitting import (
+    KFold,
+    RowShuffler,
+    Splits,
+    TrainTestSplitter,
+)
 from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
 from oop_ml.core.network.activation import (
     Activation,
@@ -195,6 +172,12 @@ from oop_ml.core.network.weight_normalisation import (
     WeightNormalization,
 )
 from oop_ml.core.observation import Observation, Stage
+from oop_ml.core.pipeline.pipelines import (
+    ClassificationPipeline,
+    Pipeline,
+    RegressionPipeline,
+)
+from oop_ml.core.pipeline.steps import PipelineStep, PipelineSteps
 from oop_ml.core.schedule import (
     ConstantSchedule,
     ExponentialDecaySchedule,
@@ -232,61 +215,79 @@ from oop_ml.core.types import (
     NumericInput,
     NumericValues,
 )
-from oop_ml.decomposition.hebbian_principal_components import (
+from oop_ml.numpy.associative_memory.hopfield_network import (
+    BipolarPattern,
+    HebbianWeights,
+    HopfieldNetwork,
+    RecallPass,
+    RecallStop,
+    RecallWalk,
+    UpdateRule,
+)
+from oop_ml.numpy.classification.binary.logistic_regression import LogisticRegression
+from oop_ml.numpy.classification.binary.newton_logistic_regression import (
+    NewtonLogisticRegression,
+)
+from oop_ml.numpy.classification.ensembles.bagging_classifier import BaggingClassifier
+from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
+    RandomForestClassifier,
+)
+from oop_ml.numpy.classification.kernels.support_vector_classifier import (
+    SupportVector,
+    SupportVectorClassifier,
+    SupportVectors,
+)
+from oop_ml.numpy.classification.linear_classifier import LinearClassifier
+from oop_ml.numpy.classification.multiclass.multinomial_logistic_regression import (
+    MultinomialLogisticRegression,
+)
+from oop_ml.numpy.classification.multiclass.one_vs_rest import OneVsRestClassifier
+from oop_ml.numpy.classification.multiclass.one_vs_rest_fits import (
+    ClassFit,
+    OneVsRestFits,
+)
+from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
+    KNearestNeighboursClassifier,
+)
+from oop_ml.numpy.classification.trees.decision_tree_classifier import (
+    DecisionTreeClassifier,
+)
+from oop_ml.numpy.clustering.k_means import KMeans
+from oop_ml.numpy.clustering.self_organising_map import (
+    GridPosition,
+    MapUnit,
+    SelfOrganisingMap,
+    UnitGrid,
+)
+from oop_ml.numpy.decomposition.hebbian_principal_components import (
     HebbianDirection,
     HebbianDirections,
     HebbianPrincipalComponents,
 )
-from oop_ml.decomposition.kernel_principal_component_analysis import (
+from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
     KernelComponent,
     KernelComponents,
     KernelPrincipalComponentAnalysis,
 )
-from oop_ml.decomposition.principal_component_analysis import (
+from oop_ml.numpy.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
-from oop_ml.generative.restricted_boltzmann_machine import (
+from oop_ml.numpy.generative.restricted_boltzmann_machine import (
     BoltzmannParameters,
     ContrastiveDivergenceUpdate,
     GibbsState,
     RestrictedBoltzmannMachine,
 )
-from oop_ml.model_selection.cross_validation import (
-    ClassificationCrossValidationResult,
-    CrossValidation,
-    RegressionCrossValidationResult,
-)
-from oop_ml.model_selection.dataset import DataSplit
-from oop_ml.model_selection.search import (
-    Candidate,
-    GridSearch,
-    ParameterRange,
-    ScoredCandidate,
-    SearchResult,
-    SearchSpace,
-)
-from oop_ml.model_selection.splitting import (
-    KFold,
-    RowShuffler,
-    Splits,
-    TrainTestSplitter,
-)
-from oop_ml.persistence.document import ModelDocument
-from oop_ml.persistence.store import (
+from oop_ml.numpy.persistence.document import ModelDocument
+from oop_ml.numpy.persistence.store import (
     build_model,
     load_model,
     model_document,
     save_model,
 )
-from oop_ml.pipeline.pipelines import (
-    ClassificationPipeline,
-    Pipeline,
-    RegressionPipeline,
-)
-from oop_ml.pipeline.steps import PipelineStep, PipelineSteps
-from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
-from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
-from oop_ml.preprocessing.rescaling.affine import (
+from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
+from oop_ml.numpy.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
+from oop_ml.numpy.preprocessing.rescaling.affine import (
     AffineScaling,
     AffineScalings,
     FeatureScaler,
@@ -295,34 +296,37 @@ from oop_ml.preprocessing.rescaling.affine import (
     RobustScaler,
     RootMeanSquareScaler,
 )
-from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
-from oop_ml.preprocessing.standardization.standardizer import Standardizer
-from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
-from oop_ml.regression.ensembles.gradient_boosting_regressor import (
+from oop_ml.numpy.preprocessing.standardization.scaling import (
+    FeatureScaling,
+    FeatureScalings,
+)
+from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
+from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
+from oop_ml.numpy.regression.ensembles.gradient_boosting_regressor import (
     GradientBoostingRegressor,
 )
-from oop_ml.regression.ensembles.random_forest_regressor import (
+from oop_ml.numpy.regression.ensembles.random_forest_regressor import (
     RandomForestRegressor,
 )
-from oop_ml.regression.kernels.kernel_ridge_regression import (
+from oop_ml.numpy.regression.kernels.kernel_ridge_regression import (
     KernelRidgeRegression,
 )
-from oop_ml.regression.least_squares.gradient_descent_regression import (
+from oop_ml.numpy.regression.least_squares.gradient_descent_regression import (
     GradientDescentRegression,
 )
-from oop_ml.regression.least_squares.multiple_feature_regression import (
+from oop_ml.numpy.regression.least_squares.multiple_feature_regression import (
     MultipleLinearRegression,
 )
-from oop_ml.regression.least_squares.simple_linear_regression import (
+from oop_ml.numpy.regression.least_squares.simple_linear_regression import (
     SimpleLinearRegression,
 )
-from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
-from oop_ml.regression.neighbours.k_nearest_regressor import (
+from oop_ml.numpy.regression.linear_feature_regressor import LinearFeatureRegressor
+from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
-from oop_ml.regression.penalised.lasso_regression import LassoRegression
-from oop_ml.regression.penalised.ridge_regression import RidgeRegression
-from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
+from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
+from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
 __all__ = [
     # Type aliases, for annotating your own code
