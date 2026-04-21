@@ -41,10 +41,25 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
-# Only the benchmarks need scikit-learn. The library itself does not depend on
-# it, and nothing under oop_ml/ imports it.
+# The scikit-learn backend. Optional, because oop_ml.numpy is the reference
+# implementation and needs nothing beyond the three required dependencies, so
+# a caller who only wants the from-scratch models should not have to install
+# an engine to get them. oop_ml.scikit is the one part of the package that
+# does import it, and it says so at import time rather than failing with a
+# bare ModuleNotFoundError.
+#
+# The floor is 1.9 rather than something older because LinearRegression.tol is
+# only interpreted as lstsq's cond on dense data from 1.9, and
+# MultipleLinearRegression's collinearity refusal is built on that. Below it
+# the pin is accepted and ignored, which is a wrong answer rather than a
+# failure, so oop_ml/scikit/engine_version.py enforces the same floor at
+# import rather than trusting this line to be honoured.
+scikit = [
+    "scikit-learn>=1.9",
+]
+# The benchmarks time the numpy backend against the same engine.
 benchmark = [
-    "scikit-learn>=1.4",
+    "scikit-learn>=1.9",
 ]
 
 [build-system]
@@ -85,3 +100,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "test/**" = ["E501"]
+# The one place an import is deliberately not at the top. This backend's
+# submodules import scikit-learn, so the guard that turns a missing or too-old
+# engine into a sentence has to run before them, and the alternative is four
+# noqa comments saying the same thing less clearly.
+"oop_ml/scikit/__init__.py" = ["E402"]

@@ -40,6 +40,10 @@ nowhere else to learn that it stops there.
 
 from __future__ import annotations
 
+from oop_ml.scikit.engine_version import check_engine_available
+
+check_engine_available()
+
 from oop_ml.scikit.classification import (
     BaggingClassifier,
     DecisionTreeClassifier,
