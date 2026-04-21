@@ -214,6 +214,7 @@ from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.row_block import RowBlock, rows_of
+from oop_ml.core.decomposition.naming import COMPONENT_NAME_PREFIX
 from oop_ml.core.exceptions import (
     AllSameValuesError,
     DivergenceError,
@@ -224,9 +225,6 @@ from oop_ml.core.exceptions import (
 )
 from oop_ml.core.schedule import ExponentialDecaySchedule, Schedule
 from oop_ml.core.types import FloatArray
-from oop_ml.numpy.decomposition.principal_component_analysis import (
-    COMPONENT_NAME_PREFIX,
-)
 
 SMALLEST_USABLE_LENGTH = 1e-12
 """How short a learned vector may be and still name a direction.

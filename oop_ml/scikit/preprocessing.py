@@ -4,11 +4,11 @@ Every class here has a namesake in ``oop_ml.numpy`` with the same name, the
 same pydantic fields, the same base class and the same learned properties, so
 that a caller can swap one backend for the other at the import line and change
 nothing else. A standardizer still answers with a
-:class:`~oop_ml.numpy.preprocessing.standardization.scaling.FeatureScalings`,
+:class:`~oop_ml.core.preprocessing.feature_scalings.FeatureScalings`,
 an affine scaler with an
-:class:`~oop_ml.numpy.preprocessing.rescaling.affine.AffineScalings`, and a
+:class:`~oop_ml.core.preprocessing.affine_scalings.AffineScalings`, and a
 polynomial expansion with a
-:class:`~oop_ml.numpy.preprocessing.polynomial.terms.PolynomialTerms`. What
+:class:`~oop_ml.core.preprocessing.polynomial_terms.PolynomialTerms`. What
 differs is who reads the statistics off the training rows.
 
 By-name matching, which the engines do not have
@@ -23,7 +23,7 @@ saw has no centre and no spread.
 The scalers keep that rule by not asking the engine to transform at all. What
 a scaler learns is two numbers per column, and the engine reports them as
 fitted attributes; the value object that holds them,
-:class:`~oop_ml.numpy.preprocessing.rescaling.affine.AffineScaling` or its
+:class:`~oop_ml.core.preprocessing.affine_scalings.AffineScaling` or its
 standardizing twin, already owns ``(value - centre) / spread`` and its inverse.
 So the engine is asked to *learn* and the learned object is asked to *apply*,
 which is the line the Boltzmann wrapper draws for the same reason. Keeping an
@@ -88,13 +88,16 @@ from oop_ml.core.base.estimator import Transformer
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import AllSameValuesError, InvalidValuesError
-from oop_ml.core.types import FloatArray
-from oop_ml.numpy.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
-from oop_ml.numpy.preprocessing.rescaling.affine import AffineScaling, AffineScalings
-from oop_ml.numpy.preprocessing.standardization.scaling import (
+from oop_ml.core.preprocessing.affine_scalings import (
+    AffineScaling,
+    AffineScalings,
+)
+from oop_ml.core.preprocessing.feature_scalings import (
     FeatureScaling,
     FeatureScalings,
 )
+from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
+from oop_ml.core.types import FloatArray
 from oop_ml.scikit.plumbing import matrix_of
 
 QUARTILES: tuple[float, float] = (0.25, 0.75)
@@ -142,7 +145,7 @@ def affine_scalings_of(
     ------
     AllSameValuesError
         If any spread is zero or negative, which is
-        :class:`~oop_ml.numpy.preprocessing.rescaling.affine.AffineScaling`
+        :class:`~oop_ml.core.preprocessing.affine_scalings.AffineScaling`
         refusing a column it cannot divide by, named.
     """
     return AffineScalings(
@@ -287,7 +290,7 @@ class EngineScaler(Transformer[Sequence[Feature]]):
     The frame the three affine wrappers share. A subclass supplies
     :meth:`_learned_scalings`, which runs its engine over the training matrix
     and reads the two numbers per column back into an
-    :class:`~oop_ml.numpy.preprocessing.rescaling.affine.AffineScalings`.
+    :class:`~oop_ml.core.preprocessing.affine_scalings.AffineScalings`.
     Everything around that, the fit, the by-name matching, the round trip and
     every refusal, is written once, as it is on the numpy backend's
     ``FeatureScaler``.
@@ -586,7 +589,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
     columns whose exponent row names more than one feature are left out on
     the way through when interactions are not wanted. The engine's
     ``powers_`` is that exponent table, one row per output column, and it is
-    what each :class:`~oop_ml.numpy.preprocessing.polynomial.terms.PolynomialTerm`
+    what each :class:`~oop_ml.core.preprocessing.polynomial_terms.PolynomialTerm`
     is built from, so the names are the numpy backend's names by the numpy
     backend's rule.
 

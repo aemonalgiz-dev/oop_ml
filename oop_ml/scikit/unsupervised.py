@@ -7,7 +7,7 @@ nothing else. A clusterer still answers with a
 :class:`~oop_ml.core.clustering.clustering.Clustering`, a decomposition still
 hands back components addressable by name, and a Boltzmann machine still
 exposes its weights through
-:class:`~oop_ml.numpy.generative.restricted_boltzmann_machine.BoltzmannParameters`.
+:class:`~oop_ml.core.generative.boltzmann.BoltzmannParameters`.
 What differs is who does the sums.
 
 The vocabulary these wrappers answer in is the numpy backend's own value
@@ -74,6 +74,7 @@ from oop_ml.core.base.convergent_fit import ConvergentFit
 from oop_ml.core.base.estimator import Clusterer, Transformer
 from oop_ml.core.clustering.centroids import Centroid, Centroids
 from oop_ml.core.clustering.clustering import Clustering
+from oop_ml.core.clustering.naming import CLUSTER_NAME_PREFIX
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
@@ -83,24 +84,21 @@ from oop_ml.core.decomposition.components import (
     PrincipalComponent,
     PrincipalComponents,
 )
-from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
-from oop_ml.core.kernel.functions import Kernel, LinearKernel
-from oop_ml.core.schedule import ConstantSchedule, Schedule
-from oop_ml.core.types import FloatArray
-from oop_ml.numpy.clustering.k_means import CLUSTER_NAME_PREFIX
-from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
+from oop_ml.core.decomposition.kernel_components import (
     KERNEL_COMPONENT_NAME_PREFIX,
     MINIMUM_COMPONENT_VARIANCE,
     KernelComponent,
     KernelComponents,
 )
-from oop_ml.numpy.decomposition.principal_component_analysis import (
-    COMPONENT_NAME_PREFIX,
-)
-from oop_ml.numpy.generative.restricted_boltzmann_machine import (
+from oop_ml.core.decomposition.naming import COMPONENT_NAME_PREFIX
+from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
+from oop_ml.core.generative.boltzmann import (
     HIDDEN_UNIT_NAME_PREFIX,
     BoltzmannParameters,
 )
+from oop_ml.core.kernel.functions import Kernel, LinearKernel
+from oop_ml.core.schedule import ConstantSchedule, Schedule
+from oop_ml.core.types import FloatArray
 from oop_ml.scikit.plumbing import (
     engine_kernel_parameters,
     matched_matrix,

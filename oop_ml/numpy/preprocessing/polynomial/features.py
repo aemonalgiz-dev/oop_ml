@@ -74,7 +74,7 @@ from oop_ml.core.base.estimator import Transformer
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.numpy.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
+from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
 
 
 class PolynomialFeatures(Transformer[Sequence[Feature]]):
@@ -160,7 +160,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
 
         ``collections.Counter`` does the counting and is already a
         ``Mapping[str, int]``, so it can be handed straight to
-        :class:`~oop_ml.numpy.preprocessing.polynomial.terms.PolynomialTerm`.
+        :class:`~oop_ml.core.preprocessing.polynomial_terms.PolynomialTerm`.
         """
         return PolynomialTerm(Counter(repeated_names))
 
@@ -196,7 +196,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
            different arrangement, so no term is duplicated.
         3. Keep the ones :meth:`_is_wanted` accepts, turn each into a term with
            :meth:`_term_for`, and hand the list to
-           :class:`~oop_ml.numpy.preprocessing.polynomial.terms.PolynomialTerms`.
+           :class:`~oop_ml.core.preprocessing.polynomial_terms.PolynomialTerms`.
         """
         terms_to_build = []
 

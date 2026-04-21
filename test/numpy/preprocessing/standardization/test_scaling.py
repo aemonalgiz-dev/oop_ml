@@ -9,7 +9,7 @@ from oop_ml.core.exceptions import (
     InvalidValuesError,
     NonUniqueFeaturesError,
 )
-from oop_ml.numpy.preprocessing.standardization.scaling import (
+from oop_ml.core.preprocessing.feature_scalings import (
     FeatureScaling,
     FeatureScalings,
 )

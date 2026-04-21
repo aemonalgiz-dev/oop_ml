@@ -168,9 +168,11 @@ from oop_ml.core.exceptions import (
     NonUniqueFeaturesError,
     NotFittedError,
 )
-from oop_ml.numpy.preprocessing.rescaling.affine import (
+from oop_ml.core.preprocessing.affine_scalings import (
     AffineScaling,
     AffineScalings,
+)
+from oop_ml.numpy.preprocessing.rescaling.affine import (
     FeatureScaler,
     MaxAbsScaler,
     MinMaxScaler,

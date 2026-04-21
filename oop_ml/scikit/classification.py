@@ -23,7 +23,7 @@ agree and which therefore returns the weaker
 
 Where the frame is shared, it does the work. The binary wrappers inherit the
 numpy backend's
-:class:`~oop_ml.numpy.classification.linear_classifier.LinearClassifier`, which
+:class:`~oop_ml.core.base.linear_classifier.LinearClassifier`, which
 is written entirely against ``core`` and carries the threshold rule,
 the by-name prediction, ``decision_boundary_at`` and ``odds_multiplier_for``;
 a wrapper supplies only the solve. The tree, neighbour and ensemble wrappers
@@ -88,6 +88,7 @@ from sklearn.tree import DecisionTreeClassifier as EngineDecisionTreeClassifier
 
 from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import Classifier, Fittable, MultiClassClassifier
+from oop_ml.core.base.linear_classifier import LinearClassifier
 from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
@@ -109,18 +110,17 @@ from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
 from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.kernel.matrix import KernelMatrix
+from oop_ml.core.kernel.support_vectors import (
+    SUPPORT_VECTOR_THRESHOLD,
+    SupportVector,
+    SupportVectors,
+)
 from oop_ml.core.logistic import stable_logistic, stable_softmax
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import ClassificationLeaf, LeafNode
 from oop_ml.core.types import FloatArray
 from oop_ml.core.validation import ValueRole
-from oop_ml.numpy.classification.kernels.support_vector_classifier import (
-    SUPPORT_VECTOR_THRESHOLD,
-    SupportVector,
-    SupportVectors,
-)
-from oop_ml.numpy.classification.linear_classifier import LinearClassifier
 from oop_ml.scikit.plumbing import (
     EngineMember,
     configuration_of,
@@ -217,7 +217,7 @@ def first_iteration_count(engine: Any) -> int:
 class LinearEngineClassifier(LinearClassifier, EngineMember):
     """A linear boundary over named features, solved by a scikit-learn engine.
 
-    The frame, :class:`~oop_ml.numpy.classification.linear_classifier.LinearClassifier`,
+    The frame, :class:`~oop_ml.core.base.linear_classifier.LinearClassifier`,
     validates the features, insists the target is 0/1 with both classes, builds
     the design matrix, splits the intercept off the solution, pairs the weights
     with their names and thresholds the sigmoid. It imports nothing from the

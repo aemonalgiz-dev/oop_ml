@@ -88,6 +88,7 @@ from oop_ml.core.clustering.clustering import (
     Clustering,
     InitialisationAttempt,
 )
+from oop_ml.core.clustering.naming import CLUSTER_NAME_PREFIX
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.predictions import Predictions
@@ -95,14 +96,6 @@ from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
 from oop_ml.core.parallel import parallel_map
 from oop_ml.core.types import FloatArray, IndexArray
-
-CLUSTER_NAME_PREFIX = "cluster"
-"""How groups are named: ``cluster_1``, ``cluster_2``, and so on.
-
-One-indexed to match the components, and a name rather than a bare position so
-that a caller reading a report is looking at ``cluster_3`` rather than at the
-number ``2``, which in this library usually means a class.
-"""
 
 
 class KMeans(Clusterer[Sequence[Feature]]):

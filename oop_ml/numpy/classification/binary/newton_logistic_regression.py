@@ -112,13 +112,13 @@ import numpy as np
 from pydantic import Field
 
 from oop_ml.core.base.iterative_solver import IterativeSolver
+from oop_ml.core.base.linear_classifier import LinearClassifier
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.exceptions import SingularHessianError
 from oop_ml.core.solving.positive_definite import solve_positive_definite
 from oop_ml.core.types import FloatArray
-from oop_ml.numpy.classification.linear_classifier import LinearClassifier
 from oop_ml.numpy.classification.logistic import sigmoid
 
 

@@ -38,12 +38,12 @@ import numpy as np
 from pydantic import ConfigDict, PrivateAttr
 
 from oop_ml.core.base.estimator import MultiClassClassifier
+from oop_ml.core.base.linear_classifier import LinearClassifier
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import ClassScores
 from oop_ml.core.exceptions import InvalidValuesError
-from oop_ml.numpy.classification.linear_classifier import LinearClassifier
 from oop_ml.numpy.classification.multiclass.one_vs_rest_fits import (
     ClassFit,
     OneVsRestFits,

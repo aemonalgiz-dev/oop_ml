@@ -17,6 +17,10 @@ import numpy as np
 import pytest
 
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.decomposition.kernel_components import (
+    KernelComponent,
+    KernelComponents,
+)
 from oop_ml.core.exceptions import (
     InvalidValuesError,
     NotFittedError,
@@ -24,8 +28,6 @@ from oop_ml.core.exceptions import (
 )
 from oop_ml.core.kernel.functions import LinearKernel, RadialBasisKernel
 from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
-    KernelComponent,
-    KernelComponents,
     KernelPrincipalComponentAnalysis,
 )
 from oop_ml.numpy.decomposition.principal_component_analysis import (

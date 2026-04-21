@@ -97,6 +97,10 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     ShapeMismatchError,
 )
+from oop_ml.core.generative.boltzmann import (
+    BoltzmannParameters,
+    ContrastiveDivergenceUpdate,
+)
 from oop_ml.core.schedule import (
     ConstantSchedule,
     ExponentialDecaySchedule,
@@ -104,8 +108,6 @@ from oop_ml.core.schedule import (
 )
 from oop_ml.core.types import FloatArray
 from oop_ml.numpy.generative.restricted_boltzmann_machine import (
-    BoltzmannParameters,
-    ContrastiveDivergenceUpdate,
     GibbsState,
     RestrictedBoltzmannMachine,
 )

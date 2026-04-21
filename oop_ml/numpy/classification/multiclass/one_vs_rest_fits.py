@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 
+from oop_ml.core.base.linear_classifier import LinearClassifier
 from oop_ml.core.data.feature import Feature
-from oop_ml.numpy.classification.linear_classifier import LinearClassifier
 
 
 class ClassFit:

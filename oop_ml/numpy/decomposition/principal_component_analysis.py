@@ -89,16 +89,10 @@ from oop_ml.core.decomposition.components import (
     PrincipalComponent,
     PrincipalComponents,
 )
+from oop_ml.core.decomposition.naming import COMPONENT_NAME_PREFIX
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
 from oop_ml.core.types import FloatArray
 from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
-
-COMPONENT_NAME_PREFIX = "component"
-"""How components are named: ``component_1``, ``component_2``, and so on.
-
-One-indexed, because "the first principal component" is what the literature and
-every caller says, and a ``component_0`` would make the two disagree.
-"""
 
 
 class PrincipalComponentAnalysis(Transformer[Sequence[Feature]]):

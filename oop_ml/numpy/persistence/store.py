@@ -50,6 +50,10 @@ from oop_ml.core.decomposition.components import (
     PrincipalComponent,
     PrincipalComponents,
 )
+from oop_ml.core.decomposition.kernel_components import (
+    KernelComponent,
+    KernelComponents,
+)
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.exceptions import InvalidDocumentError, NotFittedError
 from oop_ml.core.kernel.functions import (
@@ -64,6 +68,11 @@ from oop_ml.core.pipeline.pipelines import (
     RegressionPipeline,
 )
 from oop_ml.core.pipeline.steps import PipelineStep, PipelineSteps
+from oop_ml.core.preprocessing.feature_scalings import (
+    FeatureScaling,
+    FeatureScalings,
+)
+from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
 from oop_ml.core.tree.node import (
     ClassificationLeaf,
     DecisionNode,
@@ -94,8 +103,6 @@ from oop_ml.numpy.classification.trees.decision_tree_classifier import (
 )
 from oop_ml.numpy.clustering.k_means import KMeans
 from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
-    KernelComponent,
-    KernelComponents,
     KernelPrincipalComponentAnalysis,
 )
 from oop_ml.numpy.decomposition.principal_component_analysis import (
@@ -103,11 +110,6 @@ from oop_ml.numpy.decomposition.principal_component_analysis import (
 )
 from oop_ml.numpy.persistence.document import ModelDocument
 from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
-from oop_ml.numpy.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
-from oop_ml.numpy.preprocessing.standardization.scaling import (
-    FeatureScaling,
-    FeatureScalings,
-)
 from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
 from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
 from oop_ml.numpy.regression.ensembles.gradient_boosting_regressor import (

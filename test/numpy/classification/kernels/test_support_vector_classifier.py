@@ -23,10 +23,12 @@ from oop_ml.core.exceptions import (
     SingleClassError,
 )
 from oop_ml.core.kernel.functions import LinearKernel, RadialBasisKernel
-from oop_ml.numpy.classification.kernels.support_vector_classifier import (
+from oop_ml.core.kernel.support_vectors import (
     SupportVector,
-    SupportVectorClassifier,
     SupportVectors,
+)
+from oop_ml.numpy.classification.kernels.support_vector_classifier import (
+    SupportVectorClassifier,
 )
 from test.fixtures import (
     SURROUNDED_CLASS,

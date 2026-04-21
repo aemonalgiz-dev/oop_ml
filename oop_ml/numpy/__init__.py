@@ -14,6 +14,28 @@ vocabulary, the base classes, the exceptions and the evaluations, lives in
 ``oop_ml.core`` and is not repeated here.
 """
 
+from oop_ml.core.base.linear_classifier import LinearClassifier
+from oop_ml.core.decomposition.kernel_components import (
+    KernelComponent,
+    KernelComponents,
+)
+from oop_ml.core.generative.boltzmann import (
+    BoltzmannParameters,
+    ContrastiveDivergenceUpdate,
+)
+from oop_ml.core.kernel.support_vectors import (
+    SupportVector,
+    SupportVectors,
+)
+from oop_ml.core.preprocessing.affine_scalings import (
+    AffineScaling,
+    AffineScalings,
+)
+from oop_ml.core.preprocessing.feature_scalings import (
+    FeatureScaling,
+    FeatureScalings,
+)
+from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
 from oop_ml.numpy.associative_memory.hopfield_network import (
     BipolarPattern,
     HebbianWeights,
@@ -32,11 +54,8 @@ from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
     RandomForestClassifier,
 )
 from oop_ml.numpy.classification.kernels.support_vector_classifier import (
-    SupportVector,
     SupportVectorClassifier,
-    SupportVectors,
 )
-from oop_ml.numpy.classification.linear_classifier import LinearClassifier
 from oop_ml.numpy.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
@@ -64,16 +83,12 @@ from oop_ml.numpy.decomposition.hebbian_principal_components import (
     HebbianPrincipalComponents,
 )
 from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
-    KernelComponent,
-    KernelComponents,
     KernelPrincipalComponentAnalysis,
 )
 from oop_ml.numpy.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
 from oop_ml.numpy.generative.restricted_boltzmann_machine import (
-    BoltzmannParameters,
-    ContrastiveDivergenceUpdate,
     GibbsState,
     RestrictedBoltzmannMachine,
 )
@@ -85,19 +100,12 @@ from oop_ml.numpy.persistence.store import (
     save_model,
 )
 from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
-from oop_ml.numpy.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
 from oop_ml.numpy.preprocessing.rescaling.affine import (
-    AffineScaling,
-    AffineScalings,
     FeatureScaler,
     MaxAbsScaler,
     MinMaxScaler,
     RobustScaler,
     RootMeanSquareScaler,
-)
-from oop_ml.numpy.preprocessing.standardization.scaling import (
-    FeatureScaling,
-    FeatureScalings,
 )
 from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
 from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
