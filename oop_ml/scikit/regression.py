@@ -63,7 +63,7 @@ namesakes fail 48 tests in ``test/contract`` alone.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
@@ -294,6 +294,17 @@ class MultipleLinearRegression(LinearEngineRegressor):
     ``X.T X`` and so has no condition number to report.
     """
 
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
+    """
+
     def _engine_prototype(self, n_rows: int) -> LinearRegression:
         return LinearRegression(fit_intercept=self.fit_intercept, tol=RANK_THRESHOLD)
 
@@ -332,6 +343,17 @@ class RidgeRegression(LinearEngineRegressor):
     -----------------------------------
     ``normal_equations``, the observed route. The engine solves the same
     system without exposing the matrices it built.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     penalty: float = Field(default=1.0, ge=0.0)
@@ -387,6 +409,19 @@ class LassoRegression(LinearEngineRegressor):
     -----------------------------------
     ``solver_path``, the observed route. The engine's coordinate descent
     keeps no record of its sweeps.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+        "_iterations_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     penalty: float = Field(default=1.0, ge=0.0)

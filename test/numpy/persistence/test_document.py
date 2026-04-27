@@ -13,14 +13,14 @@ import pytest
 from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import InvalidDocumentError, NotFittedError
-from oop_ml.numpy.persistence.document import FORMAT_VERSION, ModelDocument
-from oop_ml.numpy.persistence.store import (
-    PERSISTABLE_TYPES,
+from oop_ml.core.persistence.document import FORMAT_VERSION, ModelDocument
+from oop_ml.core.persistence.store import (
     build_model,
     load_model,
     model_document,
     save_model,
 )
+from oop_ml.numpy.persistence import PERSISTABLE_TYPES
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 
 FEATURES = [

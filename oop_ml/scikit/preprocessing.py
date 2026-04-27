@@ -74,7 +74,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -186,6 +186,14 @@ class Standardizer(Transformer[Sequence[Feature]]):
     Reading the true variance keeps this library's rule, and a genuinely
     constant column is refused by ``check_columns_vary`` before the engine
     sees it.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
@@ -423,6 +431,14 @@ class MinMaxScaler(EngineScaler):
         its arithmetic would be a second implementation of the thing wrapped.
     """
 
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
+    """
+
     def _learned_scalings(self, feature_set: FeatureSet) -> AffineScalings:
         engine: Any = EngineMinMaxScaler(feature_range=UNIT_INTERVAL)
         engine.fit(matrix_of(feature_set))
@@ -455,6 +471,14 @@ class MaxAbsScaler(EngineScaler):
     ``centre_of``, ``spread_of``
         The numpy frame's two readings of a column. Here the engine reads
         them; see :class:`MinMaxScaler`.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     def _learned_scalings(self, feature_set: FeatureSet) -> AffineScalings:
@@ -518,6 +542,14 @@ class RobustScaler(EngineScaler):
     ``centre_of``, ``spread_of``
         The numpy frame's two readings of a column. Here the engine reads the
         centre; see :class:`MinMaxScaler`.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     def _learned_scalings(self, feature_set: FeatureSet) -> AffineScalings:

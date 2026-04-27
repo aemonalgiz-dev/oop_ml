@@ -113,7 +113,12 @@ class FeatureScaler(Transformer[Sequence[Feature]]):
     any order.
     """
 
-    LEARNED_STATE: ClassVar[tuple[str, ...]] = ()
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
+    """The centre and spread per column, which is the whole of the fit.
+
+    Declared on the family rather than on each of the four, since what a
+    scaler learns is the same pair whichever rule chose it.
+    """
 
     _scalings: AffineScalings | None = None
 

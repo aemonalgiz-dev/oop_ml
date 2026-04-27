@@ -56,18 +56,20 @@ from oop_ml.core.decomposition.kernel_components import (
 )
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.exceptions import InvalidDocumentError, NotFittedError
-from oop_ml.core.kernel.functions import (
-    LinearKernel,
-    PolynomialKernel,
-    RadialBasisKernel,
-    SigmoidKernel,
-)
+from oop_ml.core.generative.boltzmann import BoltzmannParameters
 from oop_ml.core.kernel.matrix import KernelMatrix
-from oop_ml.core.pipeline.pipelines import (
-    ClassificationPipeline,
-    RegressionPipeline,
+from oop_ml.core.persistence.document import ModelDocument
+from oop_ml.core.persistence.registry import (
+    NUMPY_BACKEND,
+    backend_of,
+    declined_reason,
+    persistable_types,
 )
 from oop_ml.core.pipeline.steps import PipelineStep, PipelineSteps
+from oop_ml.core.preprocessing.affine_scalings import (
+    AffineScaling,
+    AffineScalings,
+)
 from oop_ml.core.preprocessing.feature_scalings import (
     FeatureScaling,
     FeatureScalings,
@@ -80,62 +82,6 @@ from oop_ml.core.tree.node import (
     TreeNode,
 )
 from oop_ml.core.tree.split import Split
-from oop_ml.numpy.classification.binary.logistic_regression import LogisticRegression
-from oop_ml.numpy.classification.binary.newton_logistic_regression import (
-    NewtonLogisticRegression,
-)
-from oop_ml.numpy.classification.ensembles.bagging_classifier import BaggingClassifier
-from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
-    RandomForestClassifier,
-)
-from oop_ml.numpy.classification.kernels.support_vector_classifier import (
-    SupportVectorClassifier,
-)
-from oop_ml.numpy.classification.multiclass.multinomial_logistic_regression import (
-    MultinomialLogisticRegression,
-)
-from oop_ml.numpy.classification.multiclass.one_vs_rest import OneVsRestClassifier
-from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
-    KNearestNeighboursClassifier,
-)
-from oop_ml.numpy.classification.trees.decision_tree_classifier import (
-    DecisionTreeClassifier,
-)
-from oop_ml.numpy.clustering.k_means import KMeans
-from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
-    KernelPrincipalComponentAnalysis,
-)
-from oop_ml.numpy.decomposition.principal_component_analysis import (
-    PrincipalComponentAnalysis,
-)
-from oop_ml.numpy.persistence.document import ModelDocument
-from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
-from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
-from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
-from oop_ml.numpy.regression.ensembles.gradient_boosting_regressor import (
-    GradientBoostingRegressor,
-)
-from oop_ml.numpy.regression.ensembles.random_forest_regressor import (
-    RandomForestRegressor,
-)
-from oop_ml.numpy.regression.kernels.kernel_ridge_regression import (
-    KernelRidgeRegression,
-)
-from oop_ml.numpy.regression.least_squares.gradient_descent_regression import (
-    GradientDescentRegression,
-)
-from oop_ml.numpy.regression.least_squares.multiple_feature_regression import (
-    MultipleLinearRegression,
-)
-from oop_ml.numpy.regression.least_squares.simple_linear_regression import (
-    SimpleLinearRegression,
-)
-from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
-    KNearestNeighboursRegressor,
-)
-from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
-from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
-from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
 PERSISTABLE_ARRAY_DTYPES: dict[str, np.dtype] = {
     str(np.dtype(kind)): np.dtype(kind) for kind in ("float64", "int64", "intp", "bool")
@@ -159,54 +105,6 @@ hundred tuple tags overflows the interpreter stack with a bare RecursionError,
 which a serving process turns into a 500 rather than a 4xx. The real trees and
 ensembles this library builds are nowhere near this deep, so the bound rejects
 only attacks and corruption, never a legitimate save.
-"""
-
-PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
-    persistable.__name__: persistable
-    for persistable in (
-        # regression
-        SimpleLinearRegression,
-        MultipleLinearRegression,
-        GradientDescentRegression,
-        RidgeRegression,
-        LassoRegression,
-        KNearestNeighboursRegressor,
-        DecisionTreeRegressor,
-        BaggingRegressor,
-        RandomForestRegressor,
-        GradientBoostingRegressor,
-        KernelRidgeRegression,
-        # classification
-        LogisticRegression,
-        NewtonLogisticRegression,
-        MultinomialLogisticRegression,
-        OneVsRestClassifier,
-        KNearestNeighboursClassifier,
-        DecisionTreeClassifier,
-        BaggingClassifier,
-        RandomForestClassifier,
-        SupportVectorClassifier,
-        # unsupervised
-        KMeans,
-        PrincipalComponentAnalysis,
-        KernelPrincipalComponentAnalysis,
-        # preprocessing and composition
-        Standardizer,
-        PolynomialFeatures,
-        RegressionPipeline,
-        ClassificationPipeline,
-        # kernels appear inside hyperparameters, never as top-level models
-        LinearKernel,
-        PolynomialKernel,
-        RadialBasisKernel,
-        SigmoidKernel,
-    )
-}
-"""Every class a document may name, and the only ones it may.
-
-A dict rather than an import-by-path precisely so the set is closed: a
-document naming anything else is refused with the list of what exists, and no
-string in a file can ever cause an import.
 """
 
 
@@ -234,6 +132,7 @@ def model_document(model: Fittable) -> ModelDocument:
         type(model).__name__,
         _encoded_hyperparameters(model),
         {name: _encoded(getattr(model, name)) for name in learned_parts},
+        backend=backend_of(type(model)),
     )
 
 
@@ -258,8 +157,10 @@ def _build_model(document: ModelDocument, depth: int) -> Any:
     _check_depth(depth)
     document.check_readable()
 
-    model_type = _registered_type(document.model_type)
-    model = model_type(**_decoded_hyperparameters(document.hyperparameters))
+    model_type = _registered_type(document.model_type, document.backend)
+    model = model_type(
+        **_decoded_hyperparameters(document.hyperparameters, document.backend)
+    )
 
     if not isinstance(model, Fittable):
         raise InvalidDocumentError(
@@ -344,20 +245,25 @@ def _encoded_field(value: Any) -> Any:
     return value
 
 
-def _decoded_hyperparameters(payload: dict[str, Any]) -> dict[str, Any]:
-    return {name: _decoded_field(value) for name, value in payload.items()}
+def _decoded_hyperparameters(payload: dict[str, Any], backend: str) -> dict[str, Any]:
+    return {name: _decoded_field(value, backend) for name, value in payload.items()}
 
 
-def _decoded_field(value: Any) -> Any:
+def _decoded_field(value: Any, backend: str) -> Any:
+    """A nested configuration, resolved in the same backend as its document.
+
+    A pipeline written by one backend holds that backend's steps, so the
+    backend travels down rather than being looked up again per nesting.
+    """
     if isinstance(value, dict) and value.get("__kind__") == "configured_model":
-        model_type = _registered_type(value["model_type"])
+        model_type = _registered_type(value["model_type"], backend)
 
-        return model_type(**_decoded_hyperparameters(value["hyperparameters"]))
+        return model_type(**_decoded_hyperparameters(value["hyperparameters"], backend))
 
     if isinstance(value, dict) and value.get("__kind__") == "configured_steps":
         return PipelineSteps(
             [
-                PipelineStep(step["name"], _decoded_field(step["transformer"]))
+                PipelineStep(step["name"], _decoded_field(step["transformer"], backend))
                 for step in value["steps"]
             ]
         )
@@ -431,6 +337,27 @@ def _encoded(value: Any) -> Any:
                 "name": value.target_feature.name,
                 "values": _encoded(value.target_feature.values),
             },
+        }
+
+    if isinstance(value, BoltzmannParameters):
+        return {
+            "__kind__": "BoltzmannParameters",
+            "weights": _encoded(value.weights),
+            "visible_bias": _encoded(value.visible_bias),
+            "hidden_bias": _encoded(value.hidden_bias),
+        }
+
+    if isinstance(value, AffineScalings):
+        # Kept distinct from FeatureScalings rather than folded together. The
+        # two name their pair differently on purpose, a centre and a spread
+        # against a mean and a standard deviation, and those words are the
+        # format, so one codec reading both would have to pick a winner.
+        return {
+            "__kind__": "AffineScalings",
+            "scalings": [
+                {"name": one.name, "centre": one.centre, "spread": one.spread}
+                for one in value
+            ],
         }
 
     if isinstance(value, FeatureScalings):
@@ -568,6 +495,21 @@ def _decoded(value: Any, depth: int) -> Any:
                 value["target_feature"]["name"],
                 _decoded(value["target_feature"]["values"], depth + 1),
             ),
+        )
+
+    if kind == "BoltzmannParameters":
+        return BoltzmannParameters(
+            _decoded_array(value["weights"]),
+            _decoded_array(value["visible_bias"]),
+            _decoded_array(value["hidden_bias"]),
+        )
+
+    if kind == "AffineScalings":
+        return AffineScalings(
+            [
+                AffineScaling(one["name"], one["centre"], one["spread"])
+                for one in _expect_list(value, "scalings")
+            ]
         )
 
     if kind == "FeatureScalings":
@@ -804,46 +746,52 @@ def _document_of(payload: dict[str, Any]) -> ModelDocument:
         payload["hyperparameters"],
         payload["learned"],
         payload["format_version"],
+        payload.get("backend", NUMPY_BACKEND),
     )
 
 
-def _registered_type(name: str) -> type[BaseModel]:
-    if name not in PERSISTABLE_TYPES:
+def _registered_type(name: str, backend: str) -> type[BaseModel]:
+    """The class a document names, resolved inside the backend that wrote it."""
+    known = persistable_types(backend)
+
+    if name not in known:
+        reason = declined_reason(backend, name)
+        if reason is not None:
+            raise InvalidDocumentError(
+                f"the {backend} backend cannot restore {name}: {reason}"
+            )
         raise InvalidDocumentError(
-            f"unknown model type {name!r}; this build knows "
-            f"{', '.join(sorted(PERSISTABLE_TYPES))}"
+            f"unknown model type {name!r} for the {backend} backend; it knows "
+            f"{', '.join(sorted(known))}"
         )
 
-    return PERSISTABLE_TYPES[name]
+    return known[name]
 
 
 def _check_registered(model_type: type) -> None:
-    """Refuse a model this format cannot write, and say which one it is.
+    """Refuse a model its own backend cannot bring back, and say why.
 
-    The registry keys on a bare class name, which was unambiguous while one
-    backend existed. It is not now: every name here belongs to two classes, and
-    only the from-scratch one is registered. Saying that a ``Standardizer`` is
-    not a registered persistable type is therefore true of the argument and
-    reads as false about the name, since a ``Standardizer`` plainly is
-    registered and it is the other one. The refusal names the module instead.
+    Resolved inside the backend the class belongs to, so the two
+    ``RidgeRegression`` classes are never confused for one another. A model
+    its backend declines carries that backend's reason rather than a generic
+    absence, since the reason is the useful half.
     """
-    registered = PERSISTABLE_TYPES.get(model_type.__name__)
+    name = model_type.__name__
+    backend = backend_of(model_type)
+    known = persistable_types(backend)
 
-    if registered is model_type:
+    if known.get(name) is model_type:
         return
 
-    name = model_type.__name__
-    if registered is not None:
+    reason = declined_reason(backend, name)
+    if reason is not None:
         raise InvalidDocumentError(
-            f"{name} from {model_type.__module__} cannot be saved; this format "
-            f"holds the from-scratch models, and the registered {name} is "
-            f"{registered.__module__}.{name}. Fit that one to save, or persist "
-            f"the engine directly with the tool that engine ships"
+            f"the {backend} backend cannot save {name}: {reason}"
         )
 
     raise InvalidDocumentError(
-        f"{name} is not a registered persistable type; this build knows "
-        f"{', '.join(sorted(PERSISTABLE_TYPES))}"
+        f"{name} from {model_type.__module__} is not persistable; the "
+        f"{backend} backend saves {', '.join(sorted(known))}"
     )
 
 

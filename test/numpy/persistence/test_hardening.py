@@ -12,11 +12,11 @@ import pytest
 
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import InvalidDocumentError
+from oop_ml.core.persistence.document import ModelDocument
+from oop_ml.core.persistence.store import build_model, model_document
 from oop_ml.numpy.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
-from oop_ml.numpy.persistence.document import ModelDocument
-from oop_ml.numpy.persistence.store import build_model, model_document
 from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )

@@ -293,8 +293,8 @@ from oop_ml.numpy.generative.restricted_boltzmann_machine import (
     GibbsState,
     RestrictedBoltzmannMachine,
 )
-from oop_ml.numpy.persistence.document import ModelDocument
-from oop_ml.numpy.persistence.store import (
+from oop_ml.numpy.persistence import (
+    ModelDocument,
     build_model,
     load_model,
     model_document,

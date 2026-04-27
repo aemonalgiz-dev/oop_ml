@@ -40,13 +40,26 @@ import json
 from typing import Any
 
 from oop_ml.core.exceptions import InvalidDocumentError
+from oop_ml.core.persistence.registry import NUMPY_BACKEND
 
-FORMAT_VERSION = 1
-"""The document format this build writes and the only one it reads.
+FORMAT_VERSION = 2
+"""The document format this build writes.
 
 Bumped when the layout of an existing model's document changes shape --
 renaming a learned part, changing a codec's fields. Adding a new model type is
 not a format change: old readers never see documents naming it.
+
+Version 2 added ``backend``, because a bare class name stopped being
+unambiguous once a second backend exported the same names.
+"""
+
+READABLE_VERSIONS = (1, 2)
+"""Which versions this build can read.
+
+Version 1 is still read rather than refused. Those documents name no backend
+because only one existed when they were written, so reading them as
+from-scratch models is a fact about the files rather than a guess. They are
+the only case where the backend is inferred instead of stated.
 """
 
 
@@ -66,6 +79,10 @@ class ModelDocument:
     format_version:
         Defaults to the current version; carried explicitly so a document read
         back states what it is rather than what the reader hopes.
+    backend:
+        Which backend fitted this model, so the class name resolves inside it.
+        Defaults to the from-scratch one, which is what a version 1 document
+        that names none must have come from.
 
     Raises
     ------
@@ -73,7 +90,13 @@ class ModelDocument:
         If ``model_type`` is blank or either payload is not a dict.
     """
 
-    __slots__ = ("_format_version", "_hyperparameters", "_learned", "_model_type")
+    __slots__ = (
+        "_backend",
+        "_format_version",
+        "_hyperparameters",
+        "_learned",
+        "_model_type",
+    )
 
     def __init__(
         self,
@@ -81,6 +104,7 @@ class ModelDocument:
         hyperparameters: dict[str, Any],
         learned: dict[str, Any],
         format_version: int = FORMAT_VERSION,
+        backend: str = NUMPY_BACKEND,
     ) -> None:
         if not isinstance(model_type, str) or not model_type.strip():
             raise InvalidDocumentError("a document must name its model type")
@@ -94,6 +118,10 @@ class ModelDocument:
         self._hyperparameters = dict(hyperparameters)
         self._learned = dict(learned)
         self._format_version = int(format_version)
+
+        if not isinstance(backend, str) or not backend.strip():
+            raise InvalidDocumentError("a document must name the backend that wrote it")
+        self._backend = backend.strip()
 
     @property
     def model_type(self) -> str:
@@ -115,6 +143,11 @@ class ModelDocument:
         """Which format this document was written in."""
         return self._format_version
 
+    @property
+    def backend(self) -> str:
+        """Which backend fitted the model this document describes."""
+        return self._backend
+
     def check_readable(self) -> None:
         """Raise unless this build can read this document.
 
@@ -125,16 +158,18 @@ class ModelDocument:
             in both directions, because "too new" and "too old" send a caller
             to different remedies.
         """
-        if self._format_version != FORMAT_VERSION:
+        if self._format_version not in READABLE_VERSIONS:
+            readable = ", ".join(str(version) for version in READABLE_VERSIONS)
             raise InvalidDocumentError(
                 f"this document is format version {self._format_version} and "
-                f"this build reads version {FORMAT_VERSION}"
+                f"this build reads {readable}"
             )
 
     def to_json(self) -> str:
         """The document as a JSON string, stable and human-readable."""
         return json.dumps(
             {
+                "backend": self._backend,
                 "format_version": self._format_version,
                 "model_type": self._model_type,
                 "hyperparameters": self._hyperparameters,
@@ -180,6 +215,7 @@ class ModelDocument:
             raw["hyperparameters"],
             raw["learned"],
             raw["format_version"],
+            raw.get("backend", NUMPY_BACKEND),
         )
 
     def __repr__(self) -> str:

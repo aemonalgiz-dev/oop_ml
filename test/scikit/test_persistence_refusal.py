@@ -16,13 +16,16 @@ pinned so the answer does not drift while the question is open.
 
 from __future__ import annotations
 
+import json
 import pathlib
 
 import numpy as np
 import pytest
 
+import oop_ml.scikit as scikit_backend
 from oop_ml import Feature
 from oop_ml.core.exceptions import InvalidDocumentError
+from oop_ml.core.persistence.store import load_model, save_model
 from oop_ml.numpy import (
     DecisionTreeRegressor as NumpyDecisionTreeRegressor,
 )
@@ -38,10 +41,6 @@ from oop_ml.numpy import (
 from oop_ml.numpy import (
     RidgeRegression as NumpyRidgeRegression,
 )
-from oop_ml.numpy import (
-    Standardizer as NumpyStandardizer,
-)
-from oop_ml.numpy.persistence.store import save_model
 from oop_ml.scikit import (
     DecisionTreeRegressor as ScikitDecisionTreeRegressor,
 )
@@ -57,9 +56,7 @@ from oop_ml.scikit import (
 from oop_ml.scikit import (
     RidgeRegression as ScikitRidgeRegression,
 )
-from oop_ml.scikit import (
-    Standardizer as ScikitStandardizer,
-)
+from oop_ml.scikit.persistence import NOT_PERSISTABLE, PERSISTABLE_TYPES
 
 ROWS = [
     Feature("area", np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])),
@@ -81,38 +78,84 @@ def private_of(model: object) -> dict[str, object]:
 
 
 class TestTheRefusal:
-    def test_a_scikit_model_is_refused_by_module_rather_than_by_name(
+    """What a wrapper that still needs its engine says when asked to save."""
+
+    def test_a_wrapper_that_needs_its_engine_declines_by_name(
         self, tmp_path: pathlib.Path
     ) -> None:
-        model = ScikitStandardizer().fit(ROWS)
+        model = ScikitDecisionTreeRegressor(max_depth=3).fit(ROWS, TARGET)
 
         with pytest.raises(InvalidDocumentError) as raised:
             save_model(model, tmp_path / "model.json")
 
         message = str(raised.value)
-        assert "oop_ml.scikit" in message
-        assert "oop_ml.numpy" in message
+        assert "scikit" in message
+        assert "estimator" in message
 
-    def test_the_refusal_does_not_claim_the_name_is_unknown(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        # The wording that prompted this. A Standardizer plainly is a
-        # registered persistable type; it is the other one.
-        model = ScikitStandardizer().fit(ROWS)
+    def test_the_refusal_says_what_to_do_instead(self, tmp_path: pathlib.Path) -> None:
+        model = ScikitDecisionTreeRegressor(max_depth=3).fit(ROWS, TARGET)
 
         with pytest.raises(InvalidDocumentError) as raised:
             save_model(model, tmp_path / "model.json")
 
-        assert "is not a registered persistable type" not in str(raised.value)
+        assert "oop_ml.numpy" in str(raised.value)
 
-    def test_the_from_scratch_namesake_still_saves(
+    def test_a_wrapper_that_holds_no_engine_saves_and_returns_itself(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # The contract: a document written by this backend loads as this
+        # backend's model, not as the namesake that shares its class name.
+        model = ScikitRidgeRegression(penalty=0.1).fit(ROWS, TARGET)
+        target = tmp_path / "model.json"
+
+        save_model(model, target)
+        loaded = load_model(target)
+
+        assert type(loaded) is ScikitRidgeRegression
+        assert np.array_equal(
+            np.asarray(loaded.predict(ROWS)), np.asarray(model.predict(ROWS))
+        )
+
+    def test_the_document_records_which_backend_wrote_it(
         self, tmp_path: pathlib.Path
     ) -> None:
         target = tmp_path / "model.json"
 
-        save_model(NumpyStandardizer().fit(ROWS), target)
+        save_model(ScikitRidgeRegression(penalty=0.1).fit(ROWS, TARGET), target)
 
-        assert target.exists()
+        assert json.loads(target.read_text(encoding="utf-8"))["backend"] == "scikit"
+
+    def test_the_two_namesakes_write_different_documents(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        # Same class name, same learned parameters, different backend, and it
+        # is the backend that decides which one comes back.
+        scikit_path = tmp_path / "scikit.json"
+        numpy_path = tmp_path / "numpy.json"
+
+        save_model(ScikitRidgeRegression(penalty=0.1).fit(ROWS, TARGET), scikit_path)
+        save_model(NumpyRidgeRegression(penalty=0.1).fit(ROWS, TARGET), numpy_path)
+
+        assert (
+            json.loads(scikit_path.read_text(encoding="utf-8"))["backend"] == "scikit"
+        )
+        assert json.loads(numpy_path.read_text(encoding="utf-8"))["backend"] == "numpy"
+        assert type(load_model(scikit_path)) is ScikitRidgeRegression
+        assert type(load_model(numpy_path)) is NumpyRidgeRegression
+
+    def test_every_wrapper_is_persistable_or_declined_and_never_both(self) -> None:
+        # The same rule NOT_PROVIDED keeps: a backend can decline, it cannot
+        # forget. Configuration types are registered too and are not models.
+        exported = {
+            name
+            for name in scikit_backend.__all__
+            if isinstance(getattr(scikit_backend, name), type)
+        }
+        persistable = set(PERSISTABLE_TYPES) & exported
+        declined = set(NOT_PERSISTABLE)
+
+        assert not (persistable & declined)
+        assert exported - persistable - declined == set()
 
 
 class TestWhatTheLearnedStateWouldCarry:

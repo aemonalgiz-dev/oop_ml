@@ -22,11 +22,23 @@ from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.kernel.functions import Kernel, RadialBasisKernel
+from oop_ml.core.persistence.document import ModelDocument
+from oop_ml.core.persistence.store import (
+    build_model,
+    model_document,
+)
 from oop_ml.core.pipeline.pipelines import (
     ClassificationPipeline,
     RegressionPipeline,
 )
 from oop_ml.core.pipeline.steps import PipelineSteps
+from oop_ml.numpy import (
+    MaxAbsScaler,
+    MinMaxScaler,
+    RestrictedBoltzmannMachine,
+    RobustScaler,
+    RootMeanSquareScaler,
+)
 from oop_ml.numpy.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.numpy.classification.binary.newton_logistic_regression import (
     NewtonLogisticRegression,
@@ -55,12 +67,7 @@ from oop_ml.numpy.decomposition.kernel_principal_component_analysis import (
 from oop_ml.numpy.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
-from oop_ml.numpy.persistence.document import ModelDocument
-from oop_ml.numpy.persistence.store import (
-    PERSISTABLE_TYPES,
-    build_model,
-    model_document,
-)
+from oop_ml.numpy.persistence import PERSISTABLE_TYPES
 from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.numpy.preprocessing.standardization.standardizer import Standardizer
 from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
@@ -124,6 +131,22 @@ def probabilities_answer(model):
 
 def transform_answer(model):
     return np.column_stack([feature.values for feature in model.transform(FEATURES)])
+
+
+def transform_answer_of(block):
+    """A transform answer read over a block other than the shared features."""
+
+    def answer(model):
+        return np.column_stack([feature.values for feature in model.transform(block())])
+
+    return answer
+
+
+BINARY_FEATURES = [
+    Feature("first", np.array([0.0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0])),
+    Feature("second", np.array([1.0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1])),
+]
+"""Rows a Boltzmann machine can read, whose units are strictly binary."""
 
 
 ROUND_TRIPS = {
@@ -240,6 +263,28 @@ ROUND_TRIPS = {
             kernel=RadialBasisKernel(gamma=0.5), n_components=2
         ).fit(FEATURES),
         transform_answer,
+    ),
+    "MinMaxScaler": (
+        lambda: MinMaxScaler().fit(FEATURES),
+        transform_answer,
+    ),
+    "MaxAbsScaler": (
+        lambda: MaxAbsScaler().fit(FEATURES),
+        transform_answer,
+    ),
+    "RobustScaler": (
+        lambda: RobustScaler().fit(FEATURES),
+        transform_answer,
+    ),
+    "RootMeanSquareScaler": (
+        lambda: RootMeanSquareScaler().fit(FEATURES),
+        transform_answer,
+    ),
+    "RestrictedBoltzmannMachine": (
+        lambda: RestrictedBoltzmannMachine(
+            n_hidden_units=3, max_epochs=20, random_seed=0
+        ).fit(BINARY_FEATURES),
+        transform_answer_of(lambda: BINARY_FEATURES),
     ),
     "Standardizer": (
         lambda: Standardizer().fit(FEATURES),

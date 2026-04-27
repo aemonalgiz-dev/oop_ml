@@ -75,7 +75,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Callable, Sequence
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
@@ -347,6 +347,19 @@ class LogisticRegression(LinearEngineClassifier):
     iterations.
     """
 
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+        "_iterations_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
+    """
+
     learning_rate: float = Field(default=0.1, gt=0.0)
     max_epochs: int = Field(default=10_000, gt=0)
     tolerance: float = Field(default=1e-8, gt=0.0)
@@ -429,6 +442,19 @@ class NewtonLogisticRegression(LinearEngineClassifier):
     iterations.
     """
 
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+        "_iterations_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
+    """
+
     max_iterations: int = Field(default=100, gt=0)
     tolerance: float = Field(default=1e-10, gt=0.0)
     threshold: float = Field(default=0.5, gt=0.0, lt=1.0)
@@ -492,6 +518,20 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
     -----------------------------------
     ``solver_path``, the observed route. The engine keeps no record of its
     iterations.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercepts",
+        "_coefficients",
+        "_n_classes",
+        "_epochs_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
     """
 
     learning_rate: float = Field(default=0.1, gt=0.0)

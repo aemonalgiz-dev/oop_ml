@@ -58,7 +58,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
@@ -973,6 +973,21 @@ class RestrictedBoltzmannMachine(Transformer[Sequence[Feature]], ConvergentFit):
         If ``n_gibbs_steps`` is not one, since the engine runs exactly one
         Gibbs step per update. The default passes, so a search rebuilding
         candidates field-by-field is unaffected.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_parameters",
+        "_feature_names",
+        "_passes_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it.
+
+        Declared here rather than inherited, because a document written
+        by this backend restores this class and not its namesake, so what
+        it must carry is what this one keeps.
+        The drawing generator is deliberately absent: it is how the next
+        fit would proceed rather than anything this one learned.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")

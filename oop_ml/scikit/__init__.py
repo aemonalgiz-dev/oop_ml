@@ -55,6 +55,10 @@ from oop_ml.scikit.classification import (
     RandomForestClassifier,
     SupportVectorClassifier,
 )
+from oop_ml.scikit.persistence import (  # noqa: F401  registers this backend
+    NOT_PERSISTABLE,
+    PERSISTABLE_TYPES,
+)
 from oop_ml.scikit.preprocessing import (
     MaxAbsScaler,
     MinMaxScaler,
