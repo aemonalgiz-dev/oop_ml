@@ -818,12 +818,33 @@ def _registered_type(name: str) -> type[BaseModel]:
 
 
 def _check_registered(model_type: type) -> None:
+    """Refuse a model this format cannot write, and say which one it is.
+
+    The registry keys on a bare class name, which was unambiguous while one
+    backend existed. It is not now: every name here belongs to two classes, and
+    only the from-scratch one is registered. Saying that a ``Standardizer`` is
+    not a registered persistable type is therefore true of the argument and
+    reads as false about the name, since a ``Standardizer`` plainly is
+    registered and it is the other one. The refusal names the module instead.
+    """
     registered = PERSISTABLE_TYPES.get(model_type.__name__)
 
-    if registered is not model_type:
+    if registered is model_type:
+        return
+
+    name = model_type.__name__
+    if registered is not None:
         raise InvalidDocumentError(
-            f"{model_type.__name__} is not a registered persistable type"
+            f"{name} from {model_type.__module__} cannot be saved; this format "
+            f"holds the from-scratch models, and the registered {name} is "
+            f"{registered.__module__}.{name}. Fit that one to save, or persist "
+            f"the engine directly with the tool that engine ships"
         )
+
+    raise InvalidDocumentError(
+        f"{name} is not a registered persistable type; this build knows "
+        f"{', '.join(sorted(PERSISTABLE_TYPES))}"
+    )
 
 
 def _learned_parts_of(model_type: type) -> tuple[str, ...]:
