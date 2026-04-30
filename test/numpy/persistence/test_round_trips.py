@@ -33,6 +33,7 @@ from oop_ml.core.pipeline.pipelines import (
 )
 from oop_ml.core.pipeline.steps import PipelineSteps
 from oop_ml.numpy import (
+    GaussianNaiveBayes,
     MaxAbsScaler,
     MinMaxScaler,
     RestrictedBoltzmannMachine,
@@ -263,6 +264,10 @@ ROUND_TRIPS = {
             kernel=RadialBasisKernel(gamma=0.5), n_components=2
         ).fit(FEATURES),
         transform_answer,
+    ),
+    "GaussianNaiveBayes": (
+        lambda: GaussianNaiveBayes().fit(FEATURES, THREE_CLASSES_TARGET),
+        probabilities_answer,
     ),
     "MinMaxScaler": (
         lambda: MinMaxScaler().fit(FEATURES),

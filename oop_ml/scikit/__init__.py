@@ -47,6 +47,7 @@ check_engine_available()
 from oop_ml.scikit.classification import (
     BaggingClassifier,
     DecisionTreeClassifier,
+    GaussianNaiveBayes,
     KNearestNeighboursClassifier,
     LogisticRegression,
     MultinomialLogisticRegression,
@@ -192,6 +193,7 @@ __all__: list[str] = [
     "BaggingClassifier",
     "BaggingRegressor",
     "DecisionTreeClassifier",
+    "GaussianNaiveBayes",
     "DecisionTreeRegressor",
     "GradientBoostingRegressor",
     "KNearestNeighboursClassifier",

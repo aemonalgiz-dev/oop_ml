@@ -82,6 +82,7 @@ from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 from sklearn.ensemble import BaggingClassifier as EngineBaggingClassifier
 from sklearn.ensemble import RandomForestClassifier as EngineRandomForestClassifier
 from sklearn.linear_model import LogisticRegression as EngineLogisticRegression
+from sklearn.naive_bayes import GaussianNB as EngineGaussianNaiveBayes
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier as EngineDecisionTreeClassifier
@@ -108,6 +109,7 @@ from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
+from oop_ml.core.gaussian import gaussian_log_scores, normalised_from_log_scores
 from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.kernel.matrix import KernelMatrix
 from oop_ml.core.kernel.support_vectors import (
@@ -2016,3 +2018,139 @@ __all__ = [
     "RandomForestClassifier",
     "SupportVectorClassifier",
 ]
+
+
+class GaussianNaiveBayes(MultiClassClassifier[Sequence[Feature], Feature]):
+    """One Gaussian per class per column, fitted by ``GaussianNB``.
+
+    Translation
+    -----------
+    ``variance_smoothing`` passes through under its own name, and it means the
+    same thing on both sides: the share of the largest column variance added to
+    every variance so that a class whose column never varies still has a
+    density. The engine and the numpy backend both take the largest variance
+    across the whole block rather than per class, so the two floors are the
+    same number and the two fits agree to the last bit.
+
+    There is nothing else to translate. The model has no iteration, no
+    stopping rule and no penalty, so there is no convergence to watch and no
+    field whose meaning could drift.
+
+    Prediction does not consult the engine. What this wrapper keeps is the
+    priors, the means and the variances, which is the whole of the fit, and the
+    log score of a row under a class follows from those three by the arithmetic
+    the numpy module docstring derives. That is why this one can be saved where
+    most of this backend's wrappers cannot.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_class_priors",
+        "_means",
+        "_variances",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    variance_smoothing: float = Field(default=1e-9, ge=0.0)
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _class_priors: FloatArray | None = PrivateAttr(default=None)
+    _means: FloatArray | None = PrivateAttr(default=None)
+    _variances: FloatArray | None = PrivateAttr(default=None)
+
+    @property
+    def n_classes(self) -> int:
+        """How many classes the fit saw."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return int(self._class_priors.shape[0])
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def class_priors(self) -> FloatArray:
+        """How common each class was, one per class, summing to one."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return self._class_priors
+
+    @property
+    def means(self) -> FloatArray:
+        """Each class's average for each column, ``(n_classes, n_features)``."""
+        self._check_fitted()
+        assert self._means is not None
+        return self._means
+
+    @property
+    def variances(self) -> FloatArray:
+        """Each class's spread for each column, floored, same shape as the means."""
+        self._check_fitted()
+        assert self._variances is not None
+        return self._variances
+
+    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+        """Fit the engine and read its three summaries back.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If any feature's length differs from the target's.
+        NonBinaryLabelsError
+            If the target holds a negative or fractional value.
+        SingleClassError
+            If the target holds fewer than two classes, or leaves a gap in the
+            run from zero.
+        """
+        feature_set = FeatureSet(input_values)
+        feature_set.check_aligned_with(target_values)
+
+        target_column = target_values.column
+        target_column.check_is_label_encoded()
+
+        engine_type: Any = EngineGaussianNaiveBayes
+        engine = engine_type(var_smoothing=self.variance_smoothing)
+        engine.fit(matrix_of(feature_set), target_column.values)
+
+        self._feature_names = tuple(feature.name for feature in feature_set)
+        self._class_priors = np.asarray(engine.class_prior_, dtype=np.float64)
+        self._means = np.asarray(engine.theta_, dtype=np.float64)
+        self._variances = np.asarray(engine.var_, dtype=np.float64)
+
+        self._mark_fitted()
+        return self
+
+    def log_scores(self, input_values: Sequence[Feature]) -> FloatArray:
+        """The log of each class's prior times its density, one row per query."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._means is not None
+        assert self._variances is not None
+        assert self._class_priors is not None
+
+        return gaussian_log_scores(
+            matched_matrix(self._feature_names, input_values),
+            self._means,
+            self._variances,
+            self._class_priors,
+        )
+
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
+        """Each class's share of the total plausibility, one row per query."""
+        return ProbabilityMatrix(
+            normalised_from_log_scores(self.log_scores(input_values))
+        )
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The most plausible class for each row."""
+        return Predictions.already_checked(
+            np.argmax(self.log_scores(input_values), axis=1).astype(np.float64)
+        )

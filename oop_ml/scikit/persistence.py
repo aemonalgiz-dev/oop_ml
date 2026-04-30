@@ -38,6 +38,7 @@ from oop_ml.core.schedule import (
     LinearDecaySchedule,
 )
 from oop_ml.scikit.classification import (
+    GaussianNaiveBayes,
     LogisticRegression,
     MultinomialLogisticRegression,
     NewtonLogisticRegression,
@@ -68,6 +69,8 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         LogisticRegression,
         NewtonLogisticRegression,
         MultinomialLogisticRegression,
+        # generative, whose fitted self is three summaries per class
+        GaussianNaiveBayes,
         # preprocessing, which learn a pair of numbers per column
         Standardizer,
         MinMaxScaler,

@@ -254,6 +254,9 @@ from oop_ml.numpy.classification.ensembles.bagging_classifier import BaggingClas
 from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
     RandomForestClassifier,
 )
+from oop_ml.numpy.classification.generative.gaussian_naive_bayes import (
+    GaussianNaiveBayes,
+)
 from oop_ml.numpy.classification.kernels.support_vector_classifier import (
     SupportVectorClassifier,
 )
@@ -420,6 +423,7 @@ __all__ = [
     "RandomForestRegressor",
     "GradientBoostingRegressor",
     # Classification
+    "GaussianNaiveBayes",
     "LogisticRegression",
     "NewtonLogisticRegression",
     "MultinomialLogisticRegression",
