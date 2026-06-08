@@ -68,6 +68,7 @@ from sklearn.cluster import KMeans as EngineKMeans
 from sklearn.decomposition import PCA as EnginePCA
 from sklearn.decomposition import KernelPCA as EngineKernelPCA
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.mixture import GaussianMixture as EngineGaussianMixture
 from sklearn.neural_network import BernoulliRBM
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_random_state
@@ -84,7 +85,7 @@ from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.predictions import Predictions
-from oop_ml.core.data.probabilities import ClassScores
+from oop_ml.core.data.probabilities import ClassScores, ProbabilityMatrix
 from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.decomposition.components import (
     PrincipalComponent,
@@ -100,6 +101,10 @@ from oop_ml.core.decomposition.naming import COMPONENT_NAME_PREFIX
 from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
+from oop_ml.core.gaussian import (
+    normalised_from_log_scores,
+    quadratic_discriminant_scores,
+)
 from oop_ml.core.generative.boltzmann import (
     HIDDEN_UNIT_NAME_PREFIX,
     BoltzmannParameters,
@@ -1819,4 +1824,202 @@ class AgglomerativeClustering(Clusterer[Sequence[Feature]]):
             "general p-norm. Use one of the six DistanceMetric members here, "
             "or the oop_ml.numpy backend, which computes the block itself and "
             "accepts any Distance"
+        )
+
+
+class GaussianMixture(Clusterer[Sequence[Feature]]):
+    """Soft groups from a handful of Gaussians, fitted by the engine's
+    ``GaussianMixture``.
+
+    Translation
+    -----------
+    ``n_components``, ``max_iterations`` and ``tolerance`` reach
+    ``n_components``, ``max_iter`` and ``tol``, and ``covariance_smoothing`` is
+    ``reg_covar``, all unchanged and all meaning the same thing.
+    ``random_seed`` is ``random_state``, which fixes the k-means grouping the
+    walk starts from on both sides.
+
+    ``covariance_type`` is set to ``"full"`` rather than exposed. The engine's
+    other three shapes are the same square the generative classifiers draw --
+    ``diag`` is naive Bayes' independent columns, ``tied`` is the linear
+    discriminant's one shared matrix, ``spherical`` is k-means' -- and adding
+    them means a different M step for each rather than a keyword, so they are
+    absent from both backends rather than from one.
+
+    ``mean_log_likelihood`` is the engine's ``lower_bound_``, which is an
+    average per row and not a total, and this library's name says which it is.
+    It is also a *lower* bound, as that name promises and this one does not: it
+    is the likelihood as of the last E step, where the engine's own ``score``
+    recomputes it with the parameters the final M step produced. Measured, it
+    trails by about one tolerance -- 2.6e-05 at a tolerance of 1e-3 and 3.4e-11
+    at 1e-9 -- and it trails from below at both.
+
+    Prediction does not consult the engine. What this wrapper keeps is the
+    weights, the means and the covariances, which is the whole of the fitted
+    mixture, and the responsibilities follow from those three by the arithmetic
+    in :mod:`oop_ml.core.gaussian` -- the same call the quadratic discriminant
+    makes, with the mixing weights standing where the class priors stand. So it
+    can be saved, and the two backends' predictions agree by construction
+    wherever their parameters do.
+
+    How closely they agree
+    -----------------------
+    More closely than a walk usually allows. Both start from a k-means grouping
+    and run the same two steps, and on the numpy module's three-blob fixture
+    they take the same nine rounds and land on means agreeing to 1.8e-15,
+    weights to 5.6e-17 and covariances to 4.4e-16. That is not a promise the
+    contract makes: expectation-maximisation finds a local maximum, so two
+    k-means starts that differed at all would separate the two fits, and the
+    contract asserts what the model recovers rather than which arithmetic
+    reached it.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_weights",
+        "_means",
+        "_covariances",
+        "_mean_log_likelihood",
+        "_iterations_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    n_components: int = Field(default=1, ge=1)
+    max_iterations: int = Field(default=100, gt=0)
+    tolerance: float = Field(default=1e-3, gt=0.0)
+    covariance_smoothing: float = Field(default=1e-6, ge=0.0)
+    random_seed: int | None = None
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _weights: FloatArray | None = PrivateAttr(default=None)
+    _means: FloatArray | None = PrivateAttr(default=None)
+    _covariances: FloatArray | None = PrivateAttr(default=None)
+    _mean_log_likelihood: float | None = PrivateAttr(default=None)
+    _iterations_run: int | None = PrivateAttr(default=None)
+    _converged: bool | None = PrivateAttr(default=None)
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def weights(self) -> FloatArray:
+        """How much of the data each component accounts for, summing to one."""
+        self._check_fitted()
+        assert self._weights is not None
+        return self._weights
+
+    @property
+    def means(self) -> FloatArray:
+        """Each component's centre, ``(n_components, n_features)``."""
+        self._check_fitted()
+        assert self._means is not None
+        return self._means
+
+    @property
+    def covariances(self) -> FloatArray:
+        """Each component's shape, ``(n_components, n_features, n_features)``."""
+        self._check_fitted()
+        assert self._covariances is not None
+        return self._covariances
+
+    @property
+    def mean_log_likelihood(self) -> float:
+        """The average log likelihood of a training row under the fitted model."""
+        self._check_fitted()
+        assert self._mean_log_likelihood is not None
+        return self._mean_log_likelihood
+
+    @property
+    def iterations_run(self) -> int:
+        """How many rounds of the two steps the last fit took."""
+        self._check_fitted()
+        assert self._iterations_run is not None
+        return self._iterations_run
+
+    @property
+    def converged(self) -> bool:
+        """Whether the last fit stopped on ``tolerance`` rather than the cap."""
+        self._check_fitted()
+        assert self._converged is not None
+        return self._converged
+
+    def fit(self, input_values: Sequence[Feature]) -> Self:
+        """Fit the engine and read the mixture's three summaries back.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If the features disagree in length.
+        TooFewValuesError
+            If there are fewer rows than components. The engine refuses this
+            too; the guard is here so the refusal arrives in this library's own
+            words.
+        """
+        feature_set = FeatureSet(input_values)
+        names = tuple(feature.name for feature in feature_set)
+        matrix = matrix_of(feature_set)
+
+        if matrix.shape[0] < self.n_components:
+            raise TooFewValuesError(
+                f"{self.n_components} components were asked for and "
+                f"{matrix.shape[0]} row(s) were supplied. A component with no "
+                "rows has no centre to describe"
+            )
+
+        engine_type: Any = EngineGaussianMixture
+        engine = engine_type(
+            n_components=self.n_components,
+            covariance_type="full",
+            max_iter=self.max_iterations,
+            tol=self.tolerance,
+            reg_covar=self.covariance_smoothing,
+            random_state=self.random_seed,
+        )
+        engine.fit(matrix)
+
+        self._feature_names = names
+        self._weights = np.asarray(engine.weights_, dtype=np.float64)
+        self._means = np.asarray(engine.means_, dtype=np.float64)
+        self._covariances = np.asarray(engine.covariances_, dtype=np.float64)
+        self._mean_log_likelihood = float(engine.lower_bound_)
+        self._iterations_run = int(engine.n_iter_)
+        self._converged = bool(engine.converged_)
+
+        self._mark_fitted()
+        return self
+
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
+        """Each component's share of the responsibility for each row."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._weights is not None
+        assert self._means is not None
+        assert self._covariances is not None
+
+        scores = quadratic_discriminant_scores(
+            matched_matrix(self._feature_names, input_values),
+            self._means,
+            self._covariances,
+            self._weights,
+        )
+
+        return ProbabilityMatrix(normalised_from_log_scores(scores))
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The component most responsible for each row."""
+        return Predictions.already_checked(
+            np.argmax(
+                np.asarray(self.predict_probabilities(input_values)), axis=1
+            ).astype(np.float64)
         )

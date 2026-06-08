@@ -35,6 +35,7 @@ from oop_ml.core.pipeline.steps import PipelineSteps
 from oop_ml.numpy import (
     DBSCAN,
     AgglomerativeClustering,
+    GaussianMixture,
     GaussianNaiveBayes,
     LinearDiscriminantAnalysis,
     MaxAbsScaler,
@@ -276,6 +277,10 @@ ROUND_TRIPS = {
     "AgglomerativeClustering": (
         lambda: AgglomerativeClustering(n_clusters=3).fit(FEATURES),
         lambda model: np.asarray(model.predict(FEATURES)),
+    ),
+    "GaussianMixture": (
+        lambda: GaussianMixture(n_components=2, random_seed=0).fit(FEATURES),
+        lambda model: np.asarray(model.predict_probabilities(FEATURES)),
     ),
     "PrincipalComponentAnalysis": (
         lambda: PrincipalComponentAnalysis(n_components=2, standardize=True).fit(

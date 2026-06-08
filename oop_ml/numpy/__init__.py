@@ -81,6 +81,7 @@ from oop_ml.numpy.classification.trees.decision_tree_classifier import (
 )
 from oop_ml.numpy.clustering.agglomerative import AgglomerativeClustering
 from oop_ml.numpy.clustering.dbscan import DBSCAN
+from oop_ml.numpy.clustering.gaussian_mixture import GaussianMixture
 from oop_ml.numpy.clustering.k_means import KMeans
 from oop_ml.numpy.clustering.self_organising_map import (
     GridPosition,
@@ -177,6 +178,7 @@ __all__ = [
     "DecisionTreeClassifier",
     "KMeans",
     "DBSCAN",
+    "GaussianMixture",
     "AgglomerativeClustering",
     "GridPosition",
     "MapUnit",

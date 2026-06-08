@@ -121,6 +121,25 @@ def gaussian_log_scores(
     return densities + np.log(class_priors)[None, :]
 
 
+def log_total_from_log_scores(scores: FloatArray) -> FloatArray:
+    """The log of the total each row's scores add up to, one value per row.
+
+    ``log(sum(exp(scores)))``, done by subtracting each row's largest score
+    before exponentiating and adding it back afterwards, which is the same
+    answer and cannot overflow. The companion of
+    :func:`normalised_from_log_scores`: that one asks how the total is divided
+    between the classes, this one asks how large it is.
+
+    For a mixture that total *is* the likelihood of the row under the whole
+    model, which is what makes this the quantity a mixture reports and a
+    classifier does not.
+    """
+    largest = scores.max(axis=1)
+    shifted = np.exp(scores - largest[:, None])
+
+    return largest + np.log(shifted.sum(axis=1))
+
+
 def normalised_from_log_scores(scores: FloatArray) -> FloatArray:
     """Log scores turned into rows that sum to one.
 

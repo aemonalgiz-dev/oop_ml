@@ -41,6 +41,7 @@ import pytest
 from sklearn.cluster import DBSCAN as EngineDBSCAN
 from sklearn.cluster import AgglomerativeClustering as EngineAgglomerative
 from sklearn.cluster import KMeans as EngineKMeans
+from sklearn.mixture import GaussianMixture as EngineGaussianMixture
 from sklearn.neural_network import BernoulliRBM
 
 from oop_ml import Feature, scikit
@@ -122,6 +123,53 @@ MERGE_FEATURES = [
     Feature("left", _MERGE_ROWS[:, 0]),
     Feature("right", _MERGE_ROWS[:, 1]),
 ]
+
+
+_MIXTURE_GENERATOR = np.random.default_rng(9)
+_MIXTURE_ROWS = np.vstack(
+    [
+        _MIXTURE_GENERATOR.multivariate_normal(
+            [0.0, 0.0], [[1.0, 0.8], [0.8, 1.0]], size=80
+        ),
+        _MIXTURE_GENERATOR.multivariate_normal(
+            [6.0, 1.0], [[2.0, -1.2], [-1.2, 1.5]], size=60
+        ),
+        _MIXTURE_GENERATOR.multivariate_normal(
+            [2.0, 6.0], [[0.6, 0.0], [0.0, 0.6]], size=60
+        ),
+    ]
+)
+#: Three Gaussians of visibly different shape, far enough apart that the walk
+#: reaches them from a k-means start on both backends.
+MIXTURE_FEATURES = [
+    Feature("left", _MIXTURE_ROWS[:, 0]),
+    Feature("right", _MIXTURE_ROWS[:, 1]),
+]
+
+_BAND_GENERATOR = np.random.default_rng(21)
+_BAND_ROWS = np.vstack(
+    [
+        np.column_stack(
+            [
+                _BAND_GENERATOR.normal(scale=5.0, size=80),
+                _BAND_GENERATOR.normal(scale=0.4, size=80),
+            ]
+        ),
+        np.column_stack(
+            [
+                _BAND_GENERATOR.normal(scale=5.0, size=80),
+                _BAND_GENERATOR.normal(scale=0.4, size=80) + 3.0,
+            ]
+        ),
+    ]
+)
+#: Two long flat bands, which a centre-based grouping cuts across and a walk
+#: that begins there cannot leave.
+BAND_FEATURES = [
+    Feature("left", _BAND_ROWS[:, 0]),
+    Feature("right", _BAND_ROWS[:, 1]),
+]
+_BAND_TRUTH = np.array([0] * 80 + [1] * 80)
 
 
 class TestTheKMeansToleranceScale:
@@ -695,3 +743,137 @@ class TestTheMetricRefusalThisBackendAdds:
 
         with pytest.raises(NotFittedError):
             _ = model.labels
+
+
+class TestTheMixtureTranslation:
+    """Every setting reaches the engine under its own name, so what is worth
+    pinning is the one that is set rather than passed, and how closely two
+    walks that begin the same way stay together."""
+
+    def test_both_backends_reach_the_same_mixture(self) -> None:
+        """Closer than a walk usually allows, because both start from a
+        k-means grouping and run the same two steps. Not a promise the contract
+        makes, since a start that differed at all would separate them."""
+        expected = reference.GaussianMixture(n_components=3, random_seed=0).fit(
+            MIXTURE_FEATURES
+        )
+        wrapped = scikit.GaussianMixture(n_components=3, random_seed=0).fit(
+            MIXTURE_FEATURES
+        )
+
+        order = np.argsort(np.asarray(expected.means)[:, 0])
+        wrapped_order = np.argsort(np.asarray(wrapped.means)[:, 0])
+
+        assert np.allclose(
+            np.asarray(expected.means)[order],
+            np.asarray(wrapped.means)[wrapped_order],
+            atol=1e-9,
+        )
+        assert np.allclose(
+            np.asarray(expected.covariances)[order],
+            np.asarray(wrapped.covariances)[wrapped_order],
+            atol=1e-9,
+        )
+        assert expected.mean_log_likelihood == pytest.approx(
+            wrapped.mean_log_likelihood, abs=1e-9
+        )
+        assert expected.iterations_run == wrapped.iterations_run
+
+    def test_the_score_is_an_average_per_row_and_not_a_total(self) -> None:
+        """``lower_bound_`` is the engine's name for it and says neither, so
+        this library's does. It is also, as the name promises, a *lower* bound:
+        it is the likelihood as of the last E step, where the engine's own
+        ``score`` recomputes it with the parameters the final M step produced,
+        so it trails by about one tolerance. Measured, the gap is 2.6e-05 at a
+        tolerance of 1e-3 and 3.4e-11 at 1e-9, and it is negative at both.
+        """
+        tight = scikit.GaussianMixture(
+            n_components=3, random_seed=0, tolerance=1e-9, max_iterations=500
+        ).fit(MIXTURE_FEATURES)
+        engine = EngineGaussianMixture(
+            n_components=3,
+            covariance_type="full",
+            random_state=0,
+            tol=1e-9,
+            max_iter=500,
+        ).fit(_MIXTURE_ROWS)
+
+        trailing = tight.mean_log_likelihood - float(engine.score(_MIXTURE_ROWS))
+
+        assert trailing < 0.0
+        assert abs(trailing) < 1e-6
+        assert tight.mean_log_likelihood == pytest.approx(
+            float(engine.lower_bound_), abs=1e-12
+        )
+
+    def test_and_it_is_per_row_rather_than_summed_over_them(self) -> None:
+        """A total would grow with the dataset. Fitting the same mixture to the
+        rows twice over leaves the average where it was."""
+        once = scikit.GaussianMixture(n_components=3, random_seed=0).fit(
+            MIXTURE_FEATURES
+        )
+        doubled = [
+            Feature("left", np.concatenate([_MIXTURE_ROWS[:, 0], _MIXTURE_ROWS[:, 0]])),
+            Feature(
+                "right", np.concatenate([_MIXTURE_ROWS[:, 1], _MIXTURE_ROWS[:, 1]])
+            ),
+        ]
+        twice = scikit.GaussianMixture(n_components=3, random_seed=0).fit(doubled)
+
+        assert twice.mean_log_likelihood == pytest.approx(
+            once.mean_log_likelihood, abs=0.05
+        )
+
+    def test_the_covariance_shape_is_set_rather_than_exposed(self) -> None:
+        """``full`` on both backends. The engine's other three are the same
+        square the generative classifiers draw and each needs its own M step,
+        so they are absent from both backends rather than from one."""
+        assert "covariance_type" not in scikit.GaussianMixture.model_fields
+        assert "covariance_type" not in reference.GaussianMixture.model_fields
+
+        wrapped = scikit.GaussianMixture(n_components=3, random_seed=0).fit(
+            MIXTURE_FEATURES
+        )
+
+        assert np.asarray(wrapped.covariances).shape == (3, 2, 2)
+
+    def test_the_smoothing_reaches_the_engine_as_reg_covar(self) -> None:
+        """Visible in the answer, and exactly. Adding ``s`` times the identity
+        to a covariance raises every one of its eigenvalues by ``s``, so a
+        heavy smoothing floors the smallest across every component at that
+        number whatever fit the walk happened to find."""
+        light = scikit.GaussianMixture(
+            n_components=2, random_seed=0, covariance_smoothing=1e-6
+        ).fit(MIXTURE_FEATURES)
+        heavy = scikit.GaussianMixture(
+            n_components=2, random_seed=0, covariance_smoothing=5.0
+        ).fit(MIXTURE_FEATURES)
+
+        def smallest_spread(model: object) -> float:
+            return min(
+                float(np.linalg.eigvalsh(component).min())
+                for component in np.asarray(model.covariances)  # type: ignore[attr-defined]
+            )
+
+        assert smallest_spread(heavy) >= 5.0
+        assert smallest_spread(light) < 5.0
+
+    def test_neither_backend_escapes_a_bad_k_means_start(self) -> None:
+        """The claim the contract declines to make, measured on both sides. Two
+        long flat bands, and the engine at its own default initialisation is no
+        better than this library's, because it is the same initialisation."""
+        expected = reference.GaussianMixture(n_components=2, random_seed=0).fit(
+            BAND_FEATURES
+        )
+        wrapped = scikit.GaussianMixture(n_components=2, random_seed=0).fit(
+            BAND_FEATURES
+        )
+
+        for model in (expected, wrapped):
+            found = np.asarray(model.predict(BAND_FEATURES)).astype(int)
+            best = max(
+                float((found == _BAND_TRUTH).mean()),
+                float((found == 1 - _BAND_TRUTH).mean()),
+            )
+
+            assert best < 0.7

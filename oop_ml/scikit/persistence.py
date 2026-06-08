@@ -7,7 +7,7 @@ state.
 
 What decides whether a wrapper can be saved
 --------------------------------------------
-Whether it still needs its engine to answer. Eighteen of these read what they
+Whether it still needs its engine to answer. Nineteen of these read what they
 need off the fitted engine and let it go, so what they hold afterwards is the
 whole of the fitted model and restoring it restores the model. The other
 seventeen keep the engine and predict through it, and an engine cannot travel in
@@ -22,7 +22,7 @@ and a test holds this list against the exported one.
 
 Where that leaves a caller who wants both speed and a saved model
 ------------------------------------------------------------------
-Fit with the from-scratch namesake, which persists all thirty-nine of its
+Fit with the from-scratch namesake, which persists all forty of its
 models, or persist the engine with the tool scikit-learn ships for it. The
 refusal says so rather than leaving it to be worked out.
 """
@@ -61,6 +61,7 @@ from oop_ml.scikit.regression import (
 from oop_ml.scikit.unsupervised import (
     DBSCAN,
     AgglomerativeClustering,
+    GaussianMixture,
     RestrictedBoltzmannMachine,
 )
 
@@ -91,6 +92,7 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         # clustering, whose fitted self is the rows it saw and their labels
         DBSCAN,
         AgglomerativeClustering,
+        GaussianMixture,
         # generative, whose fitted self is a weight block and two biases
         RestrictedBoltzmannMachine,
         # configuration a model may hold, encoded inside its document
