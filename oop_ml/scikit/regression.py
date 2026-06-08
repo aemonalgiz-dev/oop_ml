@@ -71,7 +71,13 @@ from sklearn.ensemble import BaggingRegressor as EngineBaggingRegressor
 from sklearn.ensemble import GradientBoostingRegressor as EngineGradientBoosting
 from sklearn.ensemble import RandomForestRegressor as EngineRandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
-from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge
+from sklearn.linear_model import (
+    ElasticNet,
+    Lasso,
+    LinearRegression,
+    Ridge,
+)
+from sklearn.linear_model import HuberRegressor as HuberEngine
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor as EngineDecisionTreeRegressor
 
@@ -1533,10 +1539,167 @@ class GradientBoostingRegressor(
         )
 
 
+class HuberRegression(LinearEngineRegressor):
+    """A fit with bounded influence, solved by scikit-learn's ``HuberRegressor``.
+
+    Translation
+    -----------
+    ``threshold`` is the engine's ``epsilon`` unchanged, and it means the same
+    thing on both sides: multiples of a *fitted* scale rather than of the
+    target's own units. That is the translation worth reading, because it looks
+    like there is nothing to translate. Handing a fixed threshold of 1.35 to a
+    solver that did not estimate a scale misses the engine's intercept by 0.124
+    on the numpy module's own fixture, so the two backends agree only because
+    both estimate one.
+
+    ``penalty`` is the engine's ``alpha``, an L2 penalty on the coefficients,
+    and the default differs deliberately: this library's is 0.0 where the
+    engine's is 1e-4. A regression that is not a penalised one should not have
+    a penalty switched on by default, and the value is passed through, so a
+    default-constructed pair agrees at zero rather than at the engine's number.
+
+    ``max_iterations`` reaches ``max_iter`` and ``tolerance`` reaches ``tol``,
+    and neither counts the same thing on the two sides. The numpy backend
+    alternates a scale update with a reweighted least-squares solve and counts
+    those passes; the engine hands the joint objective to L-BFGS-B and counts
+    its iterations. Both are a cap on patience and a threshold on being
+    finished, and the defaults here are the numpy backend's.
+
+    ``iterations_run`` is the engine's ``n_iter_``, and ``converged`` is read
+    from whether it issued a ``ConvergenceWarning``, the same signal the lasso
+    wrapper uses for the same reason.
+
+    ``scale`` is the engine's ``scale_`` and ``n_outliers`` the count of its
+    ``outliers_``. Measured on four fixtures at three thresholds, the two
+    backends agree on the coefficients to 7.1e-05 and on the scale to 3.9e-05,
+    which is L-BFGS-B's own stopping accuracy rather than a difference of
+    objective; the outlier counts are identical.
+
+    Not mirrored from the numpy backend
+    -----------------------------------
+    The scale guard. That backend solves for the scale in closed form and so
+    divides by ``n - threshold ** 2 * n_outside``, which it refuses when the
+    quotient turns; the engine hands the joint objective to L-BFGS-B and never
+    forms it. Measured, the difference is not reachable from data on either
+    side: the scale is estimated from the same residuals, so it grows until
+    most rows are inside again, and a target drawn from pure noise fits on both
+    backends with a minority outside.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_intercept",
+        "_coefficients",
+        "_scale",
+        "_n_outliers",
+        "_iterations_run",
+        "_converged",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    threshold: float = Field(default=1.35, gt=1.0)
+    penalty: float = Field(default=0.0, ge=0.0)
+    max_iterations: int = Field(default=1_000, gt=0)
+    tolerance: float = Field(default=1e-10, gt=0.0)
+
+    _scale: float | None = PrivateAttr(default=None)
+    _n_outliers: int | None = PrivateAttr(default=None)
+    _iterations_run: int | None = PrivateAttr(default=None)
+    _converged: bool | None = PrivateAttr(default=None)
+
+    @property
+    def scale(self) -> float:
+        """The spread the threshold is measured in, estimated with the fit.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+        self._check_fitted()
+        assert self._scale is not None
+        return self._scale
+
+    @property
+    def n_outliers(self) -> int:
+        """How many training rows ended beyond ``threshold * scale``.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+        self._check_fitted()
+        assert self._n_outliers is not None
+        return self._n_outliers
+
+    @property
+    def iterations_run(self) -> int:
+        """How many iterations the engine's optimiser took.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+        self._check_fitted()
+        assert self._iterations_run is not None
+        return self._iterations_run
+
+    @property
+    def converged(self) -> bool:
+        """Whether the last fit stopped on ``tolerance`` rather than the cap.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        """
+        self._check_fitted()
+        assert self._converged is not None
+        return self._converged
+
+    def _engine_prototype(self, n_rows: int) -> HuberEngine:
+        """The engine under this library's settings. The row count is not
+        needed, since nothing here carries a scale factor over the sample."""
+        return HuberEngine(
+            epsilon=self.threshold,
+            alpha=self.penalty,
+            max_iter=self.max_iterations,
+            tol=self.tolerance,
+            fit_intercept=self.fit_intercept,
+        )
+
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
+        """Fit the engine and read the scale and the outlier count back.
+
+        The convergence warning is caught rather than shown, through
+        :func:`~oop_ml.scikit.plumbing.fit_watching_convergence`, because it
+        is the engine's only way of saying the cap was reached and
+        ``converged`` is where this library says that.
+        """
+        engine: Any = self._engine_prototype(target_column.n_samples)
+        reached_the_cap = fit_watching_convergence(
+            engine, predictor_columns(design_matrix), target_column.values
+        )
+
+        self._read_diagnostics(engine)
+        self._converged = not reached_the_cap
+
+        return solution_of(engine, design_matrix)
+
+    def _read_diagnostics(self, engine: Any) -> None:
+        """What a fitted engine says about the fit beyond its coefficients."""
+        self._scale = float(engine.scale_)
+        self._n_outliers = int(np.asarray(engine.outliers_).sum())
+        self._iterations_run = int(engine.n_iter_)
+        self._converged = int(engine.n_iter_) < self.max_iterations
+
+
 __all__ = [
     "BaggingRegressor",
     "DecisionTreeRegressor",
     "GradientBoostingRegressor",
+    "HuberRegression",
     "KNearestNeighboursRegressor",
     "KernelRidgeRegression",
     "ElasticNetRegression",

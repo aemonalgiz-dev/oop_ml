@@ -107,6 +107,7 @@ from oop_ml.numpy.regression.penalised.elastic_net_regression import (
 )
 from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
+from oop_ml.numpy.regression.robust.huber_regression import HuberRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
 PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
@@ -117,6 +118,7 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         MultipleLinearRegression,
         GradientDescentRegression,
         RidgeRegression,
+        HuberRegression,
         LassoRegression,
         ElasticNetRegression,
         KNearestNeighboursRegressor,

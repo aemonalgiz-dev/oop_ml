@@ -16,6 +16,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from sklearn.linear_model import ElasticNet as EngineElasticNet
+from sklearn.linear_model import HuberRegressor as HuberEngine
 
 from oop_ml import Feature, scikit
 from oop_ml import numpy as reference
@@ -72,6 +73,50 @@ _WIDE_GENERATOR = np.random.default_rng(20260902)
 _WIDE_LEFT = _WIDE_GENERATOR.normal(size=40)
 _WIDE_RIGHT = _WIDE_GENERATOR.normal(size=40)
 WIDE_SCALE_TARGET = Feature("target", 1.0 + 2.0 * _WIDE_LEFT + 3.0 * _WIDE_RIGHT)
+
+
+_HUBER_GENERATOR = np.random.default_rng(5)
+_SPOILED_ROWS = _HUBER_GENERATOR.normal(size=(40, 2))
+_SPOILED_VALUES = (
+    1.0
+    + 2.0 * _SPOILED_ROWS[:, 0]
+    - 3.0 * _SPOILED_ROWS[:, 1]
+    + _HUBER_GENERATOR.normal(scale=0.2, size=40)
+)
+_SPOILED_VALUES[[3, 11, 27, 34]] += 30.0
+
+#: A plane with four of forty targets shifted by thirty, which is the fixture
+#: the numpy module's own docstring reports least squares failing on.
+SPOILED_FEATURES = [
+    Feature("first", _SPOILED_ROWS[:, 0]),
+    Feature("second", _SPOILED_ROWS[:, 1]),
+]
+SPOILED_TARGET = Feature("target", _SPOILED_VALUES)
+
+
+def _reweighted_at_a_fixed_threshold(
+    rows: np.ndarray, targets: np.ndarray, threshold: float
+) -> np.ndarray:
+    """Huber's reweighting with the threshold read as an absolute distance.
+
+    The plausible misreading, kept here so that what it costs can be measured
+    rather than described.
+    """
+    design = np.column_stack([np.ones(rows.shape[0]), rows])
+    weights = np.zeros(design.shape[1])
+
+    for _ in range(500):
+        magnitude = np.abs(targets - design @ weights)
+        influence = np.where(
+            magnitude <= threshold, 1.0, threshold / np.maximum(magnitude, 1e-300)
+        )
+        scaled = design * influence[:, None]
+        moved = np.linalg.solve(design.T @ scaled, scaled.T @ targets)
+        if np.max(np.abs(moved - weights)) < 1e-13:
+            return moved
+        weights = moved
+
+    return weights
 
 
 class TestTheLassoPenaltyScale:
@@ -384,3 +429,76 @@ class TestTheCollinearRefusal:
         assert wrapped.coefficients["left"] == pytest.approx(
             expected.coefficients["left"], rel=1e-6
         )
+
+
+class TestTheHuberThresholdAndScale:
+    """``threshold`` is the engine's ``epsilon`` unchanged, and the reason that
+    is worth a test is that it looks like it needs none: both sides measure it
+    in multiples of a *fitted* scale, and a solver that used a fixed one would
+    still fit, still look reasonable and still pass a loose contract."""
+
+    @pytest.mark.parametrize("threshold", [1.1, 1.35, 2.0, 5.0])
+    def test_both_backends_reach_the_same_fit(self, threshold: float) -> None:
+        expected = reference.HuberRegression(threshold=threshold).fit(
+            SPOILED_FEATURES, SPOILED_TARGET
+        )
+        wrapped = scikit.HuberRegression(threshold=threshold).fit(
+            SPOILED_FEATURES, SPOILED_TARGET
+        )
+
+        assert wrapped.intercept == pytest.approx(expected.intercept, abs=1e-3)
+        for name in ("first", "second"):
+            assert wrapped.coefficients[name] == pytest.approx(
+                expected.coefficients[name], abs=1e-3
+            )
+        assert wrapped.scale == pytest.approx(expected.scale, abs=1e-3)
+        assert wrapped.n_outliers == expected.n_outliers
+
+    def test_a_fixed_threshold_would_have_missed_it(self) -> None:
+        """The mistake this file exists to catch, in the shape it would take.
+        Reweighting at a flat threshold of 1.35 rather than at 1.35 times the
+        fitted scale produces a perfectly respectable fit that is out by more
+        than a tenth in the intercept."""
+        engine = HuberEngine(epsilon=1.35, alpha=0.0, max_iter=1000, tol=1e-10).fit(
+            _SPOILED_ROWS, _SPOILED_VALUES
+        )
+        naive = _reweighted_at_a_fixed_threshold(
+            _SPOILED_ROWS, _SPOILED_VALUES, threshold=1.35
+        )
+
+        assert abs(naive[0] - float(engine.intercept_)) > 0.1
+        assert engine.scale_ < 0.2
+
+    def test_the_penalty_default_is_this_library_s_and_not_the_engine_s(
+        self,
+    ) -> None:
+        """The engine's ``alpha`` defaults to 1e-4 and this library's
+        ``penalty`` to zero, because a regression that is not a penalised one
+        should not have one switched on. The value is passed through, so a
+        default-constructed pair agrees at zero."""
+        assert scikit.HuberRegression().penalty == 0.0
+        assert HuberEngine().alpha == pytest.approx(1e-4)
+
+        with_penalty = scikit.HuberRegression(penalty=1.0).fit(
+            SPOILED_FEATURES, SPOILED_TARGET
+        )
+        without = scikit.HuberRegression().fit(SPOILED_FEATURES, SPOILED_TARGET)
+
+        assert with_penalty.coefficients["first"] != pytest.approx(
+            without.coefficients["first"], abs=1e-6
+        )
+
+    def test_neither_backend_reaches_the_scale_guard_on_pure_noise(self) -> None:
+        """The one place the two differ is not reachable from data. The numpy
+        backend solves for the scale in closed form and refuses when its
+        denominator turns; the engine never forms that quotient. On a target
+        with no plane in it at all, both fit and both leave a minority
+        outside."""
+        generator = np.random.default_rng(1)
+        scattered = Feature("target", generator.normal(scale=100.0, size=40))
+
+        expected = reference.HuberRegression().fit(SPOILED_FEATURES, scattered)
+        wrapped = scikit.HuberRegression().fit(SPOILED_FEATURES, scattered)
+
+        assert expected.n_outliers < 20
+        assert wrapped.n_outliers < 20
