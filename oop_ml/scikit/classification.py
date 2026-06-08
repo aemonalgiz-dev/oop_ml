@@ -79,6 +79,9 @@ from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+from sklearn.discriminant_analysis import (
+    LinearDiscriminantAnalysis as EngineLinearDiscriminant,
+)
 from sklearn.ensemble import BaggingClassifier as EngineBaggingClassifier
 from sklearn.ensemble import RandomForestClassifier as EngineRandomForestClassifier
 from sklearn.linear_model import LogisticRegression as EngineLogisticRegression
@@ -109,7 +112,12 @@ from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
-from oop_ml.core.gaussian import gaussian_log_scores, normalised_from_log_scores
+from oop_ml.core.gaussian import (
+    discriminant_weights,
+    gaussian_log_scores,
+    linear_discriminant_scores,
+    normalised_from_log_scores,
+)
 from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.kernel.matrix import KernelMatrix
 from oop_ml.core.kernel.support_vectors import (
@@ -2007,19 +2015,6 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
         )
 
 
-__all__ = [
-    "BaggingClassifier",
-    "DecisionTreeClassifier",
-    "KNearestNeighboursClassifier",
-    "LogisticRegression",
-    "MultinomialLogisticRegression",
-    "NewtonLogisticRegression",
-    "OneVsRestClassifier",
-    "RandomForestClassifier",
-    "SupportVectorClassifier",
-]
-
-
 class GaussianNaiveBayes(MultiClassClassifier[Sequence[Feature], Feature]):
     """One Gaussian per class per column, fitted by ``GaussianNB``.
 
@@ -2154,3 +2149,203 @@ class GaussianNaiveBayes(MultiClassClassifier[Sequence[Feature], Feature]):
         return Predictions.already_checked(
             np.argmax(self.log_scores(input_values), axis=1).astype(np.float64)
         )
+
+
+class LinearDiscriminantAnalysis(MultiClassClassifier[Sequence[Feature], Feature]):
+    """One mean per class over one shared covariance, fitted by the engine's
+    ``LinearDiscriminantAnalysis``.
+
+    Translation
+    -----------
+    There is no hyperparameter to translate, because the model has none. What
+    does need saying is the one number this wrapper changes on the way out, and
+    it was measured rather than assumed.
+
+    The engine's ``covariance_`` is the **biased** pooled matrix, the summed
+    within-class deviations divided by ``n``, and its own default ``svd``
+    solver whitens by the **unbiased** one, divided by ``n - K``. So the
+    attribute an engine exposes is not the matrix that engine's discriminant
+    is built from, and this wrapper multiplies it by ``n / (n - K)`` to recover
+    the one the numpy backend reports. Read straight through, the pooled
+    covariance would be too small by a fifth on the contract's own fixture.
+
+    That same split runs through the engine's two solvers. ``lsqr`` inverts the
+    biased matrix and ``svd`` the unbiased one, so the pair disagree on the
+    same rows: measured, their probabilities differ by 0.048. This backend
+    takes ``svd``, the engine's default, because the ``n - K`` denominator is
+    the standard pooled estimator and is what the numpy backend derives.
+
+    ``coef_`` is not read here, and a reader comparing this model's
+    ``discriminant_scores`` against the engine's ``decision_function`` should
+    know why they differ. The engine subtracts the prior-weighted overall mean
+    from every class's mean before solving, which shifts a row's whole set of
+    scores by one constant. It cancels in the softmax and in the ranking, so
+    the two backends' probabilities agree to 2.2e-16 and their predictions are
+    identical, while the raw scores sit a row-dependent constant apart.
+
+    Prediction does not consult the engine. What this wrapper keeps is the
+    priors, the means and the pooled covariance, which is the whole of the fit,
+    and the discriminant follows from those three by the arithmetic the numpy
+    module docstring derives. That is why this one can be saved.
+
+    One refusal is added
+    ---------------------
+    The engine fits a singular pooled covariance without complaint, taking the
+    minimum-norm discriminant its rank-revealing decomposition happens to give.
+    The numpy backend refuses that case by name, on the grounds that infinitely
+    many discriminants separate the classes equally well, and this wrapper
+    refuses it identically through the same guard in
+    :func:`~oop_ml.core.gaussian.discriminant_weights`. Measured on a fixture
+    with one column duplicated, the engine alone answers and scores 0.955.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_class_priors",
+        "_means",
+        "_pooled_covariance",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _class_priors: FloatArray | None = PrivateAttr(default=None)
+    _means: FloatArray | None = PrivateAttr(default=None)
+    _pooled_covariance: FloatArray | None = PrivateAttr(default=None)
+
+    @property
+    def n_classes(self) -> int:
+        """How many classes the fit saw."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return int(self._class_priors.shape[0])
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def class_priors(self) -> FloatArray:
+        """How common each class was, one per class, summing to one."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return self._class_priors
+
+    @property
+    def means(self) -> FloatArray:
+        """Each class's average for each column, ``(n_classes, n_features)``."""
+        self._check_fitted()
+        assert self._means is not None
+        return self._means
+
+    @property
+    def pooled_covariance(self) -> FloatArray:
+        """The within-class covariance every class shares, divided by ``n - K``."""
+        self._check_fitted()
+        assert self._pooled_covariance is not None
+        return self._pooled_covariance
+
+    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+        """Fit the engine and read its three summaries back.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If any feature's length differs from the target's.
+        NonBinaryLabelsError
+            If the target holds a negative or fractional value.
+        SingleClassError
+            If the target holds fewer than two classes, or leaves a gap in the
+            run from zero.
+        TooFewValuesError
+            If there are no more rows than classes. The engine refuses this
+            too, in a bare ``ValueError``; the guard is here so the refusal
+            arrives in this library's own words.
+        CollinearFeaturesError
+            If the pooled covariance comes out singular, which the engine
+            alone would have answered anyway.
+        """
+        feature_set = FeatureSet(input_values)
+        feature_set.check_aligned_with(target_values)
+
+        target_column = target_values.column
+        target_column.check_is_label_encoded()
+
+        n_classes = target_column.n_classes
+        n_rows = target_column.n_samples
+
+        if n_rows <= n_classes:
+            raise TooFewValuesError(
+                f"a pooled covariance over {n_classes} classes needs more than "
+                f"{n_classes} rows, and {n_rows} were supplied. Every class "
+                "spends one degree of freedom on its own mean"
+            )
+
+        engine_type: Any = EngineLinearDiscriminant
+        engine = engine_type(store_covariance=True)
+        engine.fit(matrix_of(feature_set), target_column.values)
+
+        means = np.asarray(engine.means_, dtype=np.float64)
+        biased = np.asarray(engine.covariance_, dtype=np.float64)
+        pooled = biased * n_rows / (n_rows - n_classes)
+
+        # The refusal the engine does not make. Raises before anything is
+        # assigned, so a singular design leaves the model unfitted rather than
+        # fitted and answering arbitrarily.
+        discriminant_weights(means, pooled)
+
+        self._feature_names = tuple(feature.name for feature in feature_set)
+        self._class_priors = np.asarray(engine.priors_, dtype=np.float64)
+        self._means = means
+        self._pooled_covariance = pooled
+
+        self._mark_fitted()
+        return self
+
+    def discriminant_scores(self, input_values: Sequence[Feature]) -> FloatArray:
+        """Each class's discriminant, one row per query."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._means is not None
+        assert self._pooled_covariance is not None
+        assert self._class_priors is not None
+
+        return linear_discriminant_scores(
+            matched_matrix(self._feature_names, input_values),
+            self._means,
+            self._pooled_covariance,
+            self._class_priors,
+        )
+
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
+        """Each class's share of the total plausibility, one row per query."""
+        return ProbabilityMatrix(
+            normalised_from_log_scores(self.discriminant_scores(input_values))
+        )
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The most plausible class for each row."""
+        return Predictions.already_checked(
+            np.argmax(self.discriminant_scores(input_values), axis=1).astype(np.float64)
+        )
+
+
+__all__ = [
+    "BaggingClassifier",
+    "DecisionTreeClassifier",
+    "GaussianNaiveBayes",
+    "KNearestNeighboursClassifier",
+    "LinearDiscriminantAnalysis",
+    "LogisticRegression",
+    "MultinomialLogisticRegression",
+    "NewtonLogisticRegression",
+    "OneVsRestClassifier",
+    "RandomForestClassifier",
+    "SupportVectorClassifier",
+]

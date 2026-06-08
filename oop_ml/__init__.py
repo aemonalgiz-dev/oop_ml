@@ -257,6 +257,9 @@ from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
 from oop_ml.numpy.classification.generative.gaussian_naive_bayes import (
     GaussianNaiveBayes,
 )
+from oop_ml.numpy.classification.generative.linear_discriminant_analysis import (
+    LinearDiscriminantAnalysis,
+)
 from oop_ml.numpy.classification.kernels.support_vector_classifier import (
     SupportVectorClassifier,
 )
@@ -428,6 +431,7 @@ __all__ = [
     "GradientBoostingRegressor",
     # Classification
     "GaussianNaiveBayes",
+    "LinearDiscriminantAnalysis",
     "LogisticRegression",
     "NewtonLogisticRegression",
     "MultinomialLogisticRegression",

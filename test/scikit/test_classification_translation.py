@@ -13,11 +13,14 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from sklearn.discriminant_analysis import (
+    LinearDiscriminantAnalysis as EngineLinearDiscriminant,
+)
 
 from oop_ml import Feature, scikit
 from oop_ml import numpy as reference
 from oop_ml.core.data.row_block import RowBlock
-from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.exceptions import CollinearFeaturesError, InvalidValuesError
 from oop_ml.core.kernel.functions import Kernel
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.node import DecisionNode
@@ -34,10 +37,9 @@ BAND_FEATURES = [Feature("position", _POSITIONS)]
 BAND_TARGET = Feature("band", [0.0] * 5 + [1.0] * 5 + [2.0] * 5)
 
 #: Two clusters with a gap, small enough for the numpy ascent to be stable.
-CLUSTER_FEATURES = [
-    Feature("across", [0.0, 1.0, 0.0, 1.0, 3.0, 4.0, 3.0, 4.0]),
-    Feature("up", [0.0, 0.0, 1.0, 1.0, 3.0, 3.0, 4.0, 4.0]),
-]
+_ACROSS = np.array([0.0, 1.0, 0.0, 1.0, 3.0, 4.0, 3.0, 4.0])
+_UP = np.array([0.0, 0.0, 1.0, 1.0, 3.0, 3.0, 4.0, 4.0])
+CLUSTER_FEATURES = [Feature("across", _ACROSS), Feature("up", _UP)]
 CLUSTER_TARGET = Feature("cluster", [0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0])
 
 #: Thirty rows over three classes, the third of them rare enough that a
@@ -375,3 +377,114 @@ class TestTheConvertedTree:
             assert member.root.n_samples == THREE_FEATURE_TARGET.column.n_samples
             ours = [member.feature_importances[name] for name in ("a", "b", "c")]
             assert np.allclose(ours, engine.feature_importances_, atol=1e-12)
+
+
+class TestTheDiscriminantDenominator:
+    """The pooled covariance, and the attribute that is not it.
+
+    The engine divides the summed within-class deviations by ``n`` when it
+    stores ``covariance_``, and by ``n - K`` when its default solver whitens
+    with them. So reading the attribute straight through would give a matrix
+    the engine's own discriminant does not use, and nothing would raise.
+    """
+
+    def test_the_pooled_covariance_is_rescaled_off_the_engine(self) -> None:
+        """Eight rows and two classes, every deviation half a unit, so the
+        summed squares are 2 on each diagonal. The engine stores 2 / 8 and the
+        pooled estimate is 2 / 6."""
+        wrapped = scikit.LinearDiscriminantAnalysis().fit(
+            CLUSTER_FEATURES, CLUSTER_TARGET
+        )
+        engine = EngineLinearDiscriminant(store_covariance=True).fit(
+            np.column_stack([_ACROSS, _UP]), np.asarray(CLUSTER_TARGET.column.values)
+        )
+
+        assert wrapped.pooled_covariance[0][0] == pytest.approx(1.0 / 3.0)
+        assert np.asarray(engine.covariance_)[0][0] == pytest.approx(0.25)
+        assert wrapped.pooled_covariance[0][0] == pytest.approx(
+            float(np.asarray(engine.covariance_)[0][0]) * 8 / (8 - 2)
+        )
+
+    @pytest.mark.parametrize(
+        ("features", "target"),
+        [(CLUSTER_FEATURES, CLUSTER_TARGET), (BAND_FEATURES, BAND_TARGET)],
+        ids=["two classes", "three classes"],
+    )
+    def test_both_backends_reach_the_same_summaries(
+        self, features: list[Feature], target: Feature
+    ) -> None:
+        expected = reference.LinearDiscriminantAnalysis().fit(features, target)
+        wrapped = scikit.LinearDiscriminantAnalysis().fit(features, target)
+
+        assert np.allclose(wrapped.class_priors, expected.class_priors, atol=0.0)
+        assert np.allclose(wrapped.means, expected.means, atol=0.0)
+        assert np.allclose(
+            wrapped.pooled_covariance, expected.pooled_covariance, atol=1e-14
+        )
+
+    def test_this_backend_follows_the_engine_s_svd_solver_and_not_its_lsqr(
+        self,
+    ) -> None:
+        """The engine's two solvers do not agree with each other.
+
+        ``lsqr`` inverts the biased matrix and ``svd`` the unbiased one, so on
+        three overlapping bands their probabilities sit 0.074 apart. This
+        backend takes ``svd``, the engine's default and the standard pooled
+        estimator, and matches it exactly.
+        """
+        positions = np.asarray(_POSITIONS).reshape(-1, 1)
+        labels = np.asarray(BAND_TARGET.column.values)
+
+        by_svd = EngineLinearDiscriminant().fit(positions, labels)
+        by_lsqr = EngineLinearDiscriminant(solver="lsqr").fit(positions, labels)
+        wrapped = scikit.LinearDiscriminantAnalysis().fit(BAND_FEATURES, BAND_TARGET)
+
+        ours = np.asarray(wrapped.predict_probabilities(BAND_FEATURES))
+
+        assert np.max(np.abs(by_svd.predict_proba(positions) - ours)) == 0.0
+        assert np.max(np.abs(by_lsqr.predict_proba(positions) - ours)) > 0.07
+
+    def test_the_difference_of_two_discriminants_is_the_engine_s_own_boundary(
+        self,
+    ) -> None:
+        """The engine subtracts the prior-weighted overall mean from every
+        class's mean, which shifts a row's whole set of scores by one constant.
+        Subtract one class's score from another's and the shift is gone, which
+        is why the probabilities agree while the raw scores need not."""
+        rows = np.column_stack([_ACROSS, _UP])
+        wrapped = scikit.LinearDiscriminantAnalysis().fit(
+            CLUSTER_FEATURES, CLUSTER_TARGET
+        )
+        engine = EngineLinearDiscriminant().fit(
+            rows, np.asarray(CLUSTER_TARGET.column.values)
+        )
+
+        scores = np.asarray(wrapped.discriminant_scores(CLUSTER_FEATURES))
+
+        assert np.allclose(
+            scores[:, 1] - scores[:, 0], engine.decision_function(rows), atol=1e-12
+        )
+
+
+class TestTheSingularRefusal:
+    """A refusal this backend adds, so that both backends answer alike."""
+
+    def test_the_engine_alone_would_answer_a_design_with_no_unique_answer(
+        self,
+    ) -> None:
+        """A duplicated column leaves the pooled covariance singular, and the
+        engine's rank-revealing decomposition picks one of the infinitely many
+        discriminants that separate the classes equally well. It fits and it
+        scores, which is the quiet half."""
+        rows = np.column_stack([_ACROSS, _UP, _ACROSS])
+        labels = np.asarray(CLUSTER_TARGET.column.values)
+
+        engine = EngineLinearDiscriminant().fit(rows, labels)
+
+        assert engine.score(rows, labels) == 1.0
+
+    def test_and_this_backend_refuses_it_by_name(self) -> None:
+        duplicated = [*CLUSTER_FEATURES, Feature("again", np.asarray(_ACROSS))]
+
+        with pytest.raises(CollinearFeaturesError):
+            scikit.LinearDiscriminantAnalysis().fit(duplicated, CLUSTER_TARGET)

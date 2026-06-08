@@ -7,7 +7,7 @@ state.
 
 What decides whether a wrapper can be saved
 --------------------------------------------
-Whether it still needs its engine to answer. Thirteen of these read what they
+Whether it still needs its engine to answer. Fourteen of these read what they
 need off the fitted engine and let it go, so what they hold afterwards is the
 whole of the fitted model and restoring it restores the model. The other
 seventeen keep the engine and predict through it, and an engine cannot travel in
@@ -22,7 +22,7 @@ and a test holds this list against the exported one.
 
 Where that leaves a caller who wants both speed and a saved model
 ------------------------------------------------------------------
-Fit with the from-scratch namesake, which persists all thirty-four of its
+Fit with the from-scratch namesake, which persists all thirty-five of its
 models, or persist the engine with the tool scikit-learn ships for it. The
 refusal says so rather than leaving it to be worked out.
 """
@@ -39,6 +39,7 @@ from oop_ml.core.schedule import (
 )
 from oop_ml.scikit.classification import (
     GaussianNaiveBayes,
+    LinearDiscriminantAnalysis,
     LogisticRegression,
     MultinomialLogisticRegression,
     NewtonLogisticRegression,
@@ -73,6 +74,7 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         MultinomialLogisticRegression,
         # generative, whose fitted self is three summaries per class
         GaussianNaiveBayes,
+        LinearDiscriminantAnalysis,
         # preprocessing, which learn a pair of numbers per column
         Standardizer,
         MinMaxScaler,
