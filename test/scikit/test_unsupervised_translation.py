@@ -39,13 +39,20 @@ from typing import Any
 import numpy as np
 import pytest
 from sklearn.cluster import DBSCAN as EngineDBSCAN
+from sklearn.cluster import AgglomerativeClustering as EngineAgglomerative
 from sklearn.cluster import KMeans as EngineKMeans
 from sklearn.neural_network import BernoulliRBM
 
 from oop_ml import Feature, scikit
 from oop_ml import numpy as reference
+from oop_ml.core.clustering.linkage import Linkage
 from oop_ml.core.distance.calculations import MinkowskiDistance
-from oop_ml.core.exceptions import AllSameValuesError, InvalidValuesError
+from oop_ml.core.distance.metric import DistanceMetric
+from oop_ml.core.exceptions import (
+    AllSameValuesError,
+    InvalidValuesError,
+    NotFittedError,
+)
 from oop_ml.core.kernel.functions import (
     Kernel,
     LinearKernel,
@@ -95,6 +102,25 @@ _DENSITY_ROWS = np.vstack(
 DENSITY_FEATURES = [
     Feature("left", _DENSITY_ROWS[:, 0]),
     Feature("right", _DENSITY_ROWS[:, 1]),
+]
+
+
+_MERGE_ROWS = np.array(
+    [
+        [0.0, 0.0],
+        [0.2, 0.0],
+        [0.0, 0.3],
+        [5.0, 5.0],
+        [5.3, 5.0],
+        [5.0, 5.4],
+        [10.0, 0.0],
+    ]
+)
+#: Two threes and a stray, small enough that the whole merge sequence is short
+#: and every height is checkable by hand.
+MERGE_FEATURES = [
+    Feature("left", _MERGE_ROWS[:, 0]),
+    Feature("right", _MERGE_ROWS[:, 1]),
 ]
 
 
@@ -540,3 +566,132 @@ class TestTheBorderConventionIsNotTheEngines:
 
         assert answered[0] >= 0.0
         assert answered[1] == -1.0
+
+
+class TestTheAgglomerativeTranslation:
+    """``n_clusters`` and ``linkage`` pass through under their own names, and
+    the metric goes by name. What needs pinning is the prefix: the engine
+    always builds the whole tree, so its ``distances_`` is longer than this
+    model's and only its first ``n - n_clusters`` entries are the merges a
+    stop-early fit made."""
+
+    @pytest.mark.parametrize("linkage", list(Linkage))
+    @pytest.mark.parametrize("n_clusters", [2, 3, 4])
+    def test_both_backends_reach_the_same_grouping_and_heights(
+        self, linkage: Linkage, n_clusters: int
+    ) -> None:
+        expected = reference.AgglomerativeClustering(
+            n_clusters=n_clusters, linkage=linkage
+        ).fit(MERGE_FEATURES)
+        wrapped = scikit.AgglomerativeClustering(
+            n_clusters=n_clusters, linkage=linkage
+        ).fit(MERGE_FEATURES)
+
+        assert all(
+            (expected.labels[one] == expected.labels[other])
+            == (wrapped.labels[one] == wrapped.labels[other])
+            for one in range(len(_MERGE_ROWS))
+            for other in range(one + 1, len(_MERGE_ROWS))
+        )
+        assert np.allclose(
+            np.asarray(wrapped.merge_distances),
+            np.asarray(expected.merge_distances),
+            atol=1e-12,
+        )
+
+    def test_the_wrapper_takes_the_prefix_of_the_engine_s_whole_tree(self) -> None:
+        """The engine records ``n - 1`` heights whatever it was asked to cut
+        at, because it builds the tree first and labels afterwards. Merging is
+        greedy, so a stop-early fit's merges are that tree's first few."""
+        engine = EngineAgglomerative(
+            n_clusters=3, linkage="average", compute_distances=True
+        ).fit(np.asarray(_MERGE_ROWS))
+        wrapped = scikit.AgglomerativeClustering(
+            n_clusters=3, linkage=Linkage.AVERAGE
+        ).fit(MERGE_FEATURES)
+
+        assert len(engine.distances_) == len(_MERGE_ROWS) - 1
+        assert len(np.asarray(wrapped.merge_distances)) == len(_MERGE_ROWS) - 3
+        assert np.allclose(
+            np.asarray(wrapped.merge_distances),
+            engine.distances_[: len(_MERGE_ROWS) - 3],
+        )
+
+    @pytest.mark.parametrize(
+        "metric",
+        [
+            DistanceMetric.EUCLIDEAN,
+            DistanceMetric.MANHATTAN,
+            DistanceMetric.CHEBYSHEV,
+            DistanceMetric.CANBERRA,
+        ],
+    )
+    def test_each_named_metric_reaches_the_engine_meaning_the_same_thing(
+        self, metric: DistanceMetric
+    ) -> None:
+        expected = reference.AgglomerativeClustering(
+            n_clusters=3, linkage=Linkage.AVERAGE, metric=metric
+        ).fit(MERGE_FEATURES)
+        wrapped = scikit.AgglomerativeClustering(
+            n_clusters=3, linkage=Linkage.AVERAGE, metric=metric
+        ).fit(MERGE_FEATURES)
+
+        assert np.allclose(
+            np.asarray(wrapped.merge_distances),
+            np.asarray(expected.merge_distances),
+            atol=1e-12,
+        )
+
+
+class TestTheMetricRefusalThisBackendAdds:
+    """The numpy backend computes the pairwise block itself and takes any
+    ``Distance``; the engine takes a metric by name and has no order parameter
+    for a general p-norm."""
+
+    def test_the_numpy_backend_accepts_a_distance_object(self) -> None:
+        model = reference.AgglomerativeClustering(
+            n_clusters=3, linkage=Linkage.AVERAGE, metric=MinkowskiDistance(3)
+        ).fit(MERGE_FEATURES)
+
+        assert model.n_clusters == 3
+
+    def test_and_this_one_refuses_it_by_name(self) -> None:
+        with pytest.raises(InvalidValuesError):
+            scikit.AgglomerativeClustering(
+                n_clusters=3, linkage=Linkage.AVERAGE, metric=MinkowskiDistance(3)
+            ).fit(MERGE_FEATURES)
+
+    def test_the_callable_route_the_neighbour_wrappers_use_does_not_exist_here(
+        self,
+    ) -> None:
+        """Measured rather than assumed, and it is why the refusal is a refusal
+        rather than a slower path. The engine hands the whole block to a
+        callable metric instead of a pair of rows, and it has no ``algorithm``
+        keyword to ask for the pairwise form."""
+
+        def between_two_rows(left: Any, right: Any) -> float:
+            return float(np.abs(np.asarray(left) - np.asarray(right)).max())
+
+        # Through an Any alias, as the wrappers reach their engines, because
+        # both calls below are deliberately the wrong shape and that is what
+        # is being demonstrated.
+        engine_type: Any = EngineAgglomerative
+
+        with pytest.raises(TypeError):
+            engine_type(n_clusters=2, linkage="average", metric=between_two_rows).fit(
+                np.asarray(_MERGE_ROWS)
+            )
+
+        with pytest.raises(TypeError):
+            engine_type(n_clusters=2, linkage="average", algorithm="brute")
+
+    def test_a_refused_metric_leaves_the_model_unfitted(self) -> None:
+        model = scikit.AgglomerativeClustering(
+            n_clusters=3, linkage=Linkage.AVERAGE, metric=MinkowskiDistance(3)
+        )
+
+        with pytest.raises(InvalidValuesError):
+            model.fit(MERGE_FEATURES)
+
+        with pytest.raises(NotFittedError):
+            _ = model.labels

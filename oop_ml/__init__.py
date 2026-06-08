@@ -36,6 +36,7 @@ from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.clustering.centroids import Centroid, Centroids
 from oop_ml.core.clustering.clustering import Clustering, InitialisationAttempt
+from oop_ml.core.clustering.linkage import Linkage
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.dataset import Dataset
@@ -280,6 +281,7 @@ from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
 from oop_ml.numpy.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
+from oop_ml.numpy.clustering.agglomerative import AgglomerativeClustering
 from oop_ml.numpy.clustering.dbscan import DBSCAN
 from oop_ml.numpy.clustering.k_means import KMeans
 from oop_ml.numpy.clustering.self_organising_map import (
@@ -413,6 +415,7 @@ __all__ = [
     "LeafNode",
     "ClassificationLeaf",
     "DistanceMetric",
+    "Linkage",
     "Distance",
     "BroadcastDistance",
     "MinkowskiDistance",
@@ -489,6 +492,7 @@ __all__ = [
     "GridSearch",
     "KMeans",
     "DBSCAN",
+    "AgglomerativeClustering",
     "Kernel",
     "KernelComponent",
     "KernelComponents",
