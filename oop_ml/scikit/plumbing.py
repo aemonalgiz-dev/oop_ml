@@ -354,34 +354,41 @@ def pairwise_callable(distance: Distance) -> Callable[[FloatArray, FloatArray], 
     return between_rows
 
 
-def neighbour_engine_parameters(
-    n_neighbours: int, metric: DistanceMetric | Distance
-) -> dict[str, Any]:
-    """This library's neighbour configuration in the engine's keywords.
+def metric_engine_parameters(metric: DistanceMetric | Distance) -> dict[str, Any]:
+    """This library's idea of near in the engine's keywords.
 
-    ``n_neighbours`` is the engine's ``n_neighbors``. A
-    :class:`~oop_ml.core.distance.metric.DistanceMetric` is translated by
+    A :class:`~oop_ml.core.distance.metric.DistanceMetric` is translated by
     name through :data:`ENGINE_METRIC_NAMES`; a
     :class:`~oop_ml.core.distance.calculations.MinkowskiDistance` becomes the
     engine's ``minkowski`` with its order as ``p``; any other
     :class:`~oop_ml.core.distance.calculations.Distance` is handed over as a
     callable through :func:`pairwise_callable`, which works and is slow.
 
+    Every engine here that takes a metric takes it under these names, which is
+    why the translation is one function rather than one per family.
+    """
+    if isinstance(metric, DistanceMetric):
+        return {"metric": ENGINE_METRIC_NAMES[metric]}
+
+    if isinstance(metric, MinkowskiDistance):
+        return {"metric": "minkowski", "p": metric.order}
+
+    return {"metric": pairwise_callable(metric), "algorithm": "brute"}
+
+
+def neighbour_engine_parameters(
+    n_neighbours: int, metric: DistanceMetric | Distance
+) -> dict[str, Any]:
+    """This library's neighbour configuration in the engine's keywords.
+
+    ``n_neighbours`` is the engine's ``n_neighbors``, and the metric is
+    :func:`metric_engine_parameters`.
+
     Shared by the neighbour regressor and the neighbour classifier, whose
     engines take identical keywords for the search and differ only in what
     they do with the rows they find.
     """
-    if isinstance(metric, DistanceMetric):
-        return {"n_neighbors": n_neighbours, "metric": ENGINE_METRIC_NAMES[metric]}
-
-    if isinstance(metric, MinkowskiDistance):
-        return {"n_neighbors": n_neighbours, "metric": "minkowski", "p": metric.order}
-
-    return {
-        "n_neighbors": n_neighbours,
-        "metric": pairwise_callable(metric),
-        "algorithm": "brute",
-    }
+    return {"n_neighbors": n_neighbours, **metric_engine_parameters(metric)}
 
 
 def engine_kernel_parameters(kernel: Kernel) -> dict[str, Any]:

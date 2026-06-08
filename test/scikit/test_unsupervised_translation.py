@@ -38,11 +38,13 @@ from typing import Any
 
 import numpy as np
 import pytest
+from sklearn.cluster import DBSCAN as EngineDBSCAN
 from sklearn.cluster import KMeans as EngineKMeans
 from sklearn.neural_network import BernoulliRBM
 
 from oop_ml import Feature, scikit
 from oop_ml import numpy as reference
+from oop_ml.core.distance.calculations import MinkowskiDistance
 from oop_ml.core.exceptions import AllSameValuesError, InvalidValuesError
 from oop_ml.core.kernel.functions import (
     Kernel,
@@ -77,6 +79,23 @@ BINARY = [Feature(name, _BINARY[:, position]) for position, name in enumerate("a
 
 def block_of(features: list[Feature]) -> np.ndarray:
     return np.column_stack([feature.values for feature in features])
+
+
+_DENSITY_GENERATOR = np.random.default_rng(31)
+_DENSITY_ROWS = np.vstack(
+    [
+        _DENSITY_GENERATOR.normal(loc=[0.0, 0.0], scale=0.6, size=(30, 2)),
+        _DENSITY_GENERATOR.normal(loc=[5.0, 0.0], scale=0.6, size=(25, 2)),
+        _DENSITY_GENERATOR.normal(loc=[2.5, 5.0], scale=0.6, size=(20, 2)),
+        _DENSITY_GENERATOR.uniform(low=-6.0, high=11.0, size=(12, 2)),
+    ]
+)
+#: Three blobs and a dozen scattered rows, so a fit has core points, border
+#: points and noise to get right rather than only groups.
+DENSITY_FEATURES = [
+    Feature("left", _DENSITY_ROWS[:, 0]),
+    Feature("right", _DENSITY_ROWS[:, 1]),
+]
 
 
 class TestTheKMeansToleranceScale:
@@ -418,3 +437,106 @@ class TestARefitRefusedAfterTheEngineRan:
             model.fit(constant)
 
         assert np.allclose(block_of(model.transform(rows)), before)
+
+
+class TestTheDensityTranslation:
+    """``radius`` is the engine's ``eps``, ``min_neighbourhood_size`` its
+    ``min_samples``, and ``metric`` goes through the same helper the neighbour
+    models use. Nothing carries a scale factor, which is worth pinning anyway
+    because the neighbourhood size is the kind of number that quietly means
+    "and one more" on one side of a boundary."""
+
+    @pytest.mark.parametrize(
+        ("radius", "minimum"), [(0.8, 4), (1.0, 5), (1.5, 5), (2.0, 8)]
+    )
+    def test_both_backends_find_the_same_core_points(
+        self, radius: float, minimum: int
+    ) -> None:
+        expected = reference.DBSCAN(radius=radius, min_neighbourhood_size=minimum).fit(
+            DENSITY_FEATURES
+        )
+        wrapped = scikit.DBSCAN(radius=radius, min_neighbourhood_size=minimum).fit(
+            DENSITY_FEATURES
+        )
+
+        assert np.array_equal(
+            np.asarray(wrapped.core_indices), np.asarray(expected.core_indices)
+        )
+        assert np.array_equal(np.asarray(wrapped.labels), np.asarray(expected.labels))
+        assert wrapped.n_clusters == expected.n_clusters
+        assert wrapped.n_noise == expected.n_noise
+
+    def test_the_neighbourhood_size_counts_the_row_itself_on_both_sides(self) -> None:
+        """The off-by-one worth checking. Both this library and the engine
+        count the row itself, so a lone pair of rows within the radius is
+        enough at a size of two and not at three."""
+        pair = [
+            Feature("left", np.array([0.0, 0.1])),
+            Feature("right", np.array([0.0, 0.0])),
+        ]
+
+        assert (
+            scikit.DBSCAN(radius=1.0, min_neighbourhood_size=2).fit(pair).n_clusters
+            == 1
+        )
+        assert (
+            scikit.DBSCAN(radius=1.0, min_neighbourhood_size=3).fit(pair).n_noise == 2
+        )
+
+    def test_a_metric_the_enum_does_not_name_still_reaches_the_engine(self) -> None:
+        """``MinkowskiDistance(3)`` becomes the engine's ``minkowski`` at
+        ``p=3``, the same route the neighbour wrappers take, and the two
+        backends still agree."""
+        order_three = MinkowskiDistance(3)
+        expected = reference.DBSCAN(
+            radius=1.2, min_neighbourhood_size=4, metric=order_three
+        ).fit(DENSITY_FEATURES)
+        wrapped = scikit.DBSCAN(
+            radius=1.2, min_neighbourhood_size=4, metric=order_three
+        ).fit(DENSITY_FEATURES)
+
+        assert np.array_equal(np.asarray(wrapped.labels), np.asarray(expected.labels))
+
+
+class TestTheBorderConventionIsNotTheEngines:
+    """The wrapper reads the engine's *core* points and their labels, and then
+    labels every row itself. Where a border point goes is the one thing the
+    algorithm leaves open, and taking the engine's answer for it would make the
+    two backends disagree about rows neither is wrong about."""
+
+    def test_the_labels_are_rebuilt_rather_than_read_through(self) -> None:
+        """On this fixture the two answers happen to coincide, which is the
+        honest state of it: nothing guarantees they will, and the reason to
+        rebuild is that the engine's rule depends on the order the rows
+        arrived in while this one does not."""
+        engine = EngineDBSCAN(eps=1.0, min_samples=5).fit(np.asarray(_DENSITY_ROWS))
+        wrapped = scikit.DBSCAN(radius=1.0, min_neighbourhood_size=5).fit(
+            DENSITY_FEATURES
+        )
+
+        assert np.array_equal(
+            np.asarray(wrapped.core_indices),
+            np.asarray(engine.core_sample_indices_),
+        )
+        assert np.array_equal(
+            np.asarray(wrapped.labels), np.asarray(engine.labels_, dtype=float)
+        )
+
+    def test_the_engine_cannot_label_a_row_it_never_saw(self) -> None:
+        """Which is the other reason the rule lives in this library. The engine
+        has no ``predict`` at all, so a fitted one is a labelling of the
+        training rows and nothing more."""
+        assert not hasattr(EngineDBSCAN, "predict")
+
+        wrapped = scikit.DBSCAN(radius=1.0, min_neighbourhood_size=5).fit(
+            DENSITY_FEATURES
+        )
+        unseen = [
+            Feature("left", np.array([0.0, 40.0])),
+            Feature("right", np.array([0.0, 40.0])),
+        ]
+
+        answered = np.asarray(wrapped.predict(unseen))
+
+        assert answered[0] >= 0.0
+        assert answered[1] == -1.0

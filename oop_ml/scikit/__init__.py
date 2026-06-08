@@ -18,7 +18,7 @@ every numpy export that this backend does not provide is listed in
 lists together cover every model exactly once. A model can be present or it can
 be declined; it cannot be forgotten.
 
-Thirty-two models are wrapped here and five are declined. Each family was
+Thirty-three models are wrapped here and five are declined. Each family was
 built behind the same contract suite the numpy backend already passes, and each
 left :data:`NOT_PROVIDED` honest as it landed. The five that remain are
 permanent absences rather than work still to do, so each reason names the
@@ -83,6 +83,7 @@ from oop_ml.scikit.regression import (
     SimpleLinearRegression,
 )
 from oop_ml.scikit.unsupervised import (
+    DBSCAN,
     KernelPrincipalComponentAnalysis,
     KMeans,
     PrincipalComponentAnalysis,
@@ -204,6 +205,7 @@ __all__: list[str] = [
     "GradientBoostingRegressor",
     "KNearestNeighboursClassifier",
     "KMeans",
+    "DBSCAN",
     "KNearestNeighboursRegressor",
     "KernelPrincipalComponentAnalysis",
     "KernelRidgeRegression",

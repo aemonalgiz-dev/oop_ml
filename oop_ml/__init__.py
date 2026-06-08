@@ -280,6 +280,7 @@ from oop_ml.numpy.classification.neighbours.k_nearest_classifier import (
 from oop_ml.numpy.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
+from oop_ml.numpy.clustering.dbscan import DBSCAN
 from oop_ml.numpy.clustering.k_means import KMeans
 from oop_ml.numpy.clustering.self_organising_map import (
     GridPosition,
@@ -487,6 +488,7 @@ __all__ = [
     "InitialisationAttempt",
     "GridSearch",
     "KMeans",
+    "DBSCAN",
     "Kernel",
     "KernelComponent",
     "KernelComponents",

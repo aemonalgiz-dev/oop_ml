@@ -62,6 +62,7 @@ from typing import Any, ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
+from sklearn.cluster import DBSCAN as EngineDBSCAN
 from sklearn.cluster import KMeans as EngineKMeans
 from sklearn.decomposition import PCA as EnginePCA
 from sklearn.decomposition import KernelPCA as EngineKernelPCA
@@ -74,12 +75,14 @@ from oop_ml.core.base.convergent_fit import ConvergentFit
 from oop_ml.core.base.estimator import Clusterer, Transformer
 from oop_ml.core.clustering.centroids import Centroid, Centroids
 from oop_ml.core.clustering.clustering import Clustering
+from oop_ml.core.clustering.density import NOISE_LABEL, labels_from_core_points
 from oop_ml.core.clustering.naming import CLUSTER_NAME_PREFIX
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import ClassScores
+from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.decomposition.components import (
     PrincipalComponent,
     PrincipalComponents,
@@ -91,6 +94,8 @@ from oop_ml.core.decomposition.kernel_components import (
     KernelComponents,
 )
 from oop_ml.core.decomposition.naming import COMPONENT_NAME_PREFIX
+from oop_ml.core.distance.calculations import Distance
+from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
 from oop_ml.core.generative.boltzmann import (
     HIDDEN_UNIT_NAME_PREFIX,
@@ -98,11 +103,12 @@ from oop_ml.core.generative.boltzmann import (
 )
 from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.schedule import ConstantSchedule, Schedule
-from oop_ml.core.types import FloatArray
+from oop_ml.core.types import FloatArray, IndexArray
 from oop_ml.scikit.plumbing import (
     engine_kernel_parameters,
     matched_matrix,
     matrix_of,
+    metric_engine_parameters,
 )
 
 MINIMUM_DECOMPOSITION_ROWS = 2
@@ -1440,4 +1446,182 @@ class RestrictedBoltzmannMachine(Transformer[Sequence[Feature]], ConvergentFit):
             f"RestrictedBoltzmannMachine("
             f"{self.n_visible_units}x{self.n_hidden_units}, "
             f"epochs_run={self.epochs_run}, converged={self.converged})"
+        )
+
+
+class DBSCAN(Clusterer[Sequence[Feature]]):
+    """Density-based groups, found by the engine's ``DBSCAN``.
+
+    Translation
+    -----------
+    ``radius`` is the engine's ``eps`` and ``min_neighbourhood_size`` its
+    ``min_samples``, both unchanged and both meaning the same thing: the second
+    counts the row itself, since a row is within zero of itself, and the engine
+    documents the same convention. ``metric`` goes through
+    :func:`~oop_ml.scikit.plumbing.metric_engine_parameters`, the same
+    translation the neighbour models use.
+
+    What this wrapper does not take from the engine
+    ------------------------------------------------
+    The labels. It takes ``core_sample_indices_`` and the labels *of those core
+    points*, which is everything the algorithm actually determines, and then
+    labels every row through
+    :func:`~oop_ml.core.clustering.density.labels_from_core_points`, exactly as
+    the numpy backend does.
+
+    That is deliberate rather than a shortcut. Which rows are core, and how the
+    core points group, are facts about the radius and the data. Where a
+    *border* point goes is not: a row within reach of core points from two
+    clusters has two equally good claims on it, and the engine resolves that by
+    whichever expansion reached it first, which is a fact about the row order.
+    Reading its labels through would make the two backends disagree about rows
+    neither of them is wrong about, so the convention is shared instead and
+    written down once. Measured on the two-crescent fixture the two answers are
+    identical on every row, and on a fixture built so that a border point can
+    genuinely reach both clusters they still agree; the point is that nothing
+    guarantees it.
+
+    The other reason is ``predict``. The engine has none at all, having only
+    ``fit_predict``, so a fitted engine cannot label a row it has not seen.
+    Since the border rule already answers that question, the same function
+    serves both and this backend keeps the frame's promise that a clusterer
+    works on new data.
+
+    Prediction therefore does not consult the engine, and what this wrapper
+    keeps is the core points and their labels, which is the whole of the fitted
+    model. So it can be saved.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_core_points",
+        "_core_labels",
+        "_core_indices",
+        "_labels",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    radius: float = Field(default=0.5, gt=0.0)
+    min_neighbourhood_size: int = Field(default=5, ge=1)
+    metric: DistanceMetric | Distance = DistanceMetric.EUCLIDEAN
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _core_points: RowBlock | None = PrivateAttr(default=None)
+    _core_labels: FloatArray | None = PrivateAttr(default=None)
+    _core_indices: IndexArray | None = PrivateAttr(default=None)
+    _labels: FloatArray | None = PrivateAttr(default=None)
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def labels(self) -> FloatArray:
+        """The group each training row was put in, or ``-1`` for noise."""
+        self._check_fitted()
+        assert self._labels is not None
+        return self._labels
+
+    @property
+    def n_clusters(self) -> int:
+        """How many groups the fit found, which was never configured."""
+        self._check_fitted()
+        assert self._core_labels is not None
+        return int(np.unique(self._core_labels).size) if self._core_labels.size else 0
+
+    @property
+    def n_noise(self) -> int:
+        """How many training rows were placed in no group at all."""
+        self._check_fitted()
+        assert self._labels is not None
+        return int(np.count_nonzero(self._labels == NOISE_LABEL))
+
+    @property
+    def core_indices(self) -> IndexArray:
+        """Which training rows were dense enough to hold a group together."""
+        self._check_fitted()
+        assert self._core_indices is not None
+        return self._core_indices
+
+    @property
+    def core_points(self) -> RowBlock:
+        """The core rows themselves, which are the whole of the fitted model."""
+        self._check_fitted()
+        assert self._core_points is not None
+        return self._core_points
+
+    def fit(self, input_values: Sequence[Feature]) -> Self:
+        """Fit the engine, then label every row from the core points it found.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If the features disagree in length.
+        """
+        feature_set = FeatureSet(input_values)
+        names = tuple(feature.name for feature in feature_set)
+        matrix = matrix_of(feature_set)
+
+        engine_type: Any = EngineDBSCAN
+        engine = engine_type(
+            eps=self.radius,
+            min_samples=self.min_neighbourhood_size,
+            **metric_engine_parameters(self.metric),
+        )
+        engine.fit(matrix)
+
+        core_indices = np.asarray(engine.core_sample_indices_, dtype=np.intp)
+        core_labels = np.asarray(engine.labels_, dtype=np.float64)[core_indices]
+        core_points = rows_of(matrix[core_indices], names)
+
+        rows = rows_of(matrix, names)
+        labels = labels_from_core_points(
+            rows, core_points, core_labels, self.radius, self.metric
+        )
+
+        self._feature_names = names
+        self._core_points = core_points
+        self._core_labels = core_labels
+        self._core_indices = core_indices
+        self._labels = labels
+
+        self._mark_fitted()
+        return self
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The group each row belongs to, or ``-1`` if it belongs to none.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        InvalidValuesError
+            If the supplied feature names do not match those seen in ``fit``.
+        """
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._core_points is not None
+        assert self._core_labels is not None
+
+        queries = rows_of(
+            matched_matrix(self._feature_names, input_values), self._feature_names
+        )
+
+        return Predictions.already_checked(
+            labels_from_core_points(
+                queries,
+                self._core_points,
+                self._core_labels,
+                self.radius,
+                self.metric,
+            )
         )

@@ -33,6 +33,7 @@ from oop_ml.core.pipeline.pipelines import (
 )
 from oop_ml.core.pipeline.steps import PipelineSteps
 from oop_ml.numpy import (
+    DBSCAN,
     GaussianNaiveBayes,
     LinearDiscriminantAnalysis,
     MaxAbsScaler,
@@ -260,6 +261,10 @@ ROUND_TRIPS = {
     ),
     "KMeans": (
         lambda: KMeans(n_clusters=3, random_seed=0).fit(FEATURES),
+        lambda model: np.asarray(model.predict(FEATURES)),
+    ),
+    "DBSCAN": (
+        lambda: DBSCAN(radius=1.5, min_neighbourhood_size=3).fit(FEATURES),
         lambda model: np.asarray(model.predict(FEATURES)),
     ),
     "PrincipalComponentAnalysis": (
