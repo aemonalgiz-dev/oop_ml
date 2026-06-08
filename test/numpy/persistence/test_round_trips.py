@@ -93,6 +93,9 @@ from oop_ml.numpy.regression.least_squares.simple_linear_regression import (
 from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
+from oop_ml.numpy.regression.penalised.elastic_net_regression import (
+    ElasticNetRegression,
+)
 from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
@@ -171,6 +174,10 @@ ROUND_TRIPS = {
     ),
     "LassoRegression": (
         lambda: LassoRegression(penalty=0.1).fit(FEATURES, TARGET),
+        regression_answer,
+    ),
+    "ElasticNetRegression": (
+        lambda: ElasticNetRegression(penalty=0.1, l1_share=0.25).fit(FEATURES, TARGET),
         regression_answer,
     ),
     "KNearestNeighboursRegressor": (

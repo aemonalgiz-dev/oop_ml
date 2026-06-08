@@ -70,6 +70,7 @@ from oop_ml.scikit.preprocessing import (
 from oop_ml.scikit.regression import (
     BaggingRegressor,
     DecisionTreeRegressor,
+    ElasticNetRegression,
     GradientBoostingRegressor,
     KernelRidgeRegression,
     KNearestNeighboursRegressor,
@@ -195,6 +196,7 @@ __all__: list[str] = [
     "DecisionTreeClassifier",
     "GaussianNaiveBayes",
     "DecisionTreeRegressor",
+    "ElasticNetRegression",
     "GradientBoostingRegressor",
     "KNearestNeighboursClassifier",
     "KMeans",

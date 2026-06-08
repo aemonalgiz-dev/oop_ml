@@ -94,6 +94,9 @@ from oop_ml.numpy.regression.least_squares.simple_linear_regression import (
 from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
+from oop_ml.numpy.regression.penalised.elastic_net_regression import (
+    ElasticNetRegression,
+)
 from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
@@ -107,6 +110,7 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         GradientDescentRegression,
         RidgeRegression,
         LassoRegression,
+        ElasticNetRegression,
         KNearestNeighboursRegressor,
         DecisionTreeRegressor,
         BaggingRegressor,

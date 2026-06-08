@@ -7,10 +7,10 @@ state.
 
 What decides whether a wrapper can be saved
 --------------------------------------------
-Whether it still needs its engine to answer. Eleven of these read what they
+Whether it still needs its engine to answer. Thirteen of these read what they
 need off the fitted engine and let it go, so what they hold afterwards is the
 whole of the fitted model and restoring it restores the model. The other
-fifteen keep the engine and predict through it, and an engine cannot travel in
+seventeen keep the engine and predict through it, and an engine cannot travel in
 this format: a fitted decision tree is a Cython structure with no public way
 back in, and the way that does exist is pickle, which this format was built to
 avoid. Restoring those from their learned state would hand back something that
@@ -22,7 +22,7 @@ and a test holds this list against the exported one.
 
 Where that leaves a caller who wants both speed and a saved model
 ------------------------------------------------------------------
-Fit with the from-scratch namesake, which persists all thirty-one of its
+Fit with the from-scratch namesake, which persists all thirty-four of its
 models, or persist the engine with the tool scikit-learn ships for it. The
 refusal says so rather than leaving it to be worked out.
 """
@@ -50,6 +50,7 @@ from oop_ml.scikit.preprocessing import (
     Standardizer,
 )
 from oop_ml.scikit.regression import (
+    ElasticNetRegression,
     LassoRegression,
     MultipleLinearRegression,
     RidgeRegression,
@@ -66,6 +67,7 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         MultipleLinearRegression,
         RidgeRegression,
         LassoRegression,
+        ElasticNetRegression,
         LogisticRegression,
         NewtonLogisticRegression,
         MultinomialLogisticRegression,

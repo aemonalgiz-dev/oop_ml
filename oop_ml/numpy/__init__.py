@@ -134,6 +134,9 @@ from oop_ml.numpy.regression.linear_feature_regressor import LinearFeatureRegres
 from oop_ml.numpy.regression.neighbours.k_nearest_regressor import (
     KNearestNeighboursRegressor,
 )
+from oop_ml.numpy.regression.penalised.elastic_net_regression import (
+    ElasticNetRegression,
+)
 from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
@@ -205,6 +208,7 @@ __all__ = [
     "LinearFeatureRegressor",
     "KNearestNeighboursRegressor",
     "LassoRegression",
+    "ElasticNetRegression",
     "RidgeRegression",
     "DecisionTreeRegressor",
 ]

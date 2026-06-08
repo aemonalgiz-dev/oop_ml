@@ -71,7 +71,7 @@ from sklearn.ensemble import BaggingRegressor as EngineBaggingRegressor
 from sklearn.ensemble import GradientBoostingRegressor as EngineGradientBoosting
 from sklearn.ensemble import RandomForestRegressor as EngineRandomForestRegressor
 from sklearn.kernel_ridge import KernelRidge
-from sklearn.linear_model import Lasso, LinearRegression, Ridge
+from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor as EngineDecisionTreeRegressor
 
@@ -362,28 +362,17 @@ class RidgeRegression(LinearEngineRegressor):
         return Ridge(alpha=self.penalty, fit_intercept=self.fit_intercept)
 
 
-class LassoRegression(LinearEngineRegressor):
-    """Least squares with an L1 penalty, solved by scikit-learn's ``Lasso``.
+class CoordinateDescentEngineRegressor(LinearEngineRegressor):
+    """A penalised hyperplane whose engine sweeps one coefficient at a time.
+
+    The counterpart of the numpy backend's ``CoordinateDescentRegressor``, and
+    a frame for the same reason it is one there. The engine's ``Lasso`` and its
+    ``ElasticNet`` are the same coordinate descent with one extra term, so what
+    a concrete wrapper here supplies is which engine to build and at what
+    strength, and nothing else.
 
     Translation
     -----------
-    ``penalty`` is **not** the engine's ``alpha`` unchanged, and this is the
-    translation that carries a scale factor. The numpy backend minimises
-
-        ``||y - X b||^2 + penalty * sum(abs(b_j))``
-
-    while the engine minimises
-
-        ``(1 / (2 n)) * ||y - X w||^2 + alpha * sum(abs(w_j))``
-
-    Multiplying the engine's objective by ``2 n`` gives the numpy one with
-    ``penalty = 2 n alpha``, so the wrapper passes ``alpha = penalty / (2 n)``
-    where ``n`` is the number of training rows. That means the engine is built
-    inside ``fit``, since the translation needs a number only the data can
-    supply. On the numpy backend's own worked fixture, ``penalty = 12`` zeroes
-    the second coefficient and ``penalty = 16`` zeroes both, and the engine
-    reproduces both under this translation.
-
     ``max_iterations`` is the engine's ``max_iter``, a sweep for a sweep.
     ``tolerance`` is passed to ``tol`` unchanged, though the two measure
     different things. The numpy backend stops when no coefficient moved more
@@ -391,12 +380,8 @@ class LassoRegression(LinearEngineRegressor):
     below it, scaled by ``||y||^2``. Both are a threshold on being finished,
     and the default here is the numpy one.
 
-    At ``penalty = 0`` the engine warns that coordinate descent converges
-    poorly and recommends ``LinearRegression``. The warning is let through,
-    since it is true, and the fit still completes.
-
-    ``fit_intercept`` is passed through under the same name; the engine
-    centres and leaves the intercept unpenalised, as the numpy backend does.
+    ``fit_intercept`` is passed through under the same name; the engine centres
+    and leaves the intercept unpenalised, as the numpy backend does.
 
     ``iterations_run`` is the engine's ``n_iter_``. ``converged`` is read
     from whether the engine issued a ``ConvergenceWarning``, which is the
@@ -404,6 +389,10 @@ class LassoRegression(LinearEngineRegressor):
     settled on the last permitted sweep from one that ran out. A member
     adopted from a bagging engine has no such signal and reads ``converged``
     as ``n_iter_ < max_iterations`` instead.
+
+    At ``penalty = 0`` the engine warns that coordinate descent converges
+    poorly and recommends ``LinearRegression``. The warning is let through,
+    since it is true, and the fit still completes.
 
     Not mirrored from the numpy backend
     -----------------------------------
@@ -417,7 +406,7 @@ class LassoRegression(LinearEngineRegressor):
         "_iterations_run",
         "_converged",
     )
-    """What this wrapper holds once fitted, and all of it.
+    """What these wrappers hold once fitted, and all of it.
 
         Declared here rather than inherited, because a document written
         by this backend restores this class and not its namesake, so what
@@ -457,21 +446,8 @@ class LassoRegression(LinearEngineRegressor):
         assert self._converged is not None
         return self._converged
 
-    def _engine_alpha(self, n_rows: int) -> float:
-        """``penalty / (2 n)``, the scale factor the two objectives differ by."""
-        return self.penalty / (2.0 * n_rows)
-
-    def _engine_prototype(self, n_rows: int) -> Lasso:
-        """The engine at the alpha this many rows call for."""
-        return Lasso(
-            alpha=self._engine_alpha(n_rows),
-            fit_intercept=self.fit_intercept,
-            max_iter=self.max_iterations,
-            tol=self.tolerance,
-        )
-
     def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
-        """Fit the engine at the alpha this many rows call for.
+        """Fit the engine at the strength this many rows call for.
 
         The convergence warning is caught rather than shown, through
         :func:`~oop_ml.scikit.plumbing.fit_watching_convergence`, because it
@@ -497,6 +473,109 @@ class LassoRegression(LinearEngineRegressor):
         """
         self._iterations_run = int(engine.n_iter_)
         self._converged = int(engine.n_iter_) < self.max_iterations
+
+
+class LassoRegression(CoordinateDescentEngineRegressor):
+    """Least squares with an L1 penalty, solved by scikit-learn's ``Lasso``.
+
+    Translation
+    -----------
+    ``penalty`` is **not** the engine's ``alpha`` unchanged, and this is the
+    translation that carries a scale factor. The numpy backend minimises
+
+        ``||y - X b||^2 + penalty * sum(abs(b_j))``
+
+    while the engine minimises
+
+        ``(1 / (2 n)) * ||y - X w||^2 + alpha * sum(abs(w_j))``
+
+    Multiplying the engine's objective by ``2 n`` gives the numpy one with
+    ``penalty = 2 n alpha``, so the wrapper passes ``alpha = penalty / (2 n)``
+    where ``n`` is the number of training rows. That means the engine is built
+    inside ``fit``, since the translation needs a number only the data can
+    supply. On the numpy backend's own worked fixture, ``penalty = 12`` zeroes
+    the second coefficient and ``penalty = 16`` zeroes both, and the engine
+    reproduces both under this translation.
+
+    Everything else is the frame's, including both diagnostics; see
+    :class:`CoordinateDescentEngineRegressor`.
+    """
+
+    def _engine_alpha(self, n_rows: int) -> float:
+        """``penalty / (2 n)``, the scale factor the two objectives differ by."""
+        return self.penalty / (2.0 * n_rows)
+
+    def _engine_prototype(self, n_rows: int) -> Lasso:
+        """The engine at the alpha this many rows call for."""
+        return Lasso(
+            alpha=self._engine_alpha(n_rows),
+            fit_intercept=self.fit_intercept,
+            max_iter=self.max_iterations,
+            tol=self.tolerance,
+        )
+
+
+class ElasticNetRegression(CoordinateDescentEngineRegressor):
+    """Both penalties at once, solved by scikit-learn's ``ElasticNet``.
+
+    Translation
+    -----------
+    Two numbers move here, and neither passes through. The numpy backend
+    minimises
+
+        ``||y - X b||^2 + penalty * l1_share * sum(abs(b_j))
+                        + penalty * (1 - l1_share) * sum(b_j ** 2)``
+
+    while the engine minimises
+
+        ``(1 / (2 n)) * ||y - X w||^2 + alpha * l1_ratio * sum(abs(w_j))
+                        + 0.5 * alpha * (1 - l1_ratio) * sum(w_j ** 2)``
+
+    Multiply the engine's by ``2 n`` and the two penalties have to agree term
+    by term, which is two equations::
+
+        penalty * l1_share       =  2 n * alpha * l1_ratio
+        penalty * (1 - l1_share) =      n * alpha * (1 - l1_ratio)
+
+    and they solve to
+
+        ``l1_ratio = l1_share / (2 - l1_share)``
+        ``alpha    = penalty * (2 - l1_share) / (2 n)``
+
+    The share is what surprises. It does not pass through because the engine's
+    squared term carries a half where its absolute term does not, so an even
+    split on this library's terms, ``l1_share = 0.5``, is ``l1_ratio = 1 / 3``
+    on the engine's. The pair is consistent with the two models this one sits
+    between: at ``l1_share = 1`` it gives ``l1_ratio = 1`` and
+    ``alpha = penalty / (2 n)``, which is exactly ``LassoRegression``'s
+    translation, and at ``l1_share = 0`` it gives ``alpha = penalty / n``,
+    which reproduces ``RidgeRegression``. Measured across four penalties and
+    five shares on the numpy backend's own fixture, the largest disagreement
+    with the from-scratch fit is 4.9e-14.
+
+    Everything else is the frame's, including both diagnostics; see
+    :class:`CoordinateDescentEngineRegressor`.
+    """
+
+    l1_share: float = Field(default=0.5, ge=0.0, le=1.0)
+
+    def _engine_alpha(self, n_rows: int) -> float:
+        """``penalty * (2 - l1_share) / (2 n)``, the strength the engine wants."""
+        return self.penalty * (2.0 - self.l1_share) / (2.0 * n_rows)
+
+    def _engine_l1_ratio(self) -> float:
+        """``l1_share / (2 - l1_share)``, the same split in the engine's terms."""
+        return self.l1_share / (2.0 - self.l1_share)
+
+    def _engine_prototype(self, n_rows: int) -> ElasticNet:
+        """The engine at the strength and split this many rows call for."""
+        return ElasticNet(
+            alpha=self._engine_alpha(n_rows),
+            l1_ratio=self._engine_l1_ratio(),
+            fit_intercept=self.fit_intercept,
+            max_iter=self.max_iterations,
+            tol=self.tolerance,
+        )
 
 
 class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
@@ -1467,6 +1546,7 @@ __all__ = [
     "GradientBoostingRegressor",
     "KNearestNeighboursRegressor",
     "KernelRidgeRegression",
+    "ElasticNetRegression",
     "LassoRegression",
     "MultipleLinearRegression",
     "RandomForestRegressor",

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from sklearn.linear_model import ElasticNet as EngineElasticNet
 
 from oop_ml import Feature, scikit
 from oop_ml import numpy as reference
@@ -120,6 +121,83 @@ class TestTheRidgePenaltyScale:
             assert wrapped.coefficients[name] == pytest.approx(
                 expected.coefficients[name], abs=1e-9
             )
+
+
+class TestTheElasticNetPenaltyScale:
+    """Two numbers move here, and neither is the one it is named after.
+
+    ``alpha = penalty * (2 - l1_share) / (2 n)`` and
+    ``l1_ratio = l1_share / (2 - l1_share)``, which fall out of making the two
+    penalty terms agree separately once the engine's objective is multiplied
+    by ``2 n``.
+    """
+
+    @pytest.mark.parametrize("l1_share", [0.0, 0.25, 0.5, 0.75, 1.0])
+    @pytest.mark.parametrize("penalty", [0.5, 2.0, 8.0, 12.0])
+    def test_both_backends_reach_the_same_coefficients(
+        self, penalty: float, l1_share: float
+    ) -> None:
+        settings = {"tolerance": 1e-14, "max_iterations": 200_000}
+        expected = reference.ElasticNetRegression(
+            penalty=penalty, l1_share=l1_share, **settings
+        ).fit(PLANE_FEATURES, PLANE_TARGET)
+        wrapped = scikit.ElasticNetRegression(
+            penalty=penalty, l1_share=l1_share, **settings
+        ).fit(PLANE_FEATURES, PLANE_TARGET)
+
+        assert wrapped.intercept == pytest.approx(expected.intercept, abs=1e-9)
+        for name in ("first", "second"):
+            assert wrapped.coefficients[name] == pytest.approx(
+                expected.coefficients[name], abs=1e-9
+            )
+
+    def test_an_even_split_here_is_a_third_on_the_engine(self) -> None:
+        """The half the engine's squared term carries and its absolute term
+        does not, in one number."""
+        wrapper = scikit.ElasticNetRegression(penalty=2.0, l1_share=0.5)
+
+        assert wrapper._engine_l1_ratio() == pytest.approx(1.0 / 3.0)
+        assert wrapper._engine_alpha(5) == pytest.approx(2.0 * 1.5 / 10.0)
+
+    def test_the_edges_agree_with_the_two_translations_they_sit_between(self) -> None:
+        """At a whole share this must be the lasso's ``penalty / (2 n)`` and at
+        no share the ridge's ``penalty``, which is what makes the pair above a
+        generalisation rather than a third unrelated rule."""
+        lasso_edge = scikit.ElasticNetRegression(penalty=6.0, l1_share=1.0)
+        ridge_edge = scikit.ElasticNetRegression(penalty=6.0, l1_share=0.0)
+
+        assert lasso_edge._engine_l1_ratio() == 1.0
+        assert lasso_edge._engine_alpha(5) == pytest.approx(6.0 / 10.0)
+        assert ridge_edge._engine_l1_ratio() == 0.0
+        assert ridge_edge._engine_alpha(5) == pytest.approx(6.0 / 5.0)
+
+    @pytest.mark.parametrize("l1_share", [0.25, 0.5, 0.75])
+    def test_handing_the_share_over_unchanged_fits_and_is_wrong(
+        self, l1_share: float
+    ) -> None:
+        """The mistake this file exists to catch, in the shape it would take.
+
+        Passing ``l1_ratio = l1_share`` with the lasso's own ``alpha`` is the
+        obvious reading and it produces a perfectly respectable model: measured
+        on this fixture at a penalty of 2 it scores between 0.92 and 0.95 and
+        looks like nothing is wrong. It is off by as much as 0.91 in the
+        intercept, which only an agreement test at the exact penalty sees.
+        """
+        rows = np.column_stack([_FIRST, _SECOND])
+        targets = np.asarray(PLANE_TARGET.column.values, dtype=np.float64)
+
+        correct = reference.ElasticNetRegression(
+            penalty=2.0, l1_share=l1_share, tolerance=1e-14, max_iterations=200_000
+        ).fit(PLANE_FEATURES, PLANE_TARGET)
+        naive = EngineElasticNet(
+            alpha=2.0 / (2 * len(targets)),
+            l1_ratio=l1_share,
+            max_iter=200_000,
+            tol=1e-14,
+        ).fit(rows, targets)
+
+        assert naive.score(rows, targets) > 0.9
+        assert abs(naive.intercept_ - correct.intercept) > 0.4
 
 
 class TestTheKernelTranslation:
