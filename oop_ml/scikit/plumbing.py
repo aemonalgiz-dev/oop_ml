@@ -48,6 +48,19 @@ from oop_ml.core.types import FloatArray
 ENGINE_LEAF = -1
 """How scikit-learn's tree marks a node with no children."""
 
+RANK_THRESHOLD = float(np.finfo(np.float64).eps)
+"""How small a singular value has to be before it names no direction at all.
+
+Machine epsilon, relative to the largest singular value, which is the tightest
+threshold float64 admits. Every engine that takes such a threshold is pinned
+here rather than left at its own default, because those defaults are orders
+looser and are thresholds on how far apart the columns' *spreads* are rather
+than on whether one column is a combination of the others.
+:class:`~oop_ml.scikit.regression.MultipleLinearRegression` and
+:class:`~oop_ml.scikit.classification.QuadraticDiscriminantAnalysis` each
+record what their engine's own default costs.
+"""
+
 ENGINE_METRIC_NAMES: dict[DistanceMetric, str] = {
     DistanceMetric.EUCLIDEAN: "euclidean",
     DistanceMetric.MANHATTAN: "manhattan",

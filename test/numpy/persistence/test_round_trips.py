@@ -37,6 +37,7 @@ from oop_ml.numpy import (
     LinearDiscriminantAnalysis,
     MaxAbsScaler,
     MinMaxScaler,
+    QuadraticDiscriminantAnalysis,
     RestrictedBoltzmannMachine,
     RobustScaler,
     RootMeanSquareScaler,
@@ -279,6 +280,12 @@ ROUND_TRIPS = {
     ),
     "LinearDiscriminantAnalysis": (
         lambda: LinearDiscriminantAnalysis().fit(FEATURES, THREE_CLASSES_TARGET),
+        probabilities_answer,
+    ),
+    "QuadraticDiscriminantAnalysis": (
+        lambda: QuadraticDiscriminantAnalysis(shrinkage=0.1).fit(
+            FEATURES, THREE_CLASSES_TARGET
+        ),
         probabilities_answer,
     ),
     "MinMaxScaler": (

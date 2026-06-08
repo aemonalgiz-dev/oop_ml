@@ -13,8 +13,12 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from numpy.linalg import LinAlgError
 from sklearn.discriminant_analysis import (
     LinearDiscriminantAnalysis as EngineLinearDiscriminant,
+)
+from sklearn.discriminant_analysis import (
+    QuadraticDiscriminantAnalysis as EngineQuadraticDiscriminant,
 )
 
 from oop_ml import Feature, scikit
@@ -58,6 +62,31 @@ THREE_FEATURES = [Feature(name, _THREE[:, index]) for index, name in enumerate("
 THREE_FEATURE_TARGET = Feature(
     "side", (_THREE[:, 0] + 0.5 * _THREE[:, 1] > 0.0).astype(np.float64)
 )
+
+
+#: Two classes of clearly different shape, so a per-class covariance has
+#: something to describe that a shared one cannot.
+_SHAPED_GENERATOR = np.random.default_rng(23)
+_SHAPED = np.vstack(
+    [
+        _SHAPED_GENERATOR.normal(loc=[0.0, 0.0], scale=[1.0, 3.0], size=(20, 2)),
+        _SHAPED_GENERATOR.normal(loc=[4.0, 1.0], scale=[2.5, 0.6], size=(16, 2)),
+    ]
+)
+SHAPED_FEATURES = [Feature("left", _SHAPED[:, 0]), Feature("right", _SHAPED[:, 1])]
+SHAPED_TARGET = Feature("group", np.array([0.0] * 20 + [1.0] * 16))
+
+#: Forty rows in two clearly separated classes, for rescaling both columns by a
+#: sweep of factors. Separable at every factor, so a refusal is the threshold
+#: talking and not the data.
+_SEPARATED_GENERATOR = np.random.default_rng(7)
+_SEPARATED = np.vstack(
+    [
+        _SEPARATED_GENERATOR.normal(loc=[0.0, 0.0], size=(20, 2)),
+        _SEPARATED_GENERATOR.normal(loc=[4.0, 4.0], size=(20, 2)),
+    ]
+)
+SEPARATED_TARGET = Feature("group", np.array([0.0] * 20 + [1.0] * 20))
 
 
 class TestTheUnpenalisedLikelihood:
@@ -488,3 +517,84 @@ class TestTheSingularRefusal:
 
         with pytest.raises(CollinearFeaturesError):
             scikit.LinearDiscriminantAnalysis().fit(duplicated, CLUSTER_TARGET)
+
+
+class TestTheQuadraticRankThreshold:
+    """``tol`` is pinned at machine epsilon, and the engine's own default is a
+    threshold on how large the numbers are rather than on whether a class
+    describes a shape."""
+
+    @pytest.mark.parametrize("shrinkage", [0.0, 0.3, 1.0])
+    def test_both_backends_reach_the_same_summaries(self, shrinkage: float) -> None:
+        expected = reference.QuadraticDiscriminantAnalysis(shrinkage=shrinkage).fit(
+            SHAPED_FEATURES, SHAPED_TARGET
+        )
+        wrapped = scikit.QuadraticDiscriminantAnalysis(shrinkage=shrinkage).fit(
+            SHAPED_FEATURES, SHAPED_TARGET
+        )
+
+        assert np.allclose(wrapped.class_priors, expected.class_priors, atol=0.0)
+        assert np.allclose(wrapped.means, expected.means, atol=0.0)
+        assert np.allclose(wrapped.covariances, expected.covariances, atol=1e-14)
+        assert np.allclose(
+            wrapped.discriminant_scores(SHAPED_FEATURES),
+            expected.discriminant_scores(SHAPED_FEATURES),
+            atol=1e-12,
+        )
+
+    def test_the_shrinkage_reaches_the_engine_under_its_own_name(self) -> None:
+        """``reg_param``, and it means the same thing: both replace each class's
+        covariance with ``(1 - s) S + s I``, and both store the shrunk matrix
+        rather than the raw estimate."""
+        wrapped = scikit.QuadraticDiscriminantAnalysis(shrinkage=0.4).fit(
+            SHAPED_FEATURES, SHAPED_TARGET
+        )
+        raw = scikit.QuadraticDiscriminantAnalysis().fit(SHAPED_FEATURES, SHAPED_TARGET)
+
+        identity = np.eye(2)
+        expected = [
+            0.6 * np.asarray(raw.covariances)[label] + 0.4 * identity
+            for label in range(2)
+        ]
+
+        assert np.allclose(np.asarray(wrapped.covariances), expected, atol=1e-14)
+
+    @pytest.mark.parametrize("power", [-2, -3, -4, -5])
+    def test_a_change_of_units_does_not_make_a_class_rank_deficient(
+        self, power: int
+    ) -> None:
+        """The engine's default ``tol`` of 1e-4 is compared against each class
+        covariance's eigenvalues, so shrinking both columns is enough to cross
+        it. Measured on these forty rows, the engine at its default refuses
+        every factor from 1e-2 down while fitting 1e-1 perfectly; pinned at
+        machine epsilon it fits all of them and scores 1.000."""
+        scaled = [
+            Feature("left", np.asarray(_SEPARATED[:, 0]) * (10.0**power)),
+            Feature("right", np.asarray(_SEPARATED[:, 1]) * (10.0**power)),
+        ]
+
+        wrapped = scikit.QuadraticDiscriminantAnalysis().fit(scaled, SEPARATED_TARGET)
+
+        assert wrapped.score(scaled, SEPARATED_TARGET) == 1.0
+
+    @pytest.mark.parametrize("power", [-2, -5])
+    def test_and_the_engine_at_its_own_default_would_have_refused(
+        self, power: int
+    ) -> None:
+        rows = np.asarray(_SEPARATED) * (10.0**power)
+        labels = np.asarray(SEPARATED_TARGET.column.values)
+
+        with pytest.raises(LinAlgError):
+            EngineQuadraticDiscriminant(tol=1e-4).fit(rows, labels)
+
+    def test_a_singular_class_is_refused_in_this_library_s_words(self) -> None:
+        """The engine raises a bare ``LinAlgError``, which is outside this
+        library's hierarchy and says nothing a caller of this API would
+        recognise."""
+        duplicated = [
+            *SHAPED_FEATURES,
+            Feature("again", np.asarray(_SHAPED[:, 0])),
+        ]
+
+        with pytest.raises(CollinearFeaturesError):
+            scikit.QuadraticDiscriminantAnalysis().fit(duplicated, SHAPED_TARGET)

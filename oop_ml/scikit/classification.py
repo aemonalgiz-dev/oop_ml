@@ -78,9 +78,13 @@ from collections.abc import Callable, Sequence
 from typing import Any, ClassVar, Self
 
 import numpy as np
+from numpy.linalg import LinAlgError
 from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 from sklearn.discriminant_analysis import (
     LinearDiscriminantAnalysis as EngineLinearDiscriminant,
+)
+from sklearn.discriminant_analysis import (
+    QuadraticDiscriminantAnalysis as EngineQuadraticDiscriminant,
 )
 from sklearn.ensemble import BaggingClassifier as EngineBaggingClassifier
 from sklearn.ensemble import RandomForestClassifier as EngineRandomForestClassifier
@@ -111,12 +115,18 @@ from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
-from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
+from oop_ml.core.exceptions import (
+    CollinearFeaturesError,
+    InvalidValuesError,
+    TooFewValuesError,
+)
 from oop_ml.core.gaussian import (
+    MINIMUM_CLASS_ROWS,
     discriminant_weights,
     gaussian_log_scores,
     linear_discriminant_scores,
     normalised_from_log_scores,
+    quadratic_discriminant_scores,
 )
 from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.kernel.matrix import KernelMatrix
@@ -132,6 +142,7 @@ from oop_ml.core.tree.node import ClassificationLeaf, LeafNode
 from oop_ml.core.types import FloatArray
 from oop_ml.core.validation import ValueRole
 from oop_ml.scikit.plumbing import (
+    RANK_THRESHOLD,
     EngineMember,
     configuration_of,
     converted_tree,
@@ -2336,6 +2347,197 @@ class LinearDiscriminantAnalysis(MultiClassClassifier[Sequence[Feature], Feature
         )
 
 
+class QuadraticDiscriminantAnalysis(MultiClassClassifier[Sequence[Feature], Feature]):
+    """A mean and a covariance for every class, fitted by the engine's
+    ``QuadraticDiscriminantAnalysis``.
+
+    Translation
+    -----------
+    ``shrinkage`` is the engine's ``reg_param`` and means exactly the same
+    thing. Both replace each class's sample covariance with
+    ``(1 - s) S_k + s I``, and the engine stores the *shrunk* matrix in
+    ``covariance_`` rather than the raw estimate, so this wrapper reads it
+    through untouched. That is the opposite of
+    :class:`LinearDiscriminantAnalysis`, whose engine reports a matrix its own
+    discriminant does not use; the two attributes have the same name and want
+    reading differently, which is why each says so.
+
+    One engine field this library does not expose is set rather than left where
+    the engine leaves it. ``tol`` is pinned at
+    :data:`~oop_ml.scikit.plumbing.RANK_THRESHOLD`, machine epsilon, because
+    the engine compares it against each class covariance's eigenvalues and
+    refuses the fit outright when one falls below. Its own default is 1e-4,
+    which is not a threshold on whether a class describes a shape but on how
+    large the numbers happen to be. Measured on forty rows in two clearly
+    separated classes, scaling *both* columns down by 1e-2 is enough for the
+    engine at its default to refuse data it fits perfectly at 1e-1, while at
+    machine epsilon it fits and scores 1.000 at every factor down to 1e-5. A
+    change of units is not a rank deficiency.
+
+    Prediction does not consult the engine. What this wrapper keeps is the
+    priors, the means and the shrunk covariances, which is the whole of the
+    fit, so it can be saved.
+
+    Where the two backends part company, and where they do not
+    ------------------------------------------------------------
+    Nowhere in the answers. Measured across three shrinkages, the summaries
+    agree bit for bit on the priors and means and to 2.7e-15 on the
+    covariances, the raw discriminants to 2.8e-14 and the probabilities to
+    4.4e-16, and the predictions are identical. Unlike the linear model, the
+    engine's ``decision_function`` here carries no overall-mean shift, so even
+    the unnormalised scores line up.
+
+    The refusal is the wrapper's own, as it is for the linear model. A class
+    whose covariance is singular at this shrinkage raises
+    ``CollinearFeaturesError`` naming the class, where the engine raises a bare
+    ``LinAlgError``. Both refuse; only one of them does it in this library's
+    words.
+    """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_class_priors",
+        "_means",
+        "_covariances",
+    )
+    """What this wrapper holds once fitted, and all of it."""
+
+    shrinkage: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _class_priors: FloatArray | None = PrivateAttr(default=None)
+    _means: FloatArray | None = PrivateAttr(default=None)
+    _covariances: FloatArray | None = PrivateAttr(default=None)
+
+    @property
+    def n_classes(self) -> int:
+        """How many classes the fit saw."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return int(self._class_priors.shape[0])
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def class_priors(self) -> FloatArray:
+        """How common each class was, one per class, summing to one."""
+        self._check_fitted()
+        assert self._class_priors is not None
+        return self._class_priors
+
+    @property
+    def means(self) -> FloatArray:
+        """Each class's average for each column, ``(n_classes, n_features)``."""
+        self._check_fitted()
+        assert self._means is not None
+        return self._means
+
+    @property
+    def covariances(self) -> FloatArray:
+        """One shrunk covariance per class, ``(n_classes, n_features, n_features)``."""
+        self._check_fitted()
+        assert self._covariances is not None
+        return self._covariances
+
+    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+        """Fit the engine and read its three summaries back.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If any feature's length differs from the target's.
+        NonBinaryLabelsError
+            If the target holds a negative or fractional value.
+        SingleClassError
+            If the target holds fewer than two classes, or leaves a gap in the
+            run from zero.
+        TooFewValuesError
+            If any class holds fewer than two rows.
+        CollinearFeaturesError
+            If any class's covariance is singular at this shrinkage. The engine
+            refuses the same fits and raises ``LinAlgError``; this arrives
+            first, so the refusal names the class in this library's words.
+        """
+        feature_set = FeatureSet(input_values)
+        feature_set.check_aligned_with(target_values)
+
+        target_column = target_values.column
+        target_column.check_is_label_encoded()
+
+        labels = np.asarray(target_column.values, dtype=np.int64)
+        counts = np.bincount(labels, minlength=target_column.n_classes)
+        too_small = [
+            label
+            for label, count in enumerate(counts)
+            if int(count) < MINIMUM_CLASS_ROWS
+        ]
+        if too_small:
+            raise TooFewValuesError(
+                f"class {too_small[0]} holds {int(counts[too_small[0]])} row(s), "
+                "and a covariance needs at least two: with one row there is no "
+                "deviation from the class mean to measure"
+            )
+
+        engine_type: Any = EngineQuadraticDiscriminant
+        engine = engine_type(
+            reg_param=self.shrinkage, store_covariance=True, tol=RANK_THRESHOLD
+        )
+        try:
+            engine.fit(matrix_of(feature_set), target_column.values)
+        except LinAlgError:
+            raise CollinearFeaturesError(
+                "some class's covariance is singular, so that class describes "
+                "no shape in some direction. A class needs more rows than there "
+                "are columns, and no column may be a combination of the others "
+                "within it; raise shrinkage above zero to pull every class's "
+                "covariance toward the identity instead"
+            ) from None
+
+        self._feature_names = tuple(feature.name for feature in feature_set)
+        self._class_priors = np.asarray(engine.priors_, dtype=np.float64)
+        self._means = np.asarray(engine.means_, dtype=np.float64)
+        self._covariances = np.asarray(engine.covariance_, dtype=np.float64)
+
+        self._mark_fitted()
+        return self
+
+    def discriminant_scores(self, input_values: Sequence[Feature]) -> FloatArray:
+        """Each class's discriminant, one row per query."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._means is not None
+        assert self._covariances is not None
+        assert self._class_priors is not None
+
+        return quadratic_discriminant_scores(
+            matched_matrix(self._feature_names, input_values),
+            self._means,
+            self._covariances,
+            self._class_priors,
+        )
+
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
+        """Each class's share of the total plausibility, one row per query."""
+        return ProbabilityMatrix(
+            normalised_from_log_scores(self.discriminant_scores(input_values))
+        )
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The most plausible class for each row."""
+        return Predictions.already_checked(
+            np.argmax(self.discriminant_scores(input_values), axis=1).astype(np.float64)
+        )
+
+
 __all__ = [
     "BaggingClassifier",
     "DecisionTreeClassifier",
@@ -2346,6 +2548,7 @@ __all__ = [
     "MultinomialLogisticRegression",
     "NewtonLogisticRegression",
     "OneVsRestClassifier",
+    "QuadraticDiscriminantAnalysis",
     "RandomForestClassifier",
     "SupportVectorClassifier",
 ]

@@ -260,6 +260,9 @@ from oop_ml.numpy.classification.generative.gaussian_naive_bayes import (
 from oop_ml.numpy.classification.generative.linear_discriminant_analysis import (
     LinearDiscriminantAnalysis,
 )
+from oop_ml.numpy.classification.generative.quadratic_discriminant_analysis import (
+    QuadraticDiscriminantAnalysis,
+)
 from oop_ml.numpy.classification.kernels.support_vector_classifier import (
     SupportVectorClassifier,
 )
@@ -432,6 +435,7 @@ __all__ = [
     # Classification
     "GaussianNaiveBayes",
     "LinearDiscriminantAnalysis",
+    "QuadraticDiscriminantAnalysis",
     "LogisticRegression",
     "NewtonLogisticRegression",
     "MultinomialLogisticRegression",

@@ -108,6 +108,7 @@ from oop_ml.core.tree.node import LeafNode
 from oop_ml.core.types import FloatArray, NumericInput
 from oop_ml.core.validation import ValueRole
 from oop_ml.scikit.plumbing import (
+    RANK_THRESHOLD,
     EngineMember,
     configuration_of,
     converted_tree,
@@ -124,14 +125,6 @@ from oop_ml.scikit.plumbing import (
 
 MINIMUM_SIMPLE_REGRESSION_SAMPLES = 2
 """Two points determine a line, and anything fewer cannot pin down a slope."""
-
-RANK_THRESHOLD = float(np.finfo(np.float64).eps)
-"""How small a singular value has to be before it names no direction at all.
-
-Machine epsilon, relative to the largest singular value, which is the tightest
-threshold float64 admits. The engine's own default is 1e-6, ten orders looser,
-and :class:`MultipleLinearRegression` records what that costs.
-"""
 
 ENGINE_CRITERION_NAMES: dict[RegressionCriterion, str] = {
     RegressionCriterion.SQUARED_ERROR: "squared_error",
