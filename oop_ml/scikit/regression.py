@@ -111,6 +111,7 @@ from oop_ml.core.kernel.functions import Kernel, LinearKernel
 from oop_ml.core.tree.criterion import RegressionCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import LeafNode
+from oop_ml.core.tree.weights import WeightedTargets
 from oop_ml.core.types import FloatArray, NumericInput
 from oop_ml.core.validation import ValueRole
 from oop_ml.scikit.plumbing import (
@@ -1018,15 +1019,18 @@ class DecisionTreeRegressor(
     def _impurity(self) -> Impurity:
         return self.criterion.impurity
 
-    def _leaf(self, target_values: Column) -> LeafNode:
+    def _leaf(self, target_values: WeightedTargets) -> LeafNode:
         """A leaf predicting the mean of these targets.
 
         The frame requires it. The engine grows the tree, so nothing here
         calls it during a fit; it is what a leaf of this tree is.
         """
         return LeafNode(
-            prediction=float(np.mean(target_values.values)),
-            n_samples=target_values.n_samples,
+            prediction=float(
+                np.dot(target_values.weights, target_values.values)
+                / target_values.total_weight
+            ),
+            n_samples=target_values.n_rows,
             impurity=self._impurity.of(target_values),
         )
 

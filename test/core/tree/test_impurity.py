@@ -28,28 +28,39 @@ from oop_ml.core.tree.impurity import (
     Impurity,
     VarianceImpurity,
 )
+from oop_ml.core.tree.weights import WeightedTargets
 from oop_ml.core.validation import ValueRole
 
 CLASSIFICATION_MEASURES = [GiniImpurity(), EntropyImpurity()]
 EVERY_MEASURE = [*CLASSIFICATION_MEASURES, VarianceImpurity()]
 
 
-def targets(values) -> Column:
-    """These values as the target column an impurity measure now takes.
+def targets(values, weights=None) -> WeightedTargets:
+    """These values as the weighted target column an impurity measure takes.
 
     ``Impurity.of`` used to take a bare array and define the empty node as
     zero. It takes a :class:`~oop_ml.core.data.column.Column` now, which cannot
     be empty, so the case is unrepresentable rather than defined away and the
     two tests that pinned it have gone.
+
+    Since weights arrived it takes a
+    :class:`~oop_ml.core.tree.weights.WeightedTargets`, which is that column
+    paired with how much each row counts. Left off, every row counts one, and
+    the whole point of the pairing is that every measure then answers exactly
+    what it answered before.
     """
-    if isinstance(values, Column):
+    if isinstance(values, WeightedTargets):
         return values
+    if isinstance(values, Column):
+        return WeightedTargets(values, weights)
 
-    return Column(np.asarray(values, dtype=float), ValueRole.TARGET_VALUES)
+    return WeightedTargets(
+        Column(np.asarray(values, dtype=float), ValueRole.TARGET_VALUES), weights
+    )
 
 
-def labels(zeros: int, ones: int) -> Column:
-    """A class column holding this many of each class."""
+def labels(zeros: int, ones: int) -> WeightedTargets:
+    """A class column holding this many of each class, all counting alike."""
     return targets(np.concatenate([np.zeros(zeros), np.ones(ones)]))
 
 

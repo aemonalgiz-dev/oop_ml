@@ -251,6 +251,9 @@ from oop_ml.numpy.classification.binary.logistic_regression import LogisticRegre
 from oop_ml.numpy.classification.binary.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
+from oop_ml.numpy.classification.ensembles.adaboost_classifier import (
+    AdaBoostClassifier,
+)
 from oop_ml.numpy.classification.ensembles.bagging_classifier import BaggingClassifier
 from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
     RandomForestClassifier,
@@ -449,6 +452,7 @@ __all__ = [
     "OneVsRestClassifier",
     "KNearestNeighboursClassifier",
     "DecisionTreeClassifier",
+    "AdaBoostClassifier",
     "BaggingClassifier",
     "RandomForestClassifier",
     "AveragingEnsemble",

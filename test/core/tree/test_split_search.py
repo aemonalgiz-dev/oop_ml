@@ -26,6 +26,7 @@ from oop_ml.core.observation import Observation
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.search import SplitRejection, SplitSearch
 from oop_ml.core.tree.split import Split
+from oop_ml.core.tree.weights import WeightedTargets
 from oop_ml.core.validation import ValueRole
 from oop_ml.numpy.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
@@ -37,12 +38,12 @@ EXAM_ROWS = rows_of(
     np.column_stack([feature.values for feature in EXAM_OUTCOMES.input_features]),
     [feature.name for feature in EXAM_OUTCOMES.input_features],
 )
-EXAM_TARGETS = EXAM_OUTCOMES.class_feature.column
+EXAM_TARGETS = WeightedTargets(EXAM_OUTCOMES.class_feature.column)
 STEP_ROWS = rows_of(
     np.column_stack([feature.values for feature in STEP_FUNCTION.input_features]),
     [feature.name for feature in STEP_FUNCTION.input_features],
 )
-STEP_TARGETS = STEP_FUNCTION.target_feature.column
+STEP_TARGETS = WeightedTargets(STEP_FUNCTION.target_feature.column)
 
 
 def classifier(**overrides) -> DecisionTreeClassifier:
@@ -115,9 +116,11 @@ class TestTheTwoRoutesAgree:
         model._feature_names = ("flat",)
         model._n_classes = 2
         rows = rows_of(np.full((8, 1), 2.0), ["flat"])
-        targets = Column(
-            np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]),
-            ValueRole.TARGET_VALUES,
+        targets = WeightedTargets(
+            Column(
+                np.array([0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0]),
+                ValueRole.TARGET_VALUES,
+            )
         )
 
         assert model._best_split(rows, targets) is None
@@ -134,9 +137,11 @@ class TestTheTwoRoutesAgree:
                 generator.integers(0, 4, size=(n_rows, 3)).astype(float),
                 ["first", "second", "third"],
             )
-            targets = Column(
-                generator.integers(0, 2, size=n_rows).astype(float),
-                ValueRole.TARGET_VALUES,
+            targets = WeightedTargets(
+                Column(
+                    generator.integers(0, 2, size=n_rows).astype(float),
+                    ValueRole.TARGET_VALUES,
+                )
             )
 
             model = DecisionTreeClassifier(

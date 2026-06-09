@@ -43,12 +43,13 @@ import numpy as np
 
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.base.tree_model import TreeModel
-from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.tree.criterion import RegressionCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import LeafNode
+from oop_ml.core.tree.weights import WeightedTargets
+from oop_ml.core.types import NumericInput
 
 
 class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
@@ -72,14 +73,19 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
     def _impurity(self) -> Impurity:
         return self.criterion.impurity
 
-    def _leaf(self, target_values: Column) -> LeafNode:
-        """A leaf predicting the mean of these targets.
+    def _leaf(self, target_values: WeightedTargets) -> LeafNode:
+        """A leaf predicting the weighted mean of these targets.
+
+        Weighted because the mean is the constant that minimises the variance
+        the split search was measuring, and once the rows count unequally that
+        is the weighted variance. Unweighted the two are the same number, since
+        every weight is one and the total is the row count.
 
         Parameters
         ----------
         target_values:
-            ``(n_rows,)``, the targets of every training row that reached this
-            node. Never empty.
+            The targets of every training row that reached this node, paired
+            with how much each counts. Never empty.
 
         Returns
         -------
@@ -88,12 +94,20 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
             impurity of these targets under the configured criterion.
         """
         return LeafNode(
-            prediction=float(np.mean(target_values.values)),
-            n_samples=target_values.n_samples,
+            prediction=float(
+                np.dot(target_values.weights, target_values.values)
+                / target_values.total_weight
+            ),
+            n_samples=target_values.n_rows,
             impurity=self._impurity.of(target_values),
         )
 
-    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+    def fit(
+        self,
+        input_values: Sequence[Feature],
+        target_values: Feature,
+        sample_weights: NumericInput | None = None,
+    ) -> Self:
         """Grow the tree. Unlike a neighbour model, all the work is here.
 
         Parameters
@@ -102,6 +116,12 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
             One or more predictor columns, all the same length as the target.
         target_values:
             The response being regressed on.
+        sample_weights:
+            How much each row counts, or ``None`` for all alike. A row of
+            weight 2 moves every impurity and every leaf exactly the way two
+            copies of it would, which is the identity the spec asserts rather
+            than restating the formulas. Boosting is what this exists for;
+            everything else here leaves it alone.
 
         Returns
         -------
@@ -117,7 +137,7 @@ class DecisionTreeRegressor(TreeModel, Regressor[Sequence[Feature], Feature]):
         NonEqualArrayLengthError
             If any feature's length differs from the target's.
         """
-        return self._fit_tree(input_values, target_values)
+        return self._fit_tree(input_values, target_values, sample_weights)
 
     def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The mean of the box each row falls in, one value per row.

@@ -62,9 +62,8 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from oop_ml.core.data.column import Column
+from oop_ml.core.tree.weights import WeightedTargets
 from oop_ml.core.types import FloatArray
-from oop_ml.core.validation import ValueRole
 
 
 class Impurity(ABC):
@@ -72,14 +71,16 @@ class Impurity(ABC):
 
     __slots__ = ()
 
-    def of(self, target_values: Column) -> float:
+    def of(self, target_values: WeightedTargets) -> float:
         """How mixed this node is. Zero when every row agrees.
 
         Parameters
         ----------
         target_values:
-            The targets of the rows at one node. Class positions for a
-            classification measure, quantities for a regression one.
+            The targets of the rows at one node, paired with how much each of
+            them counts. Class positions for a classification measure,
+            quantities for a regression one. Uniform weights reduce every
+            measure below to its unweighted form exactly.
 
         Returns
         -------
@@ -106,19 +107,21 @@ class Impurity(ABC):
         enough that neither the tests nor the type checker notice, and which
         then travels outward into every gain and every leaf.
         """
-        return float(self._of_non_empty(target_values.values))
+        return float(self._of_non_empty(target_values))
 
     @abstractmethod
-    def _of_non_empty(self, target_values: FloatArray) -> float:
+    def _of_non_empty(self, target_values: WeightedTargets) -> float:
         """How mixed this node is, given at least one row.
 
         The formula, and nothing else. Emptiness has already been handled by
-        :meth:`of`, so this can divide by the row count without checking it.
+        :meth:`of`, so this can divide by the total weight without checking it,
+        and a total of zero is refused by
+        :class:`~oop_ml.core.tree.weights.WeightedTargets` itself.
 
         Parameters
         ----------
         target_values:
-            ``(n_rows,)``, never empty.
+            Never empty, and weighing more than nothing.
 
         Returns
         -------
@@ -127,42 +130,48 @@ class Impurity(ABC):
         """
 
     @staticmethod
-    def target_probabilities(target_values: FloatArray) -> FloatArray:
-        """What share of these rows belongs to each class present.
+    def target_probabilities(target_values: WeightedTargets) -> FloatArray:
+        """What share of this node's weight belongs to each class present.
 
         The step that turns a column of class labels into the ``p_k`` the Gini
         and entropy formulas are written in terms of: ``[0, 0, 1, 1]`` holds
-        two rows of each class, so it becomes ``[0.5, 0.5]``.
+        two rows of each class, so unweighted it becomes ``[0.5, 0.5]``, and
+        with the first row counting for three it becomes ``[0.8, 0.2]``.
 
         Returns
         -------
         FloatArray
-            One entry per class *present in this node*, summing to 1 -- not one
-            per row, and not one per class the fit saw. A class with no rows
-            here is absent rather than zero, which is what keeps ``log2`` away
-            from zero in the entropy measure.
+            One entry per class *carrying weight in this node*, summing to 1 --
+            not one per row, and not one per class the fit saw. A class with no
+            weight here is absent rather than zero, which is what keeps
+            ``log2`` away from zero in the entropy measure.
         """
-        _, counts = np.unique(target_values, return_counts=True)
+        classes = target_values.values.astype(np.int64)
+        totals = np.bincount(classes, weights=target_values.weights)
+        carrying = totals[totals > 0.0]
 
-        return counts / counts.sum()
+        return carrying / carrying.sum()
 
     def gain(
         self,
-        parent_values: Column,
-        left_values: Column,
-        right_values: Column,
+        parent_values: WeightedTargets,
+        left_values: WeightedTargets,
+        right_values: WeightedTargets,
     ) -> float:
         """How much impurity a split removes.
 
-        The children are weighted by how many rows went each way::
+        The children are weighted by how much went each way::
 
             gain = impurity(parent)
-                   - (n_left / n) * impurity(left)
-                   - (n_right / n) * impurity(right)
+                   - (weight_left / weight) * impurity(left)
+                   - (weight_right / weight) * impurity(right)
 
         The weighting is not decoration. Without it, peeling a single row off
         into its own pure child scores perfectly every time, and the tree
         degenerates into one leaf per observation.
+
+        Unweighted, a row weighs one and the totals are row counts, so this is
+        the ``n_left / n`` reading it has always been.
 
         Parameters
         ----------
@@ -184,15 +193,15 @@ class Impurity(ABC):
         left_impurity = self.of(left_values)
         right_impurity = self.of(right_values)
 
-        n = len(left_values) + len(right_values)
+        total = left_values.total_weight + right_values.total_weight
 
         return (
             parent_impurity
-            - len(left_values) * left_impurity / n
-            - len(right_values) * right_impurity / n
+            - left_values.total_weight * left_impurity / total
+            - right_values.total_weight * right_impurity / total
         )
 
-    def gains_at_every_prefix(self, sorted_targets: FloatArray) -> FloatArray:
+    def gains_at_every_prefix(self, sorted_targets: WeightedTargets) -> FloatArray:
         """The gain from cutting after 1 row, after 2 rows, and so on.
 
         The whole reason a split search can be fast. Scoring candidates one at
@@ -227,35 +236,33 @@ class Impurity(ABC):
         subclasses below exist to avoid. Every override is covered by a test
         asserting it agrees with this.
         """
-        role = ValueRole.TARGET_VALUES
-        parent = Column.selecting(sorted_targets, role)
-
         return np.array(
             [
                 self.gain(
-                    parent,
-                    Column.selecting(sorted_targets[:cut], role),
-                    Column.selecting(sorted_targets[cut:], role),
+                    sorted_targets,
+                    sorted_targets.taking(cut),
+                    sorted_targets.dropping(cut),
                 )
-                for cut in range(1, sorted_targets.size)
+                for cut in range(1, sorted_targets.n_rows)
             ],
             dtype=np.float64,
         )
 
     @staticmethod
-    def _cumulative_class_counts(sorted_targets: FloatArray) -> FloatArray:
-        """Class counts on the left of every cut, as ``(n_rows - 1, n_classes)``.
+    def _cumulative_class_counts(sorted_targets: WeightedTargets) -> FloatArray:
+        """Class weight on the left of every cut, as ``(n_rows - 1, n_classes)``.
 
-        One pass. The counts after ``i + 1`` rows are the counts after ``i``
-        plus one, which is what makes the sweep O(n) instead of O(n^2), and
-        ``cumsum`` over a one-hot encoding is how numpy says that in one call.
+        One pass. The totals after ``i + 1`` rows are the totals after ``i``
+        plus that row's weight, which is what makes the sweep O(n) instead of
+        O(n^2), and ``cumsum`` over a one-hot encoding is how numpy says that
+        in one call. Unweighted every row adds one, so these are counts.
         """
-        classes = sorted_targets.astype(np.int64)
+        classes = sorted_targets.values.astype(np.int64)
         n_rows = classes.size
         n_classes = int(classes.max()) + 1
 
         one_hot = np.zeros((n_rows, n_classes), dtype=np.float64)
-        one_hot[np.arange(n_rows), classes] = 1.0
+        one_hot[np.arange(n_rows), classes] = sorted_targets.weights
 
         return np.cumsum(one_hot, axis=0)[:-1]
 
@@ -275,28 +282,30 @@ class GiniImpurity(Impurity):
 
     __slots__ = ()
 
-    def _of_non_empty(self, target_values: FloatArray) -> float:
+    def _of_non_empty(self, target_values: WeightedTargets) -> float:
         return float(1 - np.sum(self.target_probabilities(target_values) ** 2))
 
-    def gains_at_every_prefix(self, sorted_targets: FloatArray) -> FloatArray:
-        """One sweep: the counts after i+1 rows are the counts after i plus
-        one. See :meth:`Impurity.gains_at_every_prefix`."""
+    def gains_at_every_prefix(self, sorted_targets: WeightedTargets) -> FloatArray:
+        """One sweep: the totals after i+1 rows are the totals after i plus
+        that row's weight. See :meth:`Impurity.gains_at_every_prefix`."""
         left_counts = self._cumulative_class_counts(sorted_targets)
         total_counts = np.bincount(
-            sorted_targets.astype(np.int64), minlength=left_counts.shape[1]
+            sorted_targets.values.astype(np.int64),
+            weights=sorted_targets.weights,
+            minlength=left_counts.shape[1],
         ).astype(np.float64)
 
-        n_rows = sorted_targets.size
-        rows_left = np.arange(1, n_rows, dtype=np.float64)[:, None]
-        rows_right = n_rows - rows_left
+        total = sorted_targets.total_weight
+        weight_left = np.cumsum(sorted_targets.weights)[:-1][:, None]
+        weight_right = total - weight_left
         right_counts = total_counts[None, :] - left_counts
 
-        left_impurity = 1.0 - ((left_counts / rows_left) ** 2).sum(axis=1)
-        right_impurity = 1.0 - ((right_counts / rows_right) ** 2).sum(axis=1)
+        left_impurity = 1.0 - ((left_counts / weight_left) ** 2).sum(axis=1)
+        right_impurity = 1.0 - ((right_counts / weight_right) ** 2).sum(axis=1)
 
         weighted = (
-            rows_left[:, 0] * left_impurity + rows_right[:, 0] * right_impurity
-        ) / n_rows
+            weight_left[:, 0] * left_impurity + weight_right[:, 0] * right_impurity
+        ) / total
 
         return float(self._of_non_empty(sorted_targets)) - weighted
 
@@ -318,29 +327,31 @@ class EntropyImpurity(Impurity):
 
     __slots__ = ()
 
-    def _of_non_empty(self, target_values: FloatArray) -> float:
+    def _of_non_empty(self, target_values: WeightedTargets) -> float:
         target_probabilities = self.target_probabilities(target_values)
         log_p_k = np.log2(target_probabilities)
         per_class_entropy = target_probabilities * log_p_k
         return float(-np.sum(per_class_entropy))
 
-    def gains_at_every_prefix(self, sorted_targets: FloatArray) -> FloatArray:
-        """One sweep over cumulative class counts. See
+    def gains_at_every_prefix(self, sorted_targets: WeightedTargets) -> FloatArray:
+        """One sweep over cumulative class weight. See
         :meth:`Impurity.gains_at_every_prefix`."""
         left_counts = self._cumulative_class_counts(sorted_targets)
         total_counts = np.bincount(
-            sorted_targets.astype(np.int64), minlength=left_counts.shape[1]
+            sorted_targets.values.astype(np.int64),
+            weights=sorted_targets.weights,
+            minlength=left_counts.shape[1],
         ).astype(np.float64)
 
-        n_rows = sorted_targets.size
-        rows_left = np.arange(1, n_rows, dtype=np.float64)[:, None]
-        rows_right = n_rows - rows_left
+        total = sorted_targets.total_weight
+        weight_left = np.cumsum(sorted_targets.weights)[:-1][:, None]
+        weight_right = total - weight_left
         right_counts = total_counts[None, :] - left_counts
 
         weighted = (
-            rows_left[:, 0] * self._bits(left_counts, rows_left)
-            + rows_right[:, 0] * self._bits(right_counts, rows_right)
-        ) / n_rows
+            weight_left[:, 0] * self._bits(left_counts, weight_left)
+            + weight_right[:, 0] * self._bits(right_counts, weight_right)
+        ) / total
 
         return float(self._of_non_empty(sorted_targets)) - weighted
 
@@ -369,20 +380,27 @@ class VarianceImpurity(Impurity):
 
     __slots__ = ()
 
-    def _of_non_empty(self, target_values: FloatArray) -> float:
-        y_mean = np.mean(target_values)
-        mean_squared_error = np.power(target_values - y_mean, 2)
+    def _of_non_empty(self, target_values: WeightedTargets) -> float:
+        weights = target_values.weights
+        total = target_values.total_weight
 
-        return float(np.sum(mean_squared_error) / len(target_values))
+        y_mean = float(np.dot(weights, target_values.values) / total)
+        mean_squared_error = np.power(target_values.values - y_mean, 2)
 
-    def gains_at_every_prefix(self, sorted_targets: FloatArray) -> FloatArray:
+        return float(np.dot(weights, mean_squared_error) / total)
+
+    def gains_at_every_prefix(self, sorted_targets: WeightedTargets) -> FloatArray:
         """One sweep over running sums, with no sum of squares anywhere.
 
         The identity in the module docstring says the gain *is* the variance
         of the child means, so only the means are needed -- and a mean needs
         only a running sum::
 
-            gain = (S_left^2 / n_left + S_right^2 / n_right - S^2 / n) / n
+            gain = (S_left^2 / W_left + S_right^2 / W_right - S^2 / W) / W
+
+        where ``S`` is a weight-times-target sum and ``W`` a weight total.
+        Unweighted those are the plain sum and the row count, which is the form
+        this had before weights existed and reduces to exactly.
 
         Centring first is what makes that safe: uncentred, it subtracts two
         large nearly-equal numbers to recover a small one, the same
@@ -390,7 +408,7 @@ class VarianceImpurity(Impurity):
         centred. Gain is unchanged by shifting every target equally, so the
         centring costs nothing but conditioning.
 
-        The ``- S^2 / n`` term is kept even though centring is *supposed* to
+        The ``- S^2 / W`` term is kept even though centring is *supposed* to
         make S zero. It does not, quite: the mean carries its own rounding, so
         the centred total is a small non-zero number, and dropping the term
         lets that error through the cumulative sum multiplied by the row
@@ -398,16 +416,25 @@ class VarianceImpurity(Impurity):
         assuming a zero total cost 6.1e-07 relative error where keeping the
         term costs 1.7e-13.
         """
-        centred = sorted_targets - sorted_targets.mean()
-        total = centred.sum()
+        weights = sorted_targets.weights
+        weight_total = sorted_targets.total_weight
 
-        rows_left = np.arange(1, centred.size, dtype=np.float64)
-        rows_right = centred.size - rows_left
-        sum_left = np.cumsum(centred)[:-1]
+        # Centred on the *weighted* mean, since that is the constant the
+        # weighted variance is measured about and so the one that makes the
+        # cancellation harmless.
+        centred = sorted_targets.values - float(
+            np.dot(weights, sorted_targets.values) / weight_total
+        )
+        scaled = weights * centred
+        total = scaled.sum()
+
+        weight_left = np.cumsum(weights)[:-1]
+        weight_right = weight_total - weight_left
+        sum_left = np.cumsum(scaled)[:-1]
         sum_right = total - sum_left
 
         return (
-            sum_left**2 / rows_left
-            + sum_right**2 / rows_right
-            - total**2 / centred.size
-        ) / centred.size
+            sum_left**2 / weight_left
+            + sum_right**2 / weight_right
+            - total**2 / weight_total
+        ) / weight_total

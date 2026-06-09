@@ -10,7 +10,7 @@ What decides whether a wrapper can be saved
 Whether it still needs its engine to answer. Nineteen of these read what they
 need off the fitted engine and let it go, so what they hold afterwards is the
 whole of the fitted model and restoring it restores the model. The other
-seventeen keep the engine and predict through it, and an engine cannot travel in
+eighteen keep the engine and predict through it, and an engine cannot travel in
 this format: a fitted decision tree is a Cython structure with no public way
 back in, and the way that does exist is pickle, which this format was built to
 avoid. Restoring those from their learned state would hand back something that
@@ -112,6 +112,7 @@ NEEDS_ITS_ENGINE = (
 NOT_PERSISTABLE: dict[str, str] = {
     "SimpleLinearRegression": NEEDS_ITS_ENGINE,
     "KNearestNeighboursRegressor": NEEDS_ITS_ENGINE,
+    "AdaBoostClassifier": NEEDS_ITS_ENGINE,
     "KNearestNeighboursClassifier": NEEDS_ITS_ENGINE,
     "DecisionTreeRegressor": NEEDS_ITS_ENGINE,
     "DecisionTreeClassifier": NEEDS_ITS_ENGINE,

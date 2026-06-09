@@ -86,6 +86,7 @@ from sklearn.discriminant_analysis import (
 from sklearn.discriminant_analysis import (
     QuadraticDiscriminantAnalysis as EngineQuadraticDiscriminant,
 )
+from sklearn.ensemble import AdaBoostClassifier as EngineAdaBoost
 from sklearn.ensemble import BaggingClassifier as EngineBaggingClassifier
 from sklearn.ensemble import RandomForestClassifier as EngineRandomForestClassifier
 from sklearn.linear_model import LogisticRegression as EngineLogisticRegression
@@ -117,6 +118,7 @@ from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.exceptions import (
     CollinearFeaturesError,
+    DivergenceError,
     InvalidValuesError,
     TooFewValuesError,
 )
@@ -139,6 +141,7 @@ from oop_ml.core.logistic import stable_logistic, stable_softmax
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import ClassificationLeaf, LeafNode
+from oop_ml.core.tree.weights import WeightedTargets
 from oop_ml.core.types import FloatArray
 from oop_ml.core.validation import ValueRole
 from oop_ml.scikit.plumbing import (
@@ -1245,7 +1248,7 @@ class DecisionTreeClassifier(
 
         return target_column
 
-    def _leaf(self, target_values: Column) -> LeafNode:
+    def _leaf(self, target_values: WeightedTargets) -> LeafNode:
         """A leaf answering with the most common class among these targets.
 
         The frame requires it. The engine grows the tree, so nothing here
@@ -1253,13 +1256,15 @@ class DecisionTreeClassifier(
         """
         assert self._n_classes is not None
         counts = np.bincount(
-            target_values.values.astype(np.int64), minlength=self._n_classes
+            target_values.values.astype(np.int64),
+            weights=target_values.weights,
+            minlength=self._n_classes,
         )
 
         return ClassificationLeaf(
             prediction=float(np.argmax(counts)),
-            class_shares=counts / target_values.n_samples,
-            n_samples=target_values.n_samples,
+            class_shares=counts / target_values.total_weight,
+            n_samples=target_values.n_rows,
             impurity=self._impurity.of(target_values),
         )
 
@@ -2538,7 +2543,219 @@ class QuadraticDiscriminantAnalysis(MultiClassClassifier[Sequence[Feature], Feat
         )
 
 
+SILENT_MEMBER_ERROR = 1e-10
+"""How far under the guessing bar an error has to be to be worth keeping.
+
+The error-side reading of the numpy backend's ``SILENT_MEMBER_VOICE``. At
+the bar exactly, a member's voice is zero and it contributes nothing, and
+float64 puts a stump on a constant column one ulp on the wrong side of it.
+"""
+
+
+class AdaBoostClassifier(MultiClassClassifier[Sequence[Feature], Feature]):
+    """Reweighting rounds, run by scikit-learn's ``AdaBoostClassifier``.
+
+    Translation
+    -----------
+    ``n_members`` is the engine's ``n_estimators`` and ``learning_rate`` passes
+    through under its own name. ``max_depth`` configures the weak learner
+    rather than being handed over directly: the engine takes an ``estimator``
+    and defaults to ``DecisionTreeClassifier(max_depth=1)``, so this wrapper
+    builds that same stump at the requested depth. A stump is the point --
+    see the numpy module's docstring for why a strong learner makes the
+    ensemble one model in fifty copies.
+
+    There is no ``algorithm`` to translate. Older versions of the engine had
+    SAMME and SAMME.R; 1.9 has only SAMME, which is what both backends
+    implement.
+
+    ``member_voices`` is ``estimator_weights_`` and ``member_errors`` is
+    ``estimator_errors_``, both unchanged. ``margins`` is the engine's
+    ``decision_function``, widened back to one column per class when the
+    engine collapses a two-class problem to a single signed column.
+
+    How closely the two agree, and where they part
+    -----------------------------------------------
+    Both compute the same formula, and the numbers show it: across two, four
+    and five classes the voices, the margins and the probabilities all agree
+    to 1.8e-15 or better. On one three-class fixture they part company, the
+    voices differing by 0.265, and the cause is not the boosting at all -- it
+    is a tie between two equally good stump splits, which the two tree
+    implementations break differently. From there the reweighting sends the
+    two ensembles down different paths. So the contract asserts what the
+    ensemble achieves rather than which stumps it chose, which is the position
+    every model here with a discrete choice inside it takes.
+
+    Not mirrored from the numpy backend
+    -----------------------------------
+    ``members``. The engine's are its own fitted trees, and converting fifty of
+    them into this library's nodes to hand back would be work nothing here
+    reads; the other ensembles in this backend adopt their members because
+    prediction needs them, and this one predicts through the engine.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    n_members: int = Field(default=50, ge=1)
+    learning_rate: float = Field(default=1.0, gt=0.0)
+    max_depth: int = Field(default=1, ge=1)
+    random_seed: int | None = None
+
+    _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
+    _engine: Any = PrivateAttr(default=None)
+    _n_classes: int | None = PrivateAttr(default=None)
+
+    @property
+    def n_classes(self) -> int:
+        """How many classes the fit saw."""
+        self._check_fitted()
+        assert self._n_classes is not None
+        return self._n_classes
+
+    @property
+    def feature_names(self) -> tuple[str, ...]:
+        """The columns this model was fitted on, in order."""
+        self._check_fitted()
+        assert self._feature_names is not None
+        return self._feature_names
+
+    @property
+    def n_members_fitted(self) -> int:
+        """How many rounds actually ran, which may be fewer than asked for."""
+        self._check_fitted()
+        return int(len(self._engine.estimators_))
+
+    @property
+    def member_voices(self) -> FloatArray:
+        """How loudly each member votes, one per fitted member."""
+        self._check_fitted()
+        return np.asarray(self._engine.estimator_weights_, dtype=np.float64)[
+            : self.n_members_fitted
+        ]
+
+    @property
+    def member_errors(self) -> FloatArray:
+        """Each member's weighted error at the moment it was fitted."""
+        self._check_fitted()
+        return np.asarray(self._engine.estimator_errors_, dtype=np.float64)[
+            : self.n_members_fitted
+        ]
+
+    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+        """Fit the engine's rounds.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If any feature's length differs from the target's.
+        SingleClassError
+            If the target holds fewer than two classes, or leaves a gap in the
+            run from zero.
+        """
+        feature_set = FeatureSet(input_values)
+        feature_set.check_aligned_with(target_values)
+
+        target_column = target_values.column
+        target_column.check_is_label_encoded()
+
+        engine_type: Any = EngineAdaBoost
+        stump: Any = EngineDecisionTreeClassifier(
+            max_depth=self.max_depth, random_state=self.random_seed
+        )
+        engine = engine_type(
+            estimator=stump,
+            n_estimators=self.n_members,
+            learning_rate=self.learning_rate,
+            random_state=self.random_seed,
+        )
+        engine.fit(matrix_of(feature_set), target_column.values)
+
+        n_classes = target_column.n_classes
+        guessing = 1.0 - 1.0 / n_classes
+        first_error = float(np.asarray(engine.estimator_errors_)[0])
+
+        # The refusal the numpy backend makes, made here from the number the
+        # engine reports rather than from a second fit. The engine keeps going
+        # in this case and fills the ensemble with members whose voice works
+        # out to 2.2e-16, which is an ensemble that answers with a constant.
+        if first_error >= guessing - SILENT_MEMBER_ERROR:
+            raise DivergenceError(
+                f"the first weak learner was wrong on {first_error:.3f} of the "
+                f"weight, and guessing uniformly among {n_classes} classes is "
+                f"wrong on {guessing:.3f}, so it has nothing to contribute and "
+                "neither would the ensemble. Give the learner more depth, or "
+                "more informative columns"
+            )
+
+        self._feature_names = tuple(feature.name for feature in feature_set)
+        self._engine = engine
+        self._n_classes = n_classes
+
+        self._mark_fitted()
+        return self
+
+    def margins(self, input_values: Sequence[Feature]) -> FloatArray:
+        """Each class's share less the share spread across the others.
+
+        The engine collapses a two-class problem to one signed column, since
+        the two margins are then negatives of each other; this widens it back,
+        because a caller swapping backends should not have to know that.
+        """
+        self._check_fitted()
+        assert self._feature_names is not None
+        assert self._n_classes is not None
+
+        matrix = matched_matrix(self._feature_names, input_values)
+        decision = np.asarray(self._engine.decision_function(matrix))
+
+        if decision.ndim == 1:
+            return np.column_stack([-decision, decision])
+
+        return decision
+
+    def vote_shares(self, input_values: Sequence[Feature]) -> FloatArray:
+        """Each class's share of the members' voices, one row per query.
+
+        Recovered from the margins, which is the same quantity written the
+        other way: ``share = (margin + 1 / (K - 1)) * (K - 1) / K``.
+        """
+        self._check_fitted()
+        assert self._n_classes is not None
+
+        spread = 1.0 / (self._n_classes - 1)
+        margins = self.margins(input_values)
+
+        return (margins + spread) * (self._n_classes - 1) / self._n_classes
+
+    def predict_probabilities(self, input_values: Sequence[Feature]) -> ClassScores:
+        """The margins turned into something that behaves like a probability."""
+        self._check_fitted()
+        assert self._feature_names is not None
+
+        matrix = matched_matrix(self._feature_names, input_values)
+
+        return ProbabilityMatrix(
+            np.asarray(self._engine.predict_proba(matrix), dtype=np.float64)
+        )
+
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
+        """The class the members' voices most favour."""
+        self._check_fitted()
+        assert self._feature_names is not None
+
+        matrix = matched_matrix(self._feature_names, input_values)
+
+        return Predictions.already_checked(
+            np.asarray(self._engine.predict(matrix), dtype=np.float64)
+        )
+
+
 __all__ = [
+    "AdaBoostClassifier",
     "BaggingClassifier",
     "DecisionTreeClassifier",
     "GaussianNaiveBayes",

@@ -59,6 +59,8 @@ from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import ClassificationLeaf, LeafNode
+from oop_ml.core.tree.weights import WeightedTargets
+from oop_ml.core.types import NumericInput
 
 
 class DecisionTreeClassifier(
@@ -149,8 +151,8 @@ class DecisionTreeClassifier(
 
         return target_column
 
-    def _leaf(self, target_values: Column) -> LeafNode:
-        """A leaf predicting the most common class among these targets.
+    def _leaf(self, target_values: WeightedTargets) -> LeafNode:
+        """A leaf predicting the class carrying the most weight here.
 
         Ties go to the lowest class index. The prediction is returned on the
         same ``0 .. K-1`` scale the target uses, so it goes straight into a
@@ -173,8 +175,10 @@ class DecisionTreeClassifier(
         Parameters
         ----------
         target_values:
-            ``(n_rows,)`` of class positions, for every training row that
-            reached this node. Never empty.
+            Class positions for every training row that reached this node,
+            paired with how much each counts. Never empty. Unweighted the
+            shares below are plain counts over the row count, which is what
+            they were before weights existed.
 
         Returns
         -------
@@ -190,19 +194,26 @@ class DecisionTreeClassifier(
         # stack them. _n_classes rather than n_classes: this runs during
         # growth, and the public property is still refusing until fit ends.
         counts = np.bincount(
-            target_values.values.astype(np.int64), minlength=self._n_classes
+            target_values.values.astype(np.int64),
+            weights=target_values.weights,
+            minlength=self._n_classes,
         )
 
         return ClassificationLeaf(
             # argmax takes the first maximum, so the documented tie-break --
             # lowest class index -- arrives without being written.
             prediction=float(np.argmax(counts)),
-            class_shares=counts / target_values.n_samples,
-            n_samples=target_values.n_samples,
+            class_shares=counts / target_values.total_weight,
+            n_samples=target_values.n_rows,
             impurity=self._impurity.of(target_values),
         )
 
-    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+    def fit(
+        self,
+        input_values: Sequence[Feature],
+        target_values: Feature,
+        sample_weights: NumericInput | None = None,
+    ) -> Self:
         """Grow the tree, and record how many classes it spans.
 
         Parameters
@@ -211,6 +222,12 @@ class DecisionTreeClassifier(
             One or more predictor columns, all the same length as the target.
         target_values:
             The classes, as whole positions running ``0 .. K - 1``.
+        sample_weights:
+            How much each row counts, or ``None`` for all alike. A row of
+            weight 2 moves every impurity and every leaf exactly the way two
+            copies of it would, which is the identity the spec asserts rather
+            than restating the formulas. Boosting is what this exists for;
+            everything else here leaves it alone.
 
         Returns
         -------
@@ -246,7 +263,7 @@ class DecisionTreeClassifier(
             else self.n_known_classes
         )
 
-        return self._fit_tree(input_values, target_values)
+        return self._fit_tree(input_values, target_values, sample_weights)
 
     def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The majority class of the box each row falls in, as ``0.0 .. K-1``.

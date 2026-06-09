@@ -67,7 +67,8 @@ from oop_ml.core.tree.search import (
     SplitSearch,
 )
 from oop_ml.core.tree.split import GAIN_TIE_TOLERANCE, Split
-from oop_ml.core.types import FloatArray
+from oop_ml.core.tree.weights import WeightedTargets
+from oop_ml.core.types import FloatArray, NumericInput
 
 
 class TreeModel(Fittable):
@@ -238,7 +239,7 @@ class TreeModel(Fittable):
         """
 
     @abstractmethod
-    def _leaf(self, target_values: Column) -> LeafNode:
+    def _leaf(self, target_values: WeightedTargets) -> LeafNode:
         """The leaf that answers for a node holding these targets.
 
         The one line separating a tree regressor from a tree classifier, and
@@ -247,9 +248,10 @@ class TreeModel(Fittable):
         Parameters
         ----------
         target_values:
-            The targets of every training row that reached this node. Never
-            empty -- ``min_samples_leaf`` is at least 1 and the search rejects
-            any split that would empty a child.
+            The targets of every training row that reached this node, paired
+            with how much each counts. Never empty -- ``min_samples_leaf`` is
+            at least 1 and the search rejects any split that would empty a
+            child.
 
         Returns
         -------
@@ -360,7 +362,7 @@ class TreeModel(Fittable):
         return np.where(midpoints > distinct[:-1], midpoints, distinct[1:])
 
     def split_search(
-        self, feature_matrix: RowBlock, target_values: Column
+        self, feature_matrix: RowBlock, target_values: WeightedTargets
     ) -> SplitSearch:
         """Every candidate this node considered, kept or not, and why.
 
@@ -403,7 +405,6 @@ class TreeModel(Fittable):
                 "fit the model first"
             )
 
-        role = target_values.role
         candidates: list[SplitCandidate] = []
 
         for index, name in enumerate(self._feature_names):
@@ -416,8 +417,8 @@ class TreeModel(Fittable):
 
                 gain = self._impurity.gain(
                     target_values,
-                    Column.selecting(target_values.values[goes_left], role),
-                    Column.selecting(target_values.values[~goes_left], role),
+                    target_values.selecting(goes_left),
+                    target_values.selecting(~goes_left),
                 )
 
                 if (
@@ -444,7 +445,7 @@ class TreeModel(Fittable):
         return SplitSearch(candidates)
 
     def _best_split(
-        self, feature_matrix: RowBlock, target_values: Column
+        self, feature_matrix: RowBlock, target_values: WeightedTargets
     ) -> Split | None:
         """The highest-gain split of these rows, or ``None`` if there is none.
 
@@ -489,7 +490,7 @@ class TreeModel(Fittable):
 
         assert self._feature_names is not None
 
-        n_rows = target_values.n_samples
+        n_rows = target_values.n_rows
         if n_rows < 2:
             return None
 
@@ -505,7 +506,7 @@ class TreeModel(Fittable):
             # the difference between a second and a millisecond.
             order = np.argsort(column, kind="stable")
             sorted_column = column[order]
-            gains = self._impurity.gains_at_every_prefix(target_values.values[order])
+            gains = self._impurity.gains_at_every_prefix(target_values.reordered(order))
 
             # Entry i of gains is the cut leaving i + 1 rows on the left. Such
             # a cut is only a real question where the sorted value actually
@@ -551,7 +552,7 @@ class TreeModel(Fittable):
         return best
 
     def _grow(
-        self, feature_matrix: RowBlock, target_values: Column, depth: int
+        self, feature_matrix: RowBlock, target_values: WeightedTargets, depth: int
     ) -> TreeNode:
         """Build the subtree for these rows, recursively.
         This node becomes a leaf, via :meth:`_leaf`, when **any** of:
@@ -605,7 +606,6 @@ class TreeModel(Fittable):
         if best_split.gain < self.min_impurity_decrease:
             return self._leaf(target_values)
 
-        role = target_values.role
         send_left = best_split.sends_left(feature_matrix)
 
         if len(send_left) < self.min_samples_split:
@@ -615,22 +615,36 @@ class TreeModel(Fittable):
             split=best_split,
             left=self._grow(
                 feature_matrix.select_rows(send_left),
-                Column.selecting(target_values.values[send_left], role),
+                target_values.selecting(send_left),
                 depth + 1,
             ),
             right=self._grow(
                 feature_matrix.select_rows(~send_left),
-                Column.selecting(target_values.values[~send_left], role),
+                target_values.selecting(~send_left),
                 depth + 1,
             ),
-            n_samples=target_values.n_samples,
+            n_samples=target_values.n_rows,
             impurity=self._impurity.of(target_values),
         )
 
     def _fit_tree(
-        self, input_values: Sequence[Feature], target_values: Feature
+        self,
+        input_values: Sequence[Feature],
+        target_values: Feature,
+        sample_weights: NumericInput | None = None,
     ) -> Self:
         """Validate the inputs and grow the tree. The whole of fitting.
+
+        Parameters
+        ----------
+        sample_weights:
+            How much each row counts, or ``None`` for all alike, which is what
+            every caller but a boosting round wants. A row of weight 2 moves
+            every impurity and every leaf the way two copies of it would, and
+            a spec asserts that identity rather than restating the formulas.
+            The weights change what the tree *learns*; they do not change
+            ``n_samples`` on a node or what ``min_samples_leaf`` counts, both
+            of which stay statements about structure.
 
         Raises
         ------
@@ -639,7 +653,10 @@ class TreeModel(Fittable):
         NonUniqueFeaturesError
             If two features share a name.
         NonEqualArrayLengthError
-            If any feature's length differs from the target's.
+            If any feature's length differs from the target's, or if there is
+            not one weight per row.
+        InvalidValuesError
+            If a weight is negative or they total zero.
         """
         feature_set = FeatureSet(input_values)
         feature_set.check_aligned_with(target_values)
@@ -652,7 +669,10 @@ class TreeModel(Fittable):
         # and then slices rows to hand each child its share, and slicing rows
         # is what C order makes contiguous.
         rows = rows_of(feature_set.feature_matrix, [one.name for one in feature_set])
-        self._root = self._grow(rows, self._validated_target(target_values), 0)
+        weighted = WeightedTargets(
+            self._validated_target(target_values), sample_weights
+        )
+        self._root = self._grow(rows, weighted, 0)
 
         self._mark_fitted()
         return self
