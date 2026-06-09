@@ -9,9 +9,9 @@ is persistable, which is false.
 The refusal itself is correct and is not the interesting part. What is
 recorded alongside it, and measured here rather than asserted, is that the
 learned state of several wrappers transplants into the from-scratch namesake
-and predicts identically. That is the evidence behind the open question in
-CLAUDE.md about whether a document should be backend-neutral, and it is
-pinned so the answer does not drift while the question is open.
+and predicts identically. That is the evidence behind the open question of
+whether a document should be backend-neutral, and it is pinned so the answer
+does not drift while the question is open.
 """
 
 from __future__ import annotations
