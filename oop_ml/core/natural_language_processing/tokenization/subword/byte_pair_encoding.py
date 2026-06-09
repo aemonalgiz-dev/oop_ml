@@ -38,6 +38,36 @@ At the end of ten merges, ``lowest``, which the corpus never contained, encodes
 as ``lo``, ``w``, ``est</w>``: three pieces, every one of them a symbol the
 corpus taught, and ``est</w>`` carrying the fact that a word ended there.
 
+The hole in that claim, and what closes it
+------------------------------------------
+"Nothing is ever unknown" is true of unseen *words* and false of unseen
+*characters*. A merge only ever joins two symbols that already exist, so no
+vocabulary size can invent an alphabet row, and a character the corpus never
+contained has nothing to be spelled with. Fitted on lower-case English, this
+tokenizer answers the unknown token for the ``z`` of ``Alvarez``, and the
+round trip then returns text that is not the text it started as -- a silent
+loss rather than a refusal, which is the worse failure.
+
+``byte_fallback`` closes it, and is SentencePiece's option of the same name,
+the one Llama and Gemma are trained with. Every character has a UTF-8
+spelling, so a character with no row is emitted as the rows of its bytes,
+written ``<0x41>``. That costs 256 rows plus one for a standalone end-of-word
+marker, and buys the guarantee the method is usually described as already
+having.
+
+It is **on by default**, which is a deliberate departure from Sennrich, whose
+method has no such thing. The argument is that a silent loss is the wrong
+default: without it the unknown token stands in for a character, decoding
+returns text that is not the text that went in, and nothing raises. Pass
+``byte_fallback=False`` to get the published method exactly, which is what the
+spec does where it pins the unknown token's behaviour.
+
+Its rows are a floor rather than part of ``vocabulary_size``, and that is the
+second departure. SentencePiece counts them against the budget; counting them
+here would impose a minimum of 257 on every vocabulary and make Sennrich's own
+ten-merge example impossible to run, so what the caller asks for stays a bound
+on what the corpus *taught*.
+
 Why the marker sits on the last character
 -----------------------------------------
 ``w</w>`` and ``w`` are different symbols from the first step, so a merge that
@@ -75,6 +105,11 @@ A word whose last symbol was never in the corpus encodes to the unknown token
 without its end-of-word marker, so decoding runs it into the word that follows.
 That is a fact about any vocabulary with an unknown token: the token stands for
 "something was here", and nothing about what.
+
+Under ``byte_fallback`` that paragraph does not apply, because there is no
+unknown token to reach and the marker is emitted as a row of its own. The
+round trip is then exact for any text at all, which the spec asserts on Greek,
+on an accented word and on an emoji.
 """
 
 from __future__ import annotations
@@ -104,6 +139,18 @@ from oop_ml.core.natural_language_processing.tokenization.word_level.whitespace 
 )
 from oop_ml.core.network.purpose import PassPurpose
 
+BYTE_TOKENS: tuple[str, ...] = tuple(f"<0x{value:02X}>" for value in range(256))
+"""One row per byte, ``<0x00>`` to ``<0xFF>``, SentencePiece's spelling.
+
+Six characters wide, so none of them can collide with an alphabet symbol,
+which is one character or one character plus the end-of-word marker.
+"""
+
+BYTE_VALUE_OF: dict[str, int] = {
+    token: value for value, token in enumerate(BYTE_TOKENS)
+}
+"""The reverse, for decoding a run of byte rows back into text."""
+
 
 class BytePairEncoding(LearnedTokenizer):
     """Subword tokenization by greedy most-frequent-pair merging.
@@ -114,7 +161,8 @@ class BytePairEncoding(LearnedTokenizer):
         How many tokens to learn, counting the unknown token and every symbol
         of the alphabet. The fit stops early if no pair reaches
         ``minimum_pair_frequency`` first, and ``vocabulary.n_tokens`` says how
-        many it actually learned.
+        many it actually learned. The byte fallback rows sit outside this
+        budget; see ``byte_fallback``.
     pre_tokenizer:
         Decides where the words are before any merging. Merges never cross a
         word boundary.
@@ -127,7 +175,22 @@ class BytePairEncoding(LearnedTokenizer):
         end a word are distinct from pieces that continue one and decoding
         knows where the spaces go.
     unknown_token:
-        Stands in for any symbol the corpus never used.
+        Stands in for any symbol the corpus never used. Unreachable when
+        ``byte_fallback`` is on, because then every character has a spelling.
+    byte_fallback:
+        Whether a character with no row is emitted as the rows of its UTF-8
+        bytes instead of the unknown token. SentencePiece's option of the same
+        name, and **on by default here**, so that no text is unspellable and
+        every round trip is exact.
+
+        Its 256 byte rows and one standalone end-of-word marker are a floor
+        rather than part of ``vocabulary_size``, which is a deliberate
+        divergence from SentencePiece, where they count against the budget.
+        The reason is that counting them would put a hard minimum of 257 on
+        every vocabulary, which makes a small one impossible to ask for and
+        would mean Sennrich's own ten-merge example could not be run. What
+        ``vocabulary_size`` bounds is what the corpus *taught*; the byte rows
+        are structural and are taught by nothing.
     merge_dropout:
         Probability of skipping each applicable merge while encoding under
         ``TRAINING``. Zero, the default, is ordinary byte pair encoding.
@@ -141,12 +204,14 @@ class BytePairEncoding(LearnedTokenizer):
     minimum_pair_frequency: int = Field(default=2, ge=1)
     end_of_word_marker: str = Field(default="</w>", min_length=1)
     unknown_token: str = Field(default="[UNK]", min_length=1)
+    byte_fallback: bool = True
     merge_dropout: float = Field(default=0.0, ge=0.0, lt=1.0)
     random_seed: int | None = None
 
     _vocabulary: Vocabulary = PrivateAttr()
     _merges: Merges = PrivateAttr()
     _generator: random.Random = PrivateAttr()
+    _alphabet: frozenset[str] = PrivateAttr()
 
     def fit(self, corpus: Sequence[str]) -> Self:
         """Learn the merges from ``corpus``.
@@ -168,6 +233,7 @@ class BytePairEncoding(LearnedTokenizer):
             for word_count in counts
         ]
         alphabet = alphabet_of(spelled)
+        fallback = (*BYTE_TOKENS, self.end_of_word_marker) if self.byte_fallback else ()
 
         smallest_possible = len(alphabet) + 1
         if self.vocabulary_size < smallest_possible:
@@ -182,17 +248,27 @@ class BytePairEncoding(LearnedTokenizer):
             n_merges=self.vocabulary_size - smallest_possible,
             minimum_pair_frequency=self.minimum_pair_frequency,
         )
-        tokens = [self.unknown_token, *alphabet, *(merge.merged for merge in merges)]
+        # The byte rows go last, after the merges, so that turning the
+        # fallback on never renumbers a token that already existed. Every id a
+        # caller or a saved document holds is the id it was before.
+        tokens = [
+            self.unknown_token,
+            *alphabet,
+            *(merge.merged for merge in merges),
+            *fallback,
+        ]
 
         self._vocabulary = Vocabulary(tokens, unknown_token=self.unknown_token)
         self._merges = merges
+        self._alphabet = frozenset(alphabet)
         self._generator = random.Random(self.random_seed)
         self._mark_fitted()
         return self
 
     @property
     def vocabulary(self) -> Vocabulary:
-        """The unknown token, the alphabet in codepoint order, then the merges.
+        """The unknown token, the alphabet in codepoint order, then the merges,
+        then the byte fallback rows when ``byte_fallback`` is on.
 
         Raises
         ------
@@ -227,14 +303,67 @@ class BytePairEncoding(LearnedTokenizer):
         for word in self.pre_tokenizer.split(text).texts:
             pieces.extend(
                 apply_merges(
-                    self._symbols_of(word), self._merges, dropout, self._generator
+                    self._spellable(self._symbols_of(word)),
+                    self._merges,
+                    dropout,
+                    self._generator,
                 )
             )
         return tuple(pieces)
 
     def _text_from(self, pieces: Sequence[str]) -> str:
-        return "".join(pieces).replace(self.end_of_word_marker, " ").rstrip(" ")
+        if not self.byte_fallback:
+            return "".join(pieces).replace(self.end_of_word_marker, " ").rstrip(" ")
+
+        # Byte rows are only text once a whole run of them is decoded together,
+        # since one character can be several bytes and neither half is a
+        # character on its own.
+        parts: list[str] = []
+        pending = bytearray()
+        for piece in pieces:
+            value = BYTE_VALUE_OF.get(piece)
+            if value is not None:
+                pending.append(value)
+                continue
+            if pending:
+                parts.append(pending.decode("utf-8", errors="replace"))
+                pending.clear()
+            parts.append(piece)
+        if pending:
+            parts.append(pending.decode("utf-8", errors="replace"))
+        return "".join(parts).replace(self.end_of_word_marker, " ").rstrip(" ")
 
     def _symbols_of(self, word: str) -> tuple[str, ...]:
         """A word as characters, the last one carrying the end-of-word marker."""
         return (*word[:-1], word[-1] + self.end_of_word_marker)
+
+    def _spellable(self, symbols: Sequence[str]) -> tuple[str, ...]:
+        """``symbols`` with anything the alphabet lacks replaced by byte rows.
+
+        A no-op unless ``byte_fallback`` is on, and a no-op then for every
+        symbol the corpus taught, so a character with a row of its own is
+        never spelled as bytes.
+
+        The last symbol carries the end-of-word marker, and the marker is not
+        part of the character being spelled, so it is emitted separately. A
+        character the corpus only ever met inside a word keeps its own row and
+        takes the standalone marker rather than falling back to bytes.
+        """
+        if not self.byte_fallback:
+            return tuple(symbols)
+
+        marker = self.end_of_word_marker
+        spelled: list[str] = []
+        for position, symbol in enumerate(symbols):
+            if symbol in self._alphabet:
+                spelled.append(symbol)
+                continue
+            final = position == len(symbols) - 1
+            character = symbol[: -len(marker)] if final else symbol
+            if character in self._alphabet:
+                spelled.append(character)
+            else:
+                spelled.extend(BYTE_TOKENS[byte] for byte in character.encode("utf-8"))
+            if final:
+                spelled.append(marker)
+        return tuple(spelled)

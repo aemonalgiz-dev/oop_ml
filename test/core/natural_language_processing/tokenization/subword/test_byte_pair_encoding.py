@@ -29,6 +29,11 @@ from test.core.natural_language_processing.fixtures import (
 # The unknown token plus eleven symbols, then ten merges.
 TEN_MERGES = len(SENNRICH_ALPHABET) + 1 + 10
 
+# Byte fallback is on by default and adds a row per byte plus a standalone
+# end-of-word marker. They sit after the merges and outside ``vocabulary_size``,
+# so they change what the table holds and never what it learned.
+BYTE_ROWS = 257
+
 
 def fit_ten_merges() -> BytePairEncoding:
     return BytePairEncoding(vocabulary_size=TEN_MERGES).fit(SENNRICH_CORPUS)
@@ -47,13 +52,13 @@ class TestFit:
         vocabulary = fit_ten_merges().vocabulary
 
         assert list(vocabulary)[:12] == ["[UNK]", *SENNRICH_ALPHABET]
-        assert list(vocabulary)[12:] == [
+        assert list(vocabulary)[12:TEN_MERGES] == [
             left + right for left, right, _ in SENNRICH_FIRST_TEN_MERGES
         ]
         assert vocabulary.unknown_token == "[UNK]"
 
     def test_reaches_the_requested_size_exactly(self):
-        assert fit_ten_merges().vocabulary.n_tokens == TEN_MERGES
+        assert fit_ten_merges().vocabulary.n_tokens == TEN_MERGES + BYTE_ROWS
         assert fit_ten_merges().n_merges == 10
 
     def test_stops_when_no_pair_reaches_the_minimum_frequency(self):
@@ -63,7 +68,7 @@ class TestFit:
         )
 
         assert tokenizer.n_merges == 10
-        assert tokenizer.vocabulary.n_tokens == TEN_MERGES
+        assert tokenizer.vocabulary.n_tokens == TEN_MERGES + BYTE_ROWS
 
     def test_stops_when_nothing_is_left_to_merge(self):
         tokenizer = BytePairEncoding(vocabulary_size=100, minimum_pair_frequency=1).fit(
@@ -117,7 +122,7 @@ class TestFit:
     def test_a_one_character_word_is_its_marked_character(self):
         tokenizer = BytePairEncoding(vocabulary_size=3).fit(["a a a"])
 
-        assert list(tokenizer.vocabulary) == ["[UNK]", "a</w>"]
+        assert list(tokenizer.vocabulary)[:2] == ["[UNK]", "a</w>"]
 
 
 class TestEncode:
@@ -137,11 +142,24 @@ class TestEncode:
 
         assert tokenizer.encode("lower newest").texts == ("lower</w>", "newest</w>")
 
-    def test_a_symbol_the_corpus_never_used_is_unknown(self):
-        encoding = fit_ten_merges().encode("xyz")
+    def test_a_symbol_the_corpus_never_used_is_unknown_without_byte_fallback(self):
+        """Sennrich's method exactly, which the default no longer is.
+
+        Byte fallback is on by default and gives every character a spelling,
+        so this branch is only reachable by asking for the published method.
+        """
+        published = BytePairEncoding(
+            vocabulary_size=TEN_MERGES, byte_fallback=False
+        ).fit(SENNRICH_CORPUS)
+        encoding = published.encode("xyz")
 
         assert encoding.texts == ("[UNK]", "[UNK]", "[UNK]")
         assert set(encoding.ids) == {0}
+
+    def test_the_same_symbol_is_spelled_in_bytes_by_default(self):
+        encoding = fit_ten_merges().encode("xyz")
+
+        assert "[UNK]" not in encoding.texts
 
     def test_a_blank_text_encodes_to_nothing(self):
         assert fit_ten_merges().encode("   ") == Encoding([])
@@ -188,10 +206,21 @@ class TestDecode:
         assert tokenizer.decode(tokenizer.encode("low lower").ids) == "low lower"
 
     def test_an_unknown_last_symbol_loses_its_word_boundary(self):
-        """Documented rather than hidden: the unknown token carries no marker."""
-        tokenizer = fit_ten_merges()
+        """Documented rather than hidden: the unknown token carries no marker.
+
+        This is the failure byte fallback exists to remove, so it is asked of
+        the published method; under the default the same text round-trips.
+        """
+        tokenizer = BytePairEncoding(
+            vocabulary_size=TEN_MERGES, byte_fallback=False
+        ).fit(SENNRICH_CORPUS)
 
         assert tokenizer.decode(tokenizer.encode("lox low").ids) == "lo[UNK]low"
+
+    def test_and_keeps_it_under_byte_fallback(self):
+        tokenizer = fit_ten_merges()
+
+        assert tokenizer.decode(tokenizer.encode("lox low").ids) == "lox low"
 
 
 class TestMergeDropout:

@@ -71,9 +71,11 @@ def fit_constrained(**keywords: object) -> MorphemeConstrainedBytePairEncoding:
 
 
 def fit_plain() -> BytePairEncoding:
-    return BytePairEncoding(vocabulary_size=30, minimum_pair_frequency=1).fit(
-        UNDO_CORPUS
-    )
+    # Byte fallback off, because the claim is equivalence to the published
+    # method, and this tokenizer has no fallback of its own to match.
+    return BytePairEncoding(
+        vocabulary_size=30, minimum_pair_frequency=1, byte_fallback=False
+    ).fit(UNDO_CORPUS)
 
 
 def merge_triples(tokenizer: BytePairEncoding | MorphemeConstrainedBytePairEncoding):

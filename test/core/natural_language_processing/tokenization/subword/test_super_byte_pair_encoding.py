@@ -124,7 +124,11 @@ class TestFit:
     def test_with_nothing_to_cross_it_is_plain_byte_pair_encoding(self):
         """One word per text: lifting the boundary changes nothing, whatever the
         transition, and the merges are Sennrich's ten in Sennrich's order."""
-        plain = BytePairEncoding(vocabulary_size=TEN_MERGES).fit(SENNRICH_CORPUS)
+        # Byte fallback off, because the claim is equivalence to the published
+        # method, and this tokenizer has no fallback of its own to match.
+        plain = BytePairEncoding(vocabulary_size=TEN_MERGES, byte_fallback=False).fit(
+            SENNRICH_CORPUS
+        )
         lifted = SuperBytePairEncoding(
             vocabulary_size=TEN_MERGES, transition_size=15
         ).fit(SENNRICH_ONE_WORD_PER_TEXT)

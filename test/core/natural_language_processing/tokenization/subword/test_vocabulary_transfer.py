@@ -48,8 +48,17 @@ TEN_MERGES = len(SENNRICH_ALPHABET) + 1 + 10
 def fit_byte_pair(
     vocabulary_size: int, unknown_token: str = "[UNK]"
 ) -> BytePairEncoding:
+    """Sennrich's method, byte fallback off.
+
+    Every claim in this spec is worked by hand over a vocabulary small enough
+    to write out, and the 257 fallback rows would swamp all of them while
+    changing nothing about what transfer does. What fallback *does* change is
+    pinned separately in :class:`TestBetweenByteFallbackVocabularies`.
+    """
     return BytePairEncoding(
-        vocabulary_size=vocabulary_size, unknown_token=unknown_token
+        vocabulary_size=vocabulary_size,
+        unknown_token=unknown_token,
+        byte_fallback=False,
     ).fit(SENNRICH_CORPUS)
 
 
@@ -300,3 +309,34 @@ class TestBetweenGuards:
 
         assert [mapping.target_id for mapping in mappings] == list(range(TEN_MERGES))
         assert [mapping.target_token for mapping in mappings] == list(target.vocabulary)
+
+
+class TestBetweenByteFallbackVocabularies:
+    """What the fallback rows do to a move, which is the useful part.
+
+    They are the same 257 rows in every vocabulary that has them, spelled
+    identically, so they always copy across exactly. That is what makes a
+    moved vocabulary able to spell anything the old one could.
+    """
+
+    def with_fallback(self, vocabulary_size: int) -> BytePairEncoding:
+        return BytePairEncoding(vocabulary_size=vocabulary_size).fit(SENNRICH_CORPUS)
+
+    def test_every_byte_row_maps_to_the_same_byte_row(self):
+        source = self.with_fallback(TEN_MERGES)
+        target = self.with_fallback(THREE_MERGES)
+
+        mappings = VocabularyTransfer.between(source, target)
+
+        for token in ("<0x00>", "<0x41>", "<0xFF>"):
+            mapping = mappings.for_token(token)
+            assert mapping.is_mapped
+            assert [source.vocabulary.token_of(id) for id in mapping.source_ids] == [
+                token
+            ]
+
+    def test_nothing_is_left_unmapped(self):
+        source = self.with_fallback(TEN_MERGES)
+        target = self.with_fallback(THREE_MERGES)
+
+        assert VocabularyTransfer.between(source, target).n_unmapped == 0
