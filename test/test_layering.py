@@ -35,6 +35,12 @@ BACKENDS = ("numpy", "scikit")
 #: being part of it.
 TOKENIZATION = "core/natural_language_processing"
 
+#: The domain packages inside core, of which tokenization was the first. Each
+#: is shared for core's own reason -- a token id and a picture both have to
+#: mean one thing whichever backend reads them -- and each is built on the
+#: frame rather than being part of it.
+DOMAINS = ("core/natural_language_processing", "core/computer_vision")
+
 
 def _modules_under(package: str) -> list[pathlib.Path]:
     return sorted((PACKAGE_ROOT / package).rglob("*.py"))
@@ -142,3 +148,54 @@ def test_the_scan_sees_the_modules_it_thinks_it_does() -> None:
     assert len(_modules_under("numpy")) > 30
     assert len(_modules_under("scikit")) >= 6
     assert len(_modules_under(TOKENIZATION)) > 10
+
+
+@pytest.mark.parametrize("domain", DOMAINS)
+def test_the_frame_does_not_reach_up_for_a_domain(domain: str) -> None:
+    """The tokenizer rule above, held for every domain package rather than one.
+
+    A domain is built on the frame; the frame does not depend on one. Written
+    parametrized so that adding a third domain cannot forget to be checked.
+    """
+    dotted = "oop_ml." + domain.replace("/", ".")
+    domain_modules = set(_modules_under(domain))
+    offences: list[str] = []
+    for path in _modules_under("core"):
+        if path in domain_modules:
+            continue
+        for imported in _imported_packages(path):
+            if imported.startswith(dotted):
+                offences.append(f"{_relative(path)} imports {imported}")
+
+    assert not offences, f"the frame imports {dotted}:\n  " + "\n  ".join(
+        sorted(offences)
+    )
+
+
+@pytest.mark.parametrize("domain", DOMAINS)
+def test_no_domain_imports_a_sibling_domain(domain: str) -> None:
+    """The domains are siblings rather than a stack.
+
+    Text and pictures share the frame and nothing else, so a change to one
+    cannot reach the other. If the two ever want the same helper, it belongs
+    in the frame beneath them both, which is the argument
+    ``oop_ml/core/logistic.py`` already makes for two unrelated callers.
+    """
+    others = [name for name in DOMAINS if name != domain]
+    offences: list[str] = []
+    for path in _modules_under(domain):
+        for imported in _imported_packages(path):
+            for other in others:
+                dotted = "oop_ml." + other.replace("/", ".")
+                if imported.startswith(dotted):
+                    offences.append(f"{_relative(path)} imports {imported}")
+
+    assert not offences, f"{domain} reaches into a sibling domain:\n  " + "\n  ".join(
+        sorted(offences)
+    )
+
+
+@pytest.mark.parametrize("domain", DOMAINS)
+def test_every_domain_is_scanned_rather_than_empty(domain: str) -> None:
+    """The guard on the two guards above, which an empty glob would pass."""
+    assert len(_modules_under(domain)) >= 3
