@@ -1,6 +1,6 @@
 # Examples
 
-Ten runnable scripts, simplest first. Each one is written the way a user of
+Thirteen runnable scripts, simplest first. Each one is written the way a user of
 the installed package writes code — everything comes from the top-level
 `oop_ml` import, and no example reaches into the library's internal module
 paths. Reading one tells you what your own code should look like.
@@ -43,6 +43,8 @@ root rather than from anywhere.
 | 8 | `logistic_regression` | The same API pointed at a label instead of a quantity, how to read a coefficient that multiplies the odds, and two solvers arriving at one maximum 749 epochs apart. |
 | 9 | `classification_metrics` | Why accuracy is the wrong number on a rare class, and what moving the threshold buys and costs. |
 | 10 | `multiclass_classification` | Softmax against one-vs-rest on three classes, and why macro and micro averaging are two different claims about one model. |
+| 11 | `tokenization` | Four vocabularies from one corpus: how byte pair encoding, WordPiece, the unigram model and a byte tokenizer each spell a word they have seen, one they have not, and one spelled in letters the corpus never used; and what merge dropout does to a spelling while a model is training. |
+| 12 | `embeddings` | Four tables from one two-topic corpus: word2vec, GloVe, latent semantic analysis and pointwise mutual information each put the cooking words together and the sailing words together, and the function words between; what word2vec recorded while it learned; and a text as the mean of its words. |
 
 ## Supporting modules
 

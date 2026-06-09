@@ -52,6 +52,8 @@ Python 3.11 or later.
 | **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
 | **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
+| **Tokenization** | byte pair encoding, WordPiece, unigram, SentencePiece and seven more subword builders; word-level rules from whitespace to UAX #29; dictionary, lattice, hidden Markov and pointwise segmentation; Morfessor and a finite-state analyser; character, byte, patching and hashing schemes; codebook and finite scalar quantisation |
+| **Embeddings** | word2vec (skip-gram and CBOW, negative sampling and hierarchical softmax), FastText, GloVe, paragraph vectors; latent semantic analysis, PPMI with SVD, random indexing; bag of words with TF-IDF, mean pooling, smooth inverse frequency; one table object with cosine neighbours and analogies |
 
 ## Four Conventions I Held To
 
@@ -149,6 +151,29 @@ oop_ml/
     tree/          impurity, splits, nodes
     ensemble/      bootstrap samples and the records a fit leaves behind
     evaluation/    one evaluation class per task
+    natural_language_processing/
+      tokenization/  from text to the ids a model reads, and back
+        word_level/    whitespace, patterns, Penn Treebank, Moses, rule-plus-
+                       exceptions, UAX #29
+        segmentation/  maximum matching, dictionary lattice, hidden Markov,
+                       pointwise -- for scripts written without spaces
+        subword/       byte pair encoding and its byte-level and SuperBPE
+                       variants, WordPiece, unigram, SentencePiece, shortest
+                       path, greedy coverage, vocabulary transfer
+        morphology/    Morfessor, morpheme-constrained merges, a finite-state
+                       analyser
+        characters/    character and byte tokenizers, fixed and entropy
+                       patching
+        hashing/       CANINE's hashed characters, T-FREE's trigram hashing
+        quantisation/  codebook lookup and finite scalar quantisation, the
+                       same question asked of vectors
+      embeddings/    a vector per word or per text, and one table object
+                     that answers similarity, neighbours and analogies
+        counts/        term-document with TF-IDF, latent semantic analysis,
+                       PPMI with a decomposition, random indexing
+        prediction/    word2vec (both architectures, both objectives),
+                       FastText, GloVe, paragraph vectors
+        documents/     bag of words, mean pooling, smooth inverse frequency
   regression/      least_squares, penalised, neighbours, trees, ensembles
   classification/  binary, multiclass, neighbours, trees, ensembles
   preprocessing/   standardization, polynomial
@@ -160,9 +185,43 @@ to look for "how do I classify things"; the family is carried by a base class
 instead. All of it is re-exported from the top level, so `from oop_ml import
 Feature` is all most code needs.
 
+Tokenization follows the same shape. A pre-tokenizer decides where the words
+are and answers words that know their span in the source; a tokenizer owns a
+closed vocabulary and turns text into ids and back; the ones that learn their
+vocabulary fit the way every model here fits.
+
+```python
+from oop_ml import BytePairEncoding, PassPurpose
+
+tokenizer = BytePairEncoding(vocabulary_size=22, merge_dropout=0.1).fit(corpus)
+tokenizer.encode("lowest").texts  # ('lo', 'w', 'est</w>')
+tokenizer.encode("lowest", PassPurpose.TRAINING)  # a regularised spelling
+tokenizer.decode(tokenizer.encode("lowest").ids)  # 'lowest'
+```
+
+Named systems -- Jieba, spaCy, CANINE, ByT5, HuBERT -- are provided as the
+mechanism behind them, with the product's dictionary or model left to the
+caller; the eight requested methods with no mechanism here are declined by name
+in `oop_ml.core.natural_language_processing.tokenization.NOT_PROVIDED`, each with
+the reason, and a test holds the two lists to the request.
+
+Embeddings give those ids a geometry. Every technique answers the same table
+object, so the questions are asked the same way however the vectors were
+learned:
+
+```python
+from oop_ml import Word2Vec
+
+model = Word2Vec(dimension=50, window=3, epochs=15, random_seed=0).fit(corpus)
+model.most_similar("flour", n_results=3).words  # cooking words, on a cooking corpus
+model.similarity("flour", "anchor")  # cosine, near zero across topics
+model.embeddings.analogy(["king", "woman"], ["man"], n_results=1)
+model.history.fell  # the loss went down while it learned
+```
+
 ## Examples
 
-Eleven runnable scripts in [examples/](examples/), each written against the
+Thirteen runnable scripts in [examples/](examples/), each written against the
 installed package rather than the library's internals.
 
 ```bash
@@ -176,7 +235,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1806 tests
+pytest                  # 8770 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -190,8 +249,8 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1806 passing tests**, `ruff`
-and `pyright` clean, no stubs.
+Every supervised family is implemented and green, and tokenization and
+embeddings with it: **8770 passing tests**, `ruff` and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
 an application:

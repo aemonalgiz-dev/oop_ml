@@ -110,3 +110,40 @@ class ShapeMismatchError(MLLibError):
     surface at construction, where the mistake is, instead of hours later
     inside a matrix multiply, where the mistake merely lands.
     """
+
+
+class UnknownTokenError(MLLibError):
+    """Raised when a token is looked up in a vocabulary that has no room for it.
+
+    A closed vocabulary answers every lookup: a token it holds gets its own id,
+    and one it does not gets the id of the unknown token. This is raised only
+    when there is no unknown token to fall back on, which is the case for the
+    byte-level vocabularies that are closed by construction and so never
+    needed one, and for a caller decoding an id no vocabulary of that size
+    contains. Named separately from :class:`InvalidValuesError` because the
+    remedy is different: the text is fine, and it is the vocabulary that was
+    built without a way to say "something else".
+    """
+
+
+class NonUniqueTokensError(MLLibError):
+    """Raised when a vocabulary is handed the same token twice.
+
+    Two positions for one string would mean two ids for one token, and the
+    encoder would have to choose one of them silently. The sibling of
+    :class:`NonUniqueFeaturesError`, named separately because a token is not a
+    feature and a message about features would send a reader to the wrong
+    object.
+    """
+
+
+class VocabularyTooSmallError(MLLibError):
+    """Raised when a tokenizer is asked for fewer tokens than its alphabet.
+
+    Every subword vocabulary begins with the symbols the corpus is spelled in,
+    because a symbol that has no token cannot be encoded at all. A requested
+    size below that count is not a small vocabulary, it is one that cannot
+    represent its own training data, and the fit refuses rather than dropping
+    letters. Raised at ``fit`` rather than at construction because the
+    alphabet is a fact about the corpus, and the corpus arrives at ``fit``.
+    """

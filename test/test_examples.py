@@ -12,6 +12,7 @@ import pytest
 
 from examples import (
     classification_metrics,
+    embeddings,
     gradient_descent,
     logistic_regression,
     model_selection,
@@ -22,6 +23,7 @@ from examples import (
     regularization,
     simple_regression,
     standardization,
+    tokenization,
 )
 
 EXAMPLE_MODULES = [
@@ -36,6 +38,8 @@ EXAMPLE_MODULES = [
     classification_metrics,
     multiclass_classification,
     nearest_neighbours,
+    tokenization,
+    embeddings,
 ]
 
 

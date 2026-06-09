@@ -6,6 +6,12 @@ That last clause is the one worth a test, because it held only by accident
 until the shared value objects were moved into ``core``, and nothing about the
 code makes it obvious when it stops holding.
 
+``core/natural_language_processing`` is inside ``core`` and so is held to the
+same rule by the same scan: a token id has to mean one thing whichever backend
+reads it, so nothing there imports a backend. One more arrow runs inside
+``core``: the frame does not reach up for a tokenizer, because a tokenizer is
+built on the frame rather than being part of it, and a test says so.
+
 Two things break if a backend reaches into another. The dependency becomes a
 lie, since ``oop_ml.scikit`` would need the from-scratch implementations
 installed to answer a question the engine answers. And a caller who fits a
@@ -24,6 +30,10 @@ import pytest
 PACKAGE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "oop_ml"
 
 BACKENDS = ("numpy", "scikit")
+
+#: The one domain package inside core that is built on the frame rather than
+#: being part of it.
+TOKENIZATION = "core/natural_language_processing"
 
 
 def _modules_under(package: str) -> list[pathlib.Path]:
@@ -66,7 +76,8 @@ def test_a_backend_imports_no_other_backend(backend: str) -> None:
 
 
 def test_core_imports_no_backend() -> None:
-    """The arrow points one way. Core is what backends are written against."""
+    """The arrow points one way. Core is what backends are written against,
+    and the scan covers the tokenizers under it too."""
     offences: list[str] = []
     for path in _modules_under("core"):
         for imported in _imported_packages(path):
@@ -77,6 +88,39 @@ def test_core_imports_no_backend() -> None:
         "oop_ml.core imports a backend, which inverts the layering:\n  "
         + "\n  ".join(sorted(offences))
     )
+
+
+def test_the_frame_does_not_reach_up_for_a_tokenizer() -> None:
+    """Nothing in core outside the tokenizers imports the tokenizers. A
+    tokenizer is built on the frame; the frame does not depend on one."""
+    tokenization_modules = set(_modules_under(TOKENIZATION))
+    offences: list[str] = []
+    for path in _modules_under("core"):
+        if path in tokenization_modules:
+            continue
+        for imported in _imported_packages(path):
+            if imported.startswith("oop_ml.core.natural_language_processing"):
+                offences.append(f"{_relative(path)} imports {imported}")
+
+    assert not offences, (
+        "the frame imports oop_ml.core.natural_language_processing:\n  "
+        + "\n  ".join(sorted(offences))
+    )
+
+
+def test_the_tokenizers_do_import_the_frame() -> None:
+    """The guard on the guard above, as for the backends: an empty package or a
+    broken scan would pass vacuously."""
+    reaches_frame = any(
+        any(
+            imported.startswith("oop_ml.core.")
+            and not imported.startswith("oop_ml.core.natural_language_processing")
+            for imported in _imported_packages(path)
+        )
+        for path in _modules_under(TOKENIZATION)
+    )
+
+    assert reaches_frame
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
@@ -97,3 +141,4 @@ def test_the_scan_sees_the_modules_it_thinks_it_does() -> None:
     assert len(_modules_under("core")) > 40
     assert len(_modules_under("numpy")) > 30
     assert len(_modules_under("scikit")) >= 6
+    assert len(_modules_under(TOKENIZATION)) > 10
