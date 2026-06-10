@@ -74,17 +74,38 @@ and it could describe exactly one kind of layer. Nothing outside this class
 ever has to unflatten anything: the block goes out of ``correction_for`` and
 comes back into ``stepped_by`` without anybody in between reading it.
 
-Why plain loops
----------------
-Seven nested loops for the forward pass, and the same nesting again for each of
-the three backward gradients. That is the definition written down, and it is
-verifiable by reading, which is the whole point at this stage. Measured on this
-implementation, median of five, one forward pass over 2 rows of ``2x8x8``
-through 3 filters of 3x3 costs 1.1 ms, and a batch of 8 rows of ``1x28x28``
-through 8 filters of 3x3 costs 137 ms. That is slow, and it is meant to be
-replaced by a measured pass later, in the way this library replaced the split
-search and the neighbour scan. The correct-and-slow version is what such a pass
-is measured *against*, so it is not scaffolding to be thrown away.
+Why a view and a contraction, and where the loops went
+------------------------------------------------------
+The definition is seven nested loops for the forward pass and the same nesting
+again for each of the three backward gradients, and that is how this layer was
+first written, because it is verifiable by reading. It was also slow enough to
+decide what the website could show: a network of one convolution, one pooling
+layer and one dense layer took 30 s to train for 60 epochs on 90 pictures of
+12x12, so no page could train one inside a request.
+
+The rewrite lays every window out with ``sliding_window_view``, which is a view
+of the padded block and copies nothing, takes the stride by slicing, and then
+the sum over channels and kernel positions is one ``einsum`` over three shared
+axes, which numpy hands to a matrix multiply. The kernel gradient is the same
+contraction with the blame in place of the kernels. The blame passed down is
+the only part that still loops, over the ``kernel_size ** 2`` offsets inside a
+window: for one fixed offset the windows land on distinct input positions, so a
+sliced ``+=`` is exact, and it is the loop over offsets that adds up the
+windows that overlap. Measured, median of five, before and after::
+
+    (90, 1, 12, 12)  4 filters 3x3            forward  123 ms -> 0.63 ms
+                                              backward 319 ms -> 1.37 ms
+    (32, 3, 16, 16)  8 filters 3x3, padding 1 forward  936 ms -> 1.86 ms
+                                              backward 2031 ms -> 3.58 ms
+    (16, 4, 15, 15)  6 filters 5x5, stride 2  forward  142 ms -> 0.17 ms
+                                              backward 329 ms -> 0.52 ms
+
+Between 195x and 830x, and the larger ratios are where the loops had more
+kernel entries to walk. The loops are not thrown away. They live in
+``test/core/network/test_sweep_agreement.py``, written from the definition
+with no views and no einsum, and every configuration here, padding, a stride
+that does not divide the extent, several channels, a one-by-one kernel, agrees
+with them to 1e-12 on the scores and all three gradients.
 
 The two places convolution is usually got wrong are worth naming, because both
 run happily while training something slightly other than what was asked for.
@@ -123,6 +144,7 @@ from collections.abc import Sequence
 from math import sqrt
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 from oop_ml.core.exceptions import (
     InvalidValuesError,
@@ -550,41 +572,34 @@ class Conv2d(Layer):
         ] = inputs
         return bordered
 
-    def _weighted_window(
-        self, padded: FloatArray, row: int, filter_index: int, top: int, left: int
-    ) -> float:
-        """One output position's sum, over channels and kernel positions.
+    def _windows_of(self, padded: FloatArray) -> FloatArray:
+        """Every window the kernel visits, as a view rather than a copy.
 
         Parameters
         ----------
         padded:
             The bordered block, as :meth:`_padded` returns it.
-        row:
-            Which picture in the block.
-        filter_index:
-            Which filter is answering.
-        top:
-            The window's first row inside ``padded``.
-        left:
-            The window's first column inside ``padded``.
 
         Returns
         -------
-        float
-            The sum of kernel times padded value over every position in the
-            window, across every input channel. The filter's bias is added by
-            the caller, since it is added once per output position and belongs
-            to the filter rather than to the window.
+        FloatArray
+            ``(n_rows, channels, out_height, out_width, kernel_size,
+            kernel_size)``, where entry ``[n, c, y, x, i, j]`` is the padded
+            value kernel entry ``(i, j)`` multiplies when the window sits at
+            output position ``(y, x)``. It shares memory with ``padded``, so it
+            is read and never written.
+
+        Notes
+        -----
+        Every window of every step is laid out first and the stride is then
+        taken by slicing, which is where the output extent formula comes from:
+        ``extent - kernel_size + 1`` positions exist, and a stride of ``s``
+        keeps every ``s``-th of them, ``(extent - kernel_size) // s + 1``.
         """
-        total = 0.0
-        for channel in range(self._channels):
-            for kernel_row in range(self._kernel_size):
-                for kernel_column in range(self._kernel_size):
-                    total += float(
-                        self._kernels[filter_index, channel, kernel_row, kernel_column]
-                        * padded[row, channel, top + kernel_row, left + kernel_column]
-                    )
-        return total
+        every_window = sliding_window_view(
+            padded, (self._kernel_size, self._kernel_size), axis=(2, 3)
+        )
+        return every_window[:, :, :: self._stride, :: self._stride]
 
     def _response_for(self, inputs: FloatArray, purpose: PassPurpose) -> LayerResponse:
         """The forward pass, given a block already known to be the right shape.
@@ -613,124 +628,22 @@ class Conv2d(Layer):
 
         Notes
         -----
-        Seven nested loops, which is the definition written down. See the
-        module docstring for what that costs and why the cost is accepted here
-        rather than traded away for a version that cannot be checked by
-        reading.
-
-        The blocks are wrapped by
-        :meth:`~oop_ml.core.network.layer.LayerResponse.already_checked` rather
-        than through the checking constructor, and here that is a requirement
-        rather than an optimisation: the checking constructor is written for
-        the two-dimensional case and refuses a block of four dimensions
-        outright.
+        The definition is seven nested loops, over rows, filters, both output
+        axes, channels and both kernel axes, and the last three of those are a
+        sum. Laying every window out as a view turns that sum into one
+        contraction over three shared axes, which numpy hands to a matrix
+        multiply. See the module docstring for what that bought, and for the
+        loop version the tests still hold this against.
         """
-        n_rows = inputs.shape[0]
-        _, out_height, out_width = self._shape.answers
-        padded = self._padded(inputs)
-
-        scores = np.empty((n_rows, self._n_filters, out_height, out_width))
-        for row in range(n_rows):
-            for filter_index in range(self._n_filters):
-                bias = float(self._biases[filter_index])
-                for out_row in range(out_height):
-                    top = out_row * self._stride
-                    for out_column in range(out_width):
-                        left = out_column * self._stride
-                        scores[row, filter_index, out_row, out_column] = (
-                            self._weighted_window(padded, row, filter_index, top, left)
-                            + bias
-                        )
+        windows = self._windows_of(self._padded(inputs))
+        scores = (
+            np.einsum("ncyxij,fcij->nfyx", windows, self._kernels, optimize=True)
+            + self._biases[np.newaxis, :, np.newaxis, np.newaxis]
+        )
 
         outputs = self._activation.of(scores)
 
         return LayerResponse(inputs=inputs, scores=scores, outputs=outputs)
-
-    def _add_kernel_contribution(
-        self,
-        kernel_gradient: FloatArray,
-        blame: float,
-        padded: FloatArray,
-        row: int,
-        filter_index: int,
-        top: int,
-        left: int,
-    ) -> None:
-        """Add one output position's share to the kernel gradient.
-
-        The accumulation is the whole of weight sharing seen from the back. One
-        kernel entry multiplied a value at every output position, so its slope
-        is a sum over all of them, and a version that assigns rather than adds
-        trains on the last window alone while running perfectly.
-
-        Parameters
-        ----------
-        kernel_gradient:
-            ``(n_filters, channels, kernel_size, kernel_size)``, added into.
-        blame:
-            The slope of the loss at this output position's score.
-        padded:
-            The bordered input block, as :meth:`_padded` returns it.
-        row:
-            Which picture in the block.
-        filter_index:
-            Which filter answered at this position.
-        top:
-            The window's first row inside ``padded``.
-        left:
-            The window's first column inside ``padded``.
-        """
-        for channel in range(self._channels):
-            for kernel_row in range(self._kernel_size):
-                for kernel_column in range(self._kernel_size):
-                    kernel_gradient[
-                        filter_index, channel, kernel_row, kernel_column
-                    ] += blame * float(
-                        padded[row, channel, top + kernel_row, left + kernel_column]
-                    )
-
-    def _add_passed_down_contribution(
-        self,
-        padded_blame: FloatArray,
-        blame: float,
-        row: int,
-        filter_index: int,
-        top: int,
-        left: int,
-    ) -> None:
-        """Add one output position's share to the blame the input receives.
-
-        An input value covered by several windows was used several times, so it
-        collects a contribution from each, and the loop therefore runs over
-        output positions rather than input positions. Written the other way
-        round -- one pass per input value, asking which window it belongs to --
-        the bookkeeping at the border and under a stride greater than one is
-        where implementations quietly lose terms.
-
-        Parameters
-        ----------
-        padded_blame:
-            The bordered blame block, added into. Its border is stripped off
-            by the caller once every position has contributed.
-        blame:
-            The slope of the loss at this output position's score.
-        row:
-            Which picture in the block.
-        filter_index:
-            Which filter answered at this position.
-        top:
-            The window's first row inside ``padded_blame``.
-        left:
-            The window's first column inside ``padded_blame``.
-        """
-        for channel in range(self._channels):
-            for kernel_row in range(self._kernel_size):
-                for kernel_column in range(self._kernel_size):
-                    padded_blame[
-                        row, channel, top + kernel_row, left + kernel_column
-                    ] += blame * float(
-                        self._kernels[filter_index, channel, kernel_row, kernel_column]
-                    )
 
     def correction_for(
         self, response: LayerResponse, arriving: FloatArray
@@ -782,34 +695,42 @@ class Conv2d(Layer):
         """
         arriving = self._checked_arriving(response, arriving)
 
-        n_rows = response.scores.shape[0]
         _, out_height, out_width = self._shape.answers
         padded = self._padded(response.inputs)
 
         delta = arriving * self._activation.derivative_at(response.scores)
 
-        kernel_gradient = np.zeros_like(self._kernels)
-        bias_gradient = np.zeros(self._n_filters)
+        # One kernel entry multiplied a value at every output position of every
+        # row, so its slope is a sum over all of them. The contraction below
+        # runs over rows and both output axes at once, which is weight sharing
+        # seen from the back; a version that kept only one position would
+        # train on the last window alone while running perfectly.
+        kernel_gradient = np.einsum(
+            "nfyx,ncyxij->fcij", delta, self._windows_of(padded), optimize=True
+        )
+        bias_gradient = delta.sum(axis=(0, 2, 3))
+
+        # An input value covered by several windows was used several times and
+        # is owed a contribution from each. Every window's contribution is
+        # formed at once, then added back one kernel offset at a time: for a
+        # fixed offset (i, j) the windows land on distinct input positions, so
+        # a sliced += is exact, and the overlap between offsets is what the
+        # loop over offsets accumulates. That keeps the loop kernel_size ** 2
+        # long whatever the size of the picture.
+        contributions = np.einsum(
+            "nfyx,fcij->ncyxij", delta, self._kernels, optimize=True
+        )
         padded_blame = np.zeros_like(padded)
-
-        for row in range(n_rows):
-            for filter_index in range(self._n_filters):
-                for out_row in range(out_height):
-                    top = out_row * self._stride
-                    for out_column in range(out_width):
-                        left = out_column * self._stride
-                        blame = float(delta[row, filter_index, out_row, out_column])
-
-                        # One weight is reused at every position, so both of
-                        # these accumulate rather than assign. That is weight
-                        # sharing seen from the backward side.
-                        self._add_kernel_contribution(
-                            kernel_gradient, blame, padded, row, filter_index, top, left
-                        )
-                        bias_gradient[filter_index] += blame
-                        self._add_passed_down_contribution(
-                            padded_blame, blame, row, filter_index, top, left
-                        )
+        last_row = self._stride * (out_height - 1) + 1
+        last_column = self._stride * (out_width - 1) + 1
+        for kernel_row in range(self._kernel_size):
+            for kernel_column in range(self._kernel_size):
+                padded_blame[
+                    :,
+                    :,
+                    kernel_row : kernel_row + last_row : self._stride,
+                    kernel_column : kernel_column + last_column : self._stride,
+                ] += contributions[:, :, :, :, kernel_row, kernel_column]
 
         # The border was invented by _padded and belongs to nobody, so the
         # blame that landed on it is dropped rather than passed down.

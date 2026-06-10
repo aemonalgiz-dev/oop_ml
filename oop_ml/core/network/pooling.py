@@ -30,10 +30,11 @@ the same sweep, the same refusals, the same absence of parameters. What
 :class:`MaxPool2d` and :class:`AveragePool2d` actually differ by is a single
 function, ``d output / d input``, evaluated inside one window.
 
-That is why :class:`Pool2d` holds the sweep and a subclass supplies only
-:meth:`Pool2d.shares_of`, which answers what fraction of a window's answer each
-position in it is responsible for. Written that way the whole distinction is two
-lines of arithmetic and it reads as the derivative it is::
+That is why :class:`Pool2d` holds the sweep and a subclass supplies only a
+summary and :meth:`Pool2d.shares_in_each`, which answers what fraction of a
+window's answer each position in it is responsible for. Written that way the
+whole distinction is two lines of arithmetic and it reads as the derivative it
+is::
 
     maximum   the winner is responsible for all of it        [[0, 0], [1, 0]]
     average   every position is equally responsible          [[.25, .25], [.25, .25]]
@@ -121,11 +122,10 @@ frozen numbers, so the two passes cannot disagree about a winner even in
 principle.
 
 The cost is a second scan of every window. Measured on ``(32, 8, 26, 26)`` with
-``window=2, stride=2``, median of five runs, the forward pass takes 0.0692 s and
-the backward pass 0.0965 s. The backward pass is doing the same scan plus an
-index division and an accumulation, and the ratio of 1.39 is roughly that.
-Recording the winners forward would move work rather than remove it, and it is
-an optimisation to measure rather than a correction.
+``window=2, stride=2``, median of five runs, the forward pass takes 3.0 ms and
+the backward pass 4.5 ms, the second doing the same reduction plus a scatter of
+ones and the accumulation. Recording the winners forward would move work rather
+than remove it, and it is an optimisation to measure rather than a correction.
 
 :class:`~oop_ml.core.network.dropout.Dropout` reaches the opposite conclusion
 about the same question, and the two are worth reading together. Its mask cannot
@@ -133,36 +133,41 @@ be recomputed at all, because it was drawn at random, so it *has* to be carried
 on the response. A pooling winner is a function of frozen numbers the response
 already holds, so carrying it would be storing a derivable fact.
 
-What the shared sweep costs, measured rather than waved at
------------------------------------------------------------
-Folding both layers into one sweep is not free, and the number is worth having
-before deciding it was worth it. :meth:`Pool2d.shares_of` returns an array, so
-the backward pass allocates one small block per window where a max-specific
-version indexes a single position directly. Measured on ``(8, 4, 26, 26)`` at
-``window=2, stride=2``, median of five, the backward pass costs 35.8 ms through
-``shares_of`` against 16.4 ms written directly, a ratio of 2.18x; on an
-overlapping ``(4, 8, 14, 14)`` at ``stride=1`` it is 2.06x. The two agree
-exactly, which is what makes the comparison a comparison.
+What the shared sweep cost, and the pass that closed it
+--------------------------------------------------------
+Both passes were first written as plain nested Python loops over rows, channels
+and window positions, one window at a time, and folding both layers into one
+sweep through a per-window ``shares_of`` cost a further 2.18x on the backward
+pass over a max-specific version, because it allocated a small block per
+window. That was accepted on the grounds that the module was already 32x off a
+vectorised implementation and one optimisation pass would close both, and that
+is what happened.
 
-That cost is accepted here for the reason the next section gives: this whole
-module is already 32x off a vectorised implementation, so a 2.18x on top of it
-does not change what kind of code this is, and the optimisation pass that closes
-the 32x closes this along with it. What is bought is that the difference between
-the two layers is two lines of arithmetic that read as the derivatives they are,
-rather than two near-identical hundred-line sweeps that have to be diffed to see
-where they part.
+A subclass now answers for a whole stack of windows at once,
+:meth:`Pool2d.summarise_each` and :meth:`Pool2d.shares_in_each`, over a view
+laid out by ``sliding_window_view`` with the stride taken by slicing. The
+reshape-and-reduce trick is not general, since it holds only when the stride
+equals the window and the extents divide, and the view is: overlapping windows
+are overlapping views of the same memory. The blame is scattered back one
+offset inside the window at a time, where for a fixed offset the windows land
+on distinct positions and a sliced ``+=`` is exact. Measured, median of five,
+before and after::
 
-On the loops
-------------
-Both passes are plain nested Python loops over rows, channels and window
-positions, which is the definition written down. That is deliberate and it is
-slow: the forward pass above is 0.0692 s where a reshape-and-reduce over the
-same block is 0.0022 s, 32x quicker, and on that block the two agree exactly.
-This library's rule is that correctness comes first and speed comes in a
-separate pass that measures both ends. The reshape trick is also not general --
-it holds only when the stride equals the window and the extents divide evenly --
-so the replacement is a real piece of work rather than a one-line substitution,
-and it has to carry the tie convention with it.
+    max (32, 8, 26, 26)  window 2, stride 2   forward  132 ms -> 3.0 ms
+                                              backward 536 ms -> 4.5 ms
+    max (4, 8, 14, 14)   window 2, stride 1   forward   11 ms -> 0.26 ms
+                                              backward  59 ms -> 0.35 ms
+    avg (8, 4, 26, 26)   window 3, stride 2   forward   28 ms -> 0.16 ms
+                                              backward  30 ms -> 0.47 ms
+
+What the shared base bought survives the rewrite. The difference between the
+two layers is still two functions that read as the derivatives they are, now
+written over a trailing pair of axes instead of one window, and the per-window
+:meth:`Pool2d.summarise` and :meth:`Pool2d.shares_of` remain as the same
+functions asked about a stack of one. The loops live on in
+``test/core/network/test_sweep_agreement.py``, with a winner found by a scan
+rather than by ``argmax`` so the tie convention is checked against a statement
+of it, on blocks rounded to one decimal so ties are common.
 """
 
 from __future__ import annotations
@@ -172,6 +177,7 @@ from abc import abstractmethod
 from collections.abc import Sequence
 
 import numpy as np
+from numpy.lib.stride_tricks import sliding_window_view
 
 from oop_ml.core.exceptions import (
     InvalidValuesError,
@@ -228,10 +234,10 @@ def _as_whole_number(value: object, role: str) -> int:
 class Pool2d(Layer):
     """The geometry, the sweep and the refusals every pooling layer shares.
 
-    A subclass supplies :meth:`summarise` and :meth:`shares_of` and nothing
-    else. Both are functions of one window, so neither has to know about rows,
-    channels, strides or blocks, and the two of them together are the whole of
-    what one kind of pooling is.
+    A subclass supplies :meth:`summarise_each` and :meth:`shares_in_each` and
+    nothing else. Both are functions of the two trailing axes of a stack of
+    windows, so neither has to know about rows, channels, strides or blocks,
+    and the two of them together are the whole of what one kind of pooling is.
 
     Parameters
     ----------
@@ -350,40 +356,87 @@ class Pool2d(Layer):
         return self._stride
 
     @abstractmethod
-    def summarise(self, window: FloatArray) -> float:
-        """The one number this kind of pooling keeps for a window.
+    def summarise_each(self, windows: FloatArray) -> FloatArray:
+        """The one number this kind of pooling keeps, for every window at once.
 
         Parameters
         ----------
-        window:
-            ``(window, window)``, a view into the block being pooled. It is a
+        windows:
+            ``(..., window, window)``, a view into the block being pooled with
+            any number of leading axes, one window per trailing pair. It is a
             view rather than a copy, so it must not be written to.
 
         Returns
         -------
-        float
-            The window's answer.
+        FloatArray
+            ``(...)``, each window's answer, with the leading axes kept.
         """
 
     @abstractmethod
-    def shares_of(self, window: FloatArray) -> FloatArray:
-        """What fraction of this window's answer each position is responsible for.
+    def shares_in_each(self, windows: FloatArray) -> FloatArray:
+        """What fraction of each window's answer each position is responsible for.
 
-        The derivative of :meth:`summarise` with respect to each entry of the
-        window, which for every pooling layer here is also a set of weights
-        summing to one. See the module docstring for why those are the same
-        thing and why the sum matters.
+        The derivative of :meth:`summarise_each` with respect to each entry of
+        each window, which for every pooling layer here is also a set of
+        weights summing to one per window. See the module docstring for why
+        those are the same thing and why the sum matters.
 
         Parameters
         ----------
-        window:
-            ``(window, window)``, the same view :meth:`summarise` was given.
+        windows:
+            ``(..., window, window)``, the same view :meth:`summarise_each` was
+            given.
 
         Returns
         -------
         FloatArray
-            ``(window, window)``, summing to one.
+            ``(..., window, window)``, each trailing pair summing to one.
         """
+
+    def summarise(self, window: FloatArray) -> float:
+        """The one number this kind of pooling keeps for a single window.
+
+        Parameters
+        ----------
+        window:
+            ``(window, window)``.
+
+        Returns
+        -------
+        float
+            The window's answer, by the same arithmetic the sweep uses, since
+            it is :meth:`summarise_each` asked about a stack of one.
+        """
+        return float(self.summarise_each(np.asarray(window)[np.newaxis])[0])
+
+    def shares_of(self, window: FloatArray) -> FloatArray:
+        """What fraction of a single window's answer each position earned.
+
+        Parameters
+        ----------
+        window:
+            ``(window, window)``.
+
+        Returns
+        -------
+        FloatArray
+            ``(window, window)``, summing to one, from :meth:`shares_in_each`
+            asked about a stack of one.
+        """
+        return self.shares_in_each(np.asarray(window)[np.newaxis])[0]
+
+    def _windows_of(self, inputs: FloatArray) -> FloatArray:
+        """Every window the layer visits, as a view rather than a copy.
+
+        ``(n_rows, channels, out_height, out_width, window, window)``. Every
+        window of every step is laid out first and the stride is taken by
+        slicing, so a stride below the window gives overlapping views of the
+        same memory, which is exactly what overlap means.
+        """
+        every_window = sliding_window_view(
+            inputs, (self._window, self._window), axis=(2, 3)
+        )
+        return every_window[:, :, :: self._stride, :: self._stride]
 
     def _response_for(self, inputs: FloatArray, purpose: PassPurpose) -> LayerResponse:
         """One number per window, given a block already checked.
@@ -411,28 +464,14 @@ class Pool2d(Layer):
 
         Notes
         -----
-        The definition, written as the four nested loops it is: for each row,
-        for each channel, for each window position, whatever :meth:`summarise`
-        says. The window is a view, so no copy is made per position.
+        The definition is four nested loops: for each row, for each channel,
+        for each window position, whatever the summary says. Laying every
+        window out as one view lets the subclass answer all of them in a
+        single reduction over the two trailing axes.
         """
-        n_rows = inputs.shape[0]
-        channels, out_height, out_width = self._shape.answers
-
-        outputs = np.empty((n_rows, channels, out_height, out_width))
-        for row in range(n_rows):
-            for channel in range(channels):
-                for out_row in range(out_height):
-                    top = out_row * self._stride
-                    for out_column in range(out_width):
-                        left = out_column * self._stride
-                        outputs[row, channel, out_row, out_column] = self.summarise(
-                            inputs[
-                                row,
-                                channel,
-                                top : top + self._window,
-                                left : left + self._window,
-                            ]
-                        )
+        outputs = np.ascontiguousarray(
+            self.summarise_each(self._windows_of(inputs)), dtype=np.float64
+        )
 
         # Pooling applies no bend, so the score and the answer are one and the
         # same block. Saying that here keeps LayerResponse honest rather than
@@ -487,32 +526,29 @@ class Pool2d(Layer):
         """
         arriving = self._checked_arriving(response, arriving)
 
-        n_rows = response.inputs.shape[0]
-        channels, out_height, out_width = self._shape.answers
+        _, out_height, out_width = self._shape.answers
 
+        owed = (
+            self.shares_in_each(self._windows_of(response.inputs))
+            * arriving[:, :, :, :, np.newaxis, np.newaxis]
+        )
+
+        # Accumulate: with a stride below the window, one input contributes to
+        # several windows and is owed all of them. For one fixed offset inside
+        # the window the windows land on distinct positions, so the sliced +=
+        # is exact, and the loop over offsets is where overlapping windows add
+        # up. It runs window ** 2 times whatever the size of the picture.
         passed_down = np.zeros_like(response.inputs)
-        for row in range(n_rows):
-            for channel in range(channels):
-                for out_row in range(out_height):
-                    top = out_row * self._stride
-                    for out_column in range(out_width):
-                        left = out_column * self._stride
-                        window = response.inputs[
-                            row,
-                            channel,
-                            top : top + self._window,
-                            left : left + self._window,
-                        ]
-                        # Accumulate: with a stride below the window, one input
-                        # contributes to several windows and is owed all of them.
-                        passed_down[
-                            row,
-                            channel,
-                            top : top + self._window,
-                            left : left + self._window,
-                        ] += float(
-                            arriving[row, channel, out_row, out_column]
-                        ) * self.shares_of(window)
+        last_row = self._stride * (out_height - 1) + 1
+        last_column = self._stride * (out_width - 1) + 1
+        for offset_row in range(self._window):
+            for offset_column in range(self._window):
+                passed_down[
+                    :,
+                    :,
+                    offset_row : offset_row + last_row : self._stride,
+                    offset_column : offset_column + last_column : self._stride,
+                ] += owed[:, :, :, :, offset_row, offset_column]
 
         return LayerCorrection(passed_down=passed_down, gradient=None)
 
@@ -579,28 +615,27 @@ class MaxPool2d(Pool2d):
 
     __slots__ = ()
 
-    def summarise(self, window: FloatArray) -> float:
-        """The largest value in the window."""
-        return float(window.max())
+    def summarise_each(self, windows: FloatArray) -> FloatArray:
+        """The largest value in each window."""
+        return windows.max(axis=(-2, -1))
 
-    def shares_of(self, window: FloatArray) -> FloatArray:
-        """One at the winning position, zero everywhere else.
+    def shares_in_each(self, windows: FloatArray) -> FloatArray:
+        """One at each window's winning position, zero everywhere else.
 
         The derivative of a maximum. Over the region where the winner stays the
         winner, the answer *is* that input, so its slope is exactly 1 and every
         other position's is exactly 0.
 
-        ``numpy.argmax`` reads the window flattened in row-major order and
+        Each window is read flattened in row-major order and ``numpy.argmax``
         returns the first index on a tie, which is the convention the module
-        docstring commits to. The forward pass asks the same function about the
-        same frozen numbers, so the two cannot disagree about who won.
+        docstring commits to. The value at that index is the maximum the
+        forward pass kept, so the two passes cannot disagree about who won.
         """
-        shares = np.zeros_like(window)
-        winning_row, winning_column = np.unravel_index(
-            int(np.argmax(window)), window.shape
-        )
-        shares[winning_row, winning_column] = 1.0
-        return shares
+        flattened = windows.reshape(*windows.shape[:-2], -1)
+        winners = np.argmax(flattened, axis=-1)[..., np.newaxis]
+        shares = np.zeros(flattened.shape, dtype=np.float64)
+        np.put_along_axis(shares, winners, 1.0, axis=-1)
+        return shares.reshape(windows.shape)
 
 
 class AveragePool2d(Pool2d):
@@ -625,15 +660,16 @@ class AveragePool2d(Pool2d):
 
     __slots__ = ()
 
-    def summarise(self, window: FloatArray) -> float:
-        """The mean of the window."""
-        return float(window.mean())
+    def summarise_each(self, windows: FloatArray) -> FloatArray:
+        """The mean of each window."""
+        return windows.mean(axis=(-2, -1))
 
-    def shares_of(self, window: FloatArray) -> FloatArray:
+    def shares_in_each(self, windows: FloatArray) -> FloatArray:
         """The same fraction everywhere, one over the number of positions.
 
         The derivative of a mean. Each entry enters the answer with coefficient
         ``1 / n``, so each is responsible for exactly that much of it, and a
         two-by-two window hands each of its four positions a quarter.
         """
-        return np.full_like(window, 1.0 / window.size)
+        side = windows.shape[-1]
+        return np.full(windows.shape, 1.0 / (side * side), dtype=np.float64)
