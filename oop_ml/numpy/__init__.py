@@ -36,6 +36,11 @@ from oop_ml.core.preprocessing.feature_scalings import (
     FeatureScalings,
 )
 from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
+from oop_ml.core.sequences.transitions import (
+    StateDistribution,
+    TransitionCounts,
+    TransitionMatrix,
+)
 from oop_ml.numpy.associative_memory.hopfield_network import (
     BipolarPattern,
     HebbianWeights,
@@ -118,6 +123,7 @@ from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.numpy.preprocessing.rescaling.affine import (
     FeatureScaler,
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     RobustScaler,
     RootMeanSquareScaler,
@@ -153,6 +159,7 @@ from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.robust.huber_regression import HuberRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.sequences.markov_chain import MarkovChain
 
 __all__ = [
     "BipolarPattern",
@@ -214,9 +221,14 @@ __all__ = [
     "MinMaxScaler",
     "RobustScaler",
     "RootMeanSquareScaler",
+    "MeanCentrer",
     "FeatureScaling",
     "FeatureScalings",
     "Standardizer",
+    "MarkovChain",
+    "StateDistribution",
+    "TransitionCounts",
+    "TransitionMatrix",
     "BaggingRegressor",
     "GradientBoostingRegressor",
     "RandomForestRegressor",

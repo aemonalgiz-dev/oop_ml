@@ -17,11 +17,38 @@ scaler                       centre              spread
 ``MaxAbsScaler``             zero                the largest magnitude
 ``RobustScaler``             the median          the interquartile range
 ``RootMeanSquareScaler``     zero                the root mean square
+``MeanCentrer``              the mean            one
 ===========================  ==================  ==========================
 
 So a subclass here supplies :meth:`FeatureScaler.centre_of` and
 :meth:`FeatureScaler.spread_of` and nothing else. Everything around them, the
 fit, the by-name matching, the round trip and every refusal, is written once.
+
+Why a spread of one is honest here
+----------------------------------
+:class:`MeanCentrer` reports a spread of exactly 1.0 for every column it
+learns, whatever that column's own spread is. Read as "this column's spread is
+one", that would be the lie the established libraries tell when they patch a
+zero spread with a one, and a caller reading ``scalings["height"].spread``
+could take it that way.
+
+It is not that reading, for the reason the table already gives for a centre of
+zero. What an :class:`~oop_ml.core.preprocessing.affine_scalings.AffineScaling`
+reports as its spread is *what the centred value is divided by*, not a statistic
+of the column, and :class:`MaxAbsScaler` and :class:`RootMeanSquareScaler` have
+reported a centre of 0.0 on every column all along on exactly that reading. A
+spread of one is the same statement from the other side: this scaler divides by
+one, which is to say by nothing. The patch is a lie because it replaces a
+measured spread of zero with a one, after which the two cannot be told apart.
+Here nothing was measured and nothing is replaced, and the number is the same on
+every column precisely because it is not a reading of any of them.
+
+What the frame must not do is refuse on its behalf. The zero-spread refusal
+lives in :class:`AffineScaling` and fires on the divisor, and this scaler's
+divisor is never zero, so a constant column is accepted and centred to exact
+zeros. That is the right answer for a scaler that does not divide, and the spec
+asserts it beside the refusal the four dividing members make of the all-zero
+column.
 
 Why ``Standardizer`` is in the table and not in this module
 ------------------------------------------------------------
@@ -46,6 +73,17 @@ than measured. **Robust** uses the median and the interquartile range, so a
 tenth of the column can be nonsense without moving either number. **Root mean
 square** divides by magnitude without centring at all, which is the input-side
 twin of :class:`~oop_ml.core.network.row_normalisation.RMSNormalization`.
+**Mean centring** removes the level and nothing else, for a method whose
+question is about spread around the middle of the data rather than about scale.
+
+The clearest case of a method that needs it is a search for the direction the
+data spreads along. Measured on two hundred rows spread along ``(1, -1)``
+around a level of ``(10, 10)``, the leading singular direction of the raw block
+points at the level, agreeing with it to a cosine of 0.999996 and with the
+spread to 0.0029, which is to say not at all. Centred first, the same
+calculation agrees with the spread to 0.99993. The uncentred answer is not a
+worse estimate of the spread; it answers a different question, where the data
+sits, and nothing about it looks wrong.
 
 Why a zero spread is refused rather than patched
 --------------------------------------------------
@@ -116,8 +154,8 @@ class FeatureScaler(Transformer[Sequence[Feature]]):
     LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
     """The centre and spread per column, which is the whole of the fit.
 
-    Declared on the family rather than on each of the four, since what a
-    scaler learns is the same pair whichever rule chose it.
+    Declared on the family rather than on each member, since what a scaler
+    learns is the same pair whichever rule chose it.
     """
 
     _scalings: AffineScalings | None = None
@@ -154,8 +192,9 @@ class FeatureScaler(Transformer[Sequence[Feature]]):
     def spread_of(values: FloatArray) -> float:
         """What to divide this column's centred values by.
 
-        Must be strictly positive for a column that can be scaled at all;
-        :class:`AffineScaling` refuses anything else, by name.
+        One for the scaler that deliberately does not divide. Must be strictly
+        positive for a column that can be scaled at all; :class:`AffineScaling`
+        refuses anything else, by name.
         """
 
     def fit(self, input_values: Sequence[Feature]) -> Self:
@@ -364,3 +403,32 @@ class RootMeanSquareScaler(FeatureScaler):
     def spread_of(values: FloatArray) -> float:
         """The root mean square, which is magnitude measured about zero."""
         return float(np.sqrt(np.mean(values**2)))
+
+
+class MeanCentrer(FeatureScaler):
+    """Subtract each column's mean, and divide by nothing.
+
+    The half of standardizing that is not about scale. The level is removed and
+    everything else is kept: the spread, the shape of the column, and the gap
+    between any two of its values. Standardizing is this followed by dividing by
+    the standard deviation, which the spec asserts rather than describes.
+
+    A constant column is accepted and answers zeros, where every other member
+    that centres refuses it. That is not the patch the module docstring
+    declines, because nothing is divided here and there is no zero spread to
+    paper over; a column of zeros is the honest centred column.
+
+    What it costs is the thing :class:`MaxAbsScaler` exists to avoid. A column
+    whose zeros are structural has its mean written into every one of them, so
+    a sparse column stops being sparse, exactly as it does under standardizing.
+    """
+
+    @staticmethod
+    def centre_of(values: FloatArray) -> float:
+        """The mean, so that the centred column averages zero."""
+        return float(np.mean(values))
+
+    @staticmethod
+    def spread_of(values: FloatArray) -> float:
+        """One. This scaler deliberately does not divide by anything."""
+        return 1.0

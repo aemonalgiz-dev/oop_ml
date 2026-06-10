@@ -38,7 +38,9 @@ from oop_ml.numpy import (
     GaussianMixture,
     GaussianNaiveBayes,
     LinearDiscriminantAnalysis,
+    MarkovChain,
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     QuadraticDiscriminantAnalysis,
     RestrictedBoltzmannMachine,
@@ -157,6 +159,12 @@ BINARY_FEATURES = [
     Feature("second", np.array([1.0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1])),
 ]
 """Rows a Boltzmann machine can read, whose units are strictly binary."""
+
+STATE_SEQUENCES = [
+    ["sunny", "sunny", "rainy", "cloudy", "sunny", "rainy", "rainy"],
+    ["cloudy", "cloudy", "sunny"],
+]
+"""Named states a Markov chain can count, across two sequences."""
 
 
 ROUND_TRIPS = {
@@ -323,6 +331,14 @@ ROUND_TRIPS = {
     "RootMeanSquareScaler": (
         lambda: RootMeanSquareScaler().fit(FEATURES),
         transform_answer,
+    ),
+    "MeanCentrer": (
+        lambda: MeanCentrer().fit(FEATURES),
+        transform_answer,
+    ),
+    "MarkovChain": (
+        lambda: MarkovChain(smoothing=0.5).fit(STATE_SEQUENCES),
+        lambda model: np.asarray(model.transitions),
     ),
     "RestrictedBoltzmannMachine": (
         lambda: RestrictedBoltzmannMachine(

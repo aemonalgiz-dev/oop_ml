@@ -1,13 +1,18 @@
 """Spec for the affine scaling family, where the differences carry the file.
 
-Four scalers are specified here and they share almost everything. Each learns a
+Five scalers are specified here and they share almost everything. Each learns a
 centre and a spread per column and then answers ``(value - centre) / spread``,
 so the fit, the by-name matching, the round trip and every refusal are one
-implementation with four readings of two numbers laid over it. That shared half
+implementation with five readings of two numbers laid over it. That shared half
 is asserted of every member at once in
 :class:`TestTheAffineFamilyContract`, because a claim about a family that is
 only ever made of whichever member was written first is a claim nobody is
 keeping.
+
+The fifth member, mean centring, joined after the table of breaks below was
+measured. It divides by nothing, so it is held to every family claim except the
+ones that need a column refused, and :class:`TestMeanCentring` makes the claims
+only it makes.
 
 The shared half is also the easy half. A round trip through a division and a
 multiplication is hard to get wrong and, having got it right once, impossible to
@@ -175,6 +180,7 @@ from oop_ml.core.preprocessing.affine_scalings import (
 from oop_ml.numpy.preprocessing.rescaling.affine import (
     FeatureScaler,
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     RobustScaler,
     RootMeanSquareScaler,
@@ -216,9 +222,15 @@ SCALERS = [
     pytest.param(MaxAbsScaler, id="MaxAbsScaler"),
     pytest.param(RobustScaler, id="RobustScaler"),
     pytest.param(RootMeanSquareScaler, id="RootMeanSquareScaler"),
+    pytest.param(MeanCentrer, id="MeanCentrer"),
 ]
 
-# The same four members paired with the centre and spread each one must read off
+# The members that divide by something read off the column. Mean centring
+# divides by nothing, so it has no spread that can be zero, and the claims
+# that need a column to be refused are made of these four and not of it.
+DIVIDING_SCALERS = [one for one in SCALERS if one.values[0] is not MeanCentrer]
+
+# The same five members paired with the centre and spread each one must read off
 # TEMPERATURES. Hand arithmetic, recorded above where the fixture is defined,
 # and deliberately not computed here from anything the implementation uses.
 HAND_WORKED_READINGS = [
@@ -226,9 +238,14 @@ HAND_WORKED_READINGS = [
     pytest.param(MaxAbsScaler, 0.0, 28.0, id="MaxAbsScaler"),
     pytest.param(RobustScaler, 21.0, 3.0, id="RobustScaler"),
     pytest.param(RootMeanSquareScaler, 0.0, 22.262075, id="RootMeanSquareScaler"),
+    pytest.param(MeanCentrer, 22.0, 1.0, id="MeanCentrer"),
 ]
 
-# The same four paired with what each must read off CROSSES_ZERO. All four are
+DIVIDING_READINGS = [
+    one for one in HAND_WORKED_READINGS if one.values[0] is not MeanCentrer
+]
+
+# The same five paired with what each must read off CROSSES_ZERO. All five are
 # exact integers, and none of them coincides with the reading of that column's
 # magnitudes, which is what TEMPERATURES cannot say.
 SIGNED_READINGS = [
@@ -236,6 +253,7 @@ SIGNED_READINGS = [
     pytest.param(MaxAbsScaler, 0.0, 10.0, id="MaxAbsScaler"),
     pytest.param(RobustScaler, 1.0, 4.0, id="RobustScaler"),
     pytest.param(RootMeanSquareScaler, 0.0, 5.0, id="RootMeanSquareScaler"),
+    pytest.param(MeanCentrer, -1.0, 1.0, id="MeanCentrer"),
 ]
 
 
@@ -484,13 +502,14 @@ class TestTheAffineFamilyContract:
 
         assert not np.allclose(reused, refitted)
 
-    @pytest.mark.parametrize("scaler", SCALERS)
+    @pytest.mark.parametrize("scaler", DIVIDING_SCALERS)
     def test_a_column_of_zeros_is_refused(self, scaler: type[FeatureScaler]) -> None:
         """No centre and no reading of spread makes this column divisible.
 
         The constant column of *sevens* is deliberately not the fixture here,
         because the four members disagree about it. See
-        :class:`TestWhatAConstantColumnSeparates`.
+        :class:`TestWhatAConstantColumnSeparates`. Mean centring is not among
+        the four, since it divides by nothing; see :class:`TestMeanCentring`.
         """
         with pytest.raises(AllSameValuesError):
             scaler().fit([Feature("flat", [0.0, 0.0, 0.0])])
@@ -637,11 +656,11 @@ class TestAFailedFitLeavesTheOldOneIntact:
 
         return instance
 
-    @pytest.mark.parametrize("scaler", SCALERS)
+    @pytest.mark.parametrize("scaler", DIVIDING_SCALERS)
     def test_it_is_still_fitted(self, scaler: type[FeatureScaler]) -> None:
         assert self.refit_that_fails(scaler).is_fitted is True
 
-    @pytest.mark.parametrize("scaler", SCALERS)
+    @pytest.mark.parametrize("scaler", DIVIDING_SCALERS)
     def test_it_still_knows_both_columns(self, scaler: type[FeatureScaler]) -> None:
         assert self.refit_that_fails(scaler).scalings.names == (
             "temperature",
@@ -649,7 +668,7 @@ class TestAFailedFitLeavesTheOldOneIntact:
         )
 
     @pytest.mark.parametrize(
-        ("scaler", "expected_centre", "expected_spread"), HAND_WORKED_READINGS
+        ("scaler", "expected_centre", "expected_spread"), DIVIDING_READINGS
     )
     def test_the_first_column_kept_its_original_reading(
         self,
@@ -667,7 +686,7 @@ class TestAFailedFitLeavesTheOldOneIntact:
         assert scaling.centre == pytest.approx(expected_centre)
         assert scaling.spread == pytest.approx(expected_spread, abs=1e-6)
 
-    @pytest.mark.parametrize("scaler", SCALERS)
+    @pytest.mark.parametrize("scaler", DIVIDING_SCALERS)
     def test_it_still_answers_what_it_answered_before(
         self, scaler: type[FeatureScaler]
     ) -> None:
@@ -1276,3 +1295,98 @@ class TestTheRobustReadings:
 
         assert centre == pytest.approx(7.0)
         assert 7.0 not in self.EVEN_LENGTH
+
+
+class TestMeanCentring:
+    """The member that divides by nothing, and what that changes.
+
+    It sits inside every claim of the family contract that is about centring,
+    matching, the round trip and the hand-worked readings, and outside the two
+    that need a column to be refused, since a scaler dividing by one has no
+    divisor that can be zero. These are the claims only it makes.
+    """
+
+    def test_the_spread_is_one_on_every_column_whatever_the_column_s_spread(
+        self,
+    ) -> None:
+        """Not a reading of the column, which is why it is the same number twice."""
+        scalings = fitted(MeanCentrer).scalings
+
+        assert scalings["temperature"].spread == 1.0
+        assert scalings["humidity"].spread == 1.0
+        assert population_standard_deviation_of(
+            TEMPERATURES
+        ) != population_standard_deviation_of(HUMIDITIES)
+
+    def test_the_centred_column_averages_zero(self) -> None:
+        centred = fitted(MeanCentrer).transform(training_features())[0].values
+
+        assert mean_of([float(value) for value in centred]) == pytest.approx(
+            0.0, abs=1e-12
+        )
+
+    def test_the_column_s_own_spread_is_untouched(self) -> None:
+        centred = fitted(MeanCentrer).transform(training_features())[0].values
+
+        assert population_standard_deviation_of(
+            [float(value) for value in centred]
+        ) == pytest.approx(population_standard_deviation_of(TEMPERATURES))
+
+    def test_the_gaps_between_values_are_kept(self) -> None:
+        """On the column that crosses zero, where a sign error would show."""
+        centred = (
+            MeanCentrer().fit_transform([Feature("signed", CROSSES_ZERO)])[0].values
+        )
+
+        np.testing.assert_allclose(np.diff(centred), np.diff(CROSSES_ZERO))
+
+    def test_standardizing_is_centring_then_dividing_by_the_deviation(self) -> None:
+        """The deviation from the plain Python definition, not from either class."""
+        centred = MeanCentrer().fit_transform(training_features())[0].values
+        standardized = Standardizer().fit_transform(training_features())[0].values
+
+        np.testing.assert_allclose(
+            centred / population_standard_deviation_of(TEMPERATURES), standardized
+        )
+
+    @pytest.mark.parametrize(
+        "column",
+        [
+            pytest.param([7.0, 7.0, 7.0], id="sevens"),
+            pytest.param([0.0, 0.0, 0.0], id="zeros"),
+        ],
+    )
+    def test_a_constant_column_is_accepted_and_answers_exact_zeros(
+        self, column: list[float]
+    ) -> None:
+        """Every dividing member refuses the zeros, and two refuse the sevens.
+
+        There is no divisor here to be zero, so there is nothing to refuse, and
+        a column of zeros is what centring a constant honestly gives.
+        """
+        rescaled = MeanCentrer().fit_transform([Feature("flat", column)])[0].values
+
+        assert [float(value) for value in rescaled] == [0.0, 0.0, 0.0]
+
+    def test_it_writes_the_mean_into_every_structural_zero(self) -> None:
+        """``[0, 0, 0, 4, 0, 8]`` has a mean of 2.0, so every zero becomes -2.0.
+
+        Standardizing answers -0.6547 for the same zeros, which is -2.0 divided
+        by that column's standard deviation of 3.0551. Centring is where the
+        sparsity goes, and dividing afterwards does not bring it back.
+        """
+        sparse = TestStructuralZeros.SPARSE
+
+        rescaled = MeanCentrer().fit_transform([Feature("counts", sparse)])[0].values
+
+        assert [float(value) for value in rescaled] == [
+            -2.0,
+            -2.0,
+            -2.0,
+            2.0,
+            -2.0,
+            6.0,
+        ]
+        assert population_standard_deviation_of(sparse) == pytest.approx(
+            3.0551, abs=1e-4
+        )

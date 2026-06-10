@@ -96,6 +96,7 @@ from oop_ml.core.exceptions import (
     NonBinaryLabelsError,
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
+    NonUniqueStationaryDistributionError,
     NonUniqueTokensError,
     NotFittedError,
     ShapeMismatchError,
@@ -308,6 +309,7 @@ from oop_ml.core.network.row_normalisation import (
 )
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.network.stack import LayerStack, StackResponse
+from oop_ml.core.network.upsampling import NearestUpsample2d
 from oop_ml.core.network.weight_normalisation import (
     ReparameterisedGradient,
     WeightNormalization,
@@ -333,6 +335,11 @@ from oop_ml.core.schedule import (
     ExponentialDecaySchedule,
     LinearDecaySchedule,
     Schedule,
+)
+from oop_ml.core.sequences.transitions import (
+    StateDistribution,
+    TransitionCounts,
+    TransitionMatrix,
 )
 from oop_ml.core.solving.normal_equations import (
     LeastSquaresLine,
@@ -447,6 +454,7 @@ from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.numpy.preprocessing.rescaling.affine import (
     FeatureScaler,
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     RobustScaler,
     RootMeanSquareScaler,
@@ -482,6 +490,7 @@ from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.robust.huber_regression import HuberRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.sequences.markov_chain import MarkovChain
 
 __all__ = [
     # Type aliases, for annotating your own code
@@ -603,6 +612,7 @@ __all__ = [
     "MaxAbsScaler",
     "RobustScaler",
     "RootMeanSquareScaler",
+    "MeanCentrer",
     "PolynomialTerm",
     "PolynomialTerms",
     "FeatureScaling",
@@ -675,6 +685,7 @@ __all__ = [
     "Pool2d",
     "MaxPool2d",
     "AveragePool2d",
+    "NearestUpsample2d",
     "PassPurpose",
     "Dropout",
     "DropoutResponse",
@@ -843,6 +854,11 @@ __all__ = [
     "WordVectorPooling",
     "MeanPooling",
     "SmoothInverseFrequency",
+    # Sequences, where the order of the data is the data
+    "MarkovChain",
+    "StateDistribution",
+    "TransitionCounts",
+    "TransitionMatrix",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
@@ -861,5 +877,6 @@ __all__ = [
     "SingularHessianError",
     "UnknownTokenError",
     "NonUniqueTokensError",
+    "NonUniqueStationaryDistributionError",
     "VocabularyTooSmallError",
 ]

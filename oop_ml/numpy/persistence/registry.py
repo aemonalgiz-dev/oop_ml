@@ -76,6 +76,7 @@ from oop_ml.numpy.generative.restricted_boltzmann_machine import (
 from oop_ml.numpy.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.numpy.preprocessing.rescaling.affine import (
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     RobustScaler,
     RootMeanSquareScaler,
@@ -110,6 +111,7 @@ from oop_ml.numpy.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.numpy.regression.penalised.ridge_regression import RidgeRegression
 from oop_ml.numpy.regression.robust.huber_regression import HuberRegression
 from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.sequences.markov_chain import MarkovChain
 
 PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
     persistable.__name__: persistable
@@ -155,9 +157,12 @@ PERSISTABLE_TYPES: dict[str, type[BaseModel]] = {
         MaxAbsScaler,
         RobustScaler,
         RootMeanSquareScaler,
+        MeanCentrer,
         PolynomialFeatures,
         RegressionPipeline,
         ClassificationPipeline,
+        # sequences
+        MarkovChain,
         # kernels appear inside hyperparameters, never as top-level models
         LinearKernel,
         ConstantSchedule,

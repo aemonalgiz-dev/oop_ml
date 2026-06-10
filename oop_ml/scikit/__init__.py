@@ -9,22 +9,24 @@ worth running.
 
 Absence is declared, never silent
 ----------------------------------
-Not every model exists in every backend. scikit-learn has no Hopfield network
-and no self-organising map, and for three more of this library's models its
-nearest estimator either answers a different question or would leave configured
-fields read by nothing. Rather than let such a model be quietly missing here,
-every numpy export that this backend does not provide is listed in
+Not every model exists in every backend. scikit-learn has no Hopfield network,
+no self-organising map and no Markov chain, and for three more of this
+library's models its nearest estimator either answers a different question or
+would leave configured fields read by nothing. Rather than let such a model be
+quietly missing here, every numpy export that this backend does not provide is
+listed in
 :data:`NOT_PROVIDED` with the reason, and a contract test asserts that the two
 lists together cover every model exactly once. A model can be present or it can
 be declined; it cannot be forgotten.
 
-Thirty-seven models are wrapped here and five are declined. Each family was
+Thirty-eight models are wrapped here and six are declined. Each family was
 built behind the same contract suite the numpy backend already passes, and each
-left :data:`NOT_PROVIDED` honest as it landed. The five that remain are
+left :data:`NOT_PROVIDED` honest as it landed. The six that remain are
 permanent absences rather than work still to do, so each reason names the
 mechanism that breaks and the measurement behind it. Naming a missing class
-would be the weaker refusal, since the engine ships a near miss for every one of
-the five, and a reader told only that a name is absent will reach for it.
+would be the weaker refusal, since the engine ships a near miss for five of the
+six, and a reader told only that a name is absent will reach for it. The sixth,
+the Markov chain, has no near miss at all, and its reason says so.
 
 What does not interchange
 --------------------------
@@ -65,6 +67,7 @@ from oop_ml.scikit.persistence import (  # noqa: F401  registers this backend
 )
 from oop_ml.scikit.preprocessing import (
     MaxAbsScaler,
+    MeanCentrer,
     MinMaxScaler,
     PolynomialFeatures,
     RobustScaler,
@@ -195,6 +198,19 @@ NOT_PROVIDED: dict[str, str] = {
         "invented, which is arithmetic wearing an engine's coat rather than a "
         "wrap"
     ),
+    "MarkovChain": (
+        "scikit-learn has no model of a sequence of states, and the closest "
+        "thing it ships is nothing. Swept across all 208 estimators, the only "
+        "two whose names mention a chain are ClassifierChain and "
+        "RegressorChain, which feed one output column's predictions into the "
+        "features of the next and have no states, no transitions and no "
+        "notion of which row came after which. Every estimator's fit reads a "
+        "matrix of rows, so a sequence would have to arrive already counted "
+        "into a transition table, and the counting, the division, the matrix "
+        "power, the stationary solve and the draw are the whole of this "
+        "model. A wrapper would be the numpy backend's arithmetic with no "
+        "engine underneath it at all"
+    ),
 }
 
 __all__: list[str] = [
@@ -220,6 +236,7 @@ __all__: list[str] = [
     "LassoRegression",
     "LogisticRegression",
     "MaxAbsScaler",
+    "MeanCentrer",
     "MinMaxScaler",
     "MultinomialLogisticRegression",
     "MultipleLinearRegression",

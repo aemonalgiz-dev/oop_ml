@@ -75,6 +75,7 @@ from oop_ml.core.preprocessing.feature_scalings import (
     FeatureScalings,
 )
 from oop_ml.core.preprocessing.polynomial_terms import PolynomialTerm, PolynomialTerms
+from oop_ml.core.sequences.transitions import TransitionCounts
 from oop_ml.core.tree.node import (
     ClassificationLeaf,
     DecisionNode,
@@ -422,6 +423,16 @@ def _encoded(value: Any) -> Any:
             "inertia": value.inertia,
         }
 
+    if isinstance(value, TransitionCounts):
+        # The counts and not the table, because the table is the counts plus
+        # the smoothing, and the smoothing is a hyperparameter the document
+        # already carries. Storing both would let a hand edit make them disagree.
+        return {
+            "__kind__": "TransitionCounts",
+            "states": list(value.states),
+            "counts": _encoded(value.values),
+        }
+
     if isinstance(value, TreeNode):
         return {"__kind__": "TreeNode", "node": _encoded_node(value)}
 
@@ -563,6 +574,11 @@ def _decoded(value: Any, depth: int) -> Any:
                 ]
             ),
             value["inertia"],
+        )
+
+    if kind == "TransitionCounts":
+        return TransitionCounts(
+            _expect_list(value, "states"), _decoded(value["counts"], depth + 1)
         )
 
     if kind == "TreeNode":

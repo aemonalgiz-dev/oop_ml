@@ -99,6 +99,20 @@ class SingleClassError(MLLibError):
     """
 
 
+class NonUniqueStationaryDistributionError(MLLibError):
+    """Raised when a Markov chain has more than one stationary distribution.
+
+    That happens exactly when the chain holds more than one closed group of
+    states, a group a walk can enter and never leave. Each closed group has its
+    own stationary distribution, and every mixture of them is stationary too,
+    so "the" stationary distribution names nothing. A reducible chain with a
+    single closed group is not this case: it has exactly one, with no share at
+    all on the states it drains away from. Named separately from
+    :class:`UndefinedMetricError` because the remedy is specific: the counts
+    are fine, and it is the chain they describe that splits in two.
+    """
+
+
 class ShapeMismatchError(MLLibError):
     """Raised when two widths that have to agree do not.
 
