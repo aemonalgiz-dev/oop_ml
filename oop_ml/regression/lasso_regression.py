@@ -191,29 +191,22 @@ class LassoRegression(LinearFeatureRegressor):
         return float(np.sign(value) * max(0.0, abs(value) - threshold))
 
     @staticmethod
-    def _partial_residual(
-        design_matrix: FloatArray,
-        weights: FloatArray,
-        target_values: FloatArray,
-        column_index: int,
-    ) -> FloatArray:
-        """What this one column alone is being asked to explain.
+    def _column_norms(design_matrix: FloatArray) -> FloatArray:
+        """``sum(x_j ** 2)`` for every column, computed once for the whole solve.
 
-        The residual with every column's contribution removed and then this
-        column's own contribution added back, which makes it the leftover as it
-        would stand if this coefficient were zero::
-
-            r_j = y - X b + x_j * b_j
+        This is the denominator of every coordinate update, and it does not move
+        as the weights move, so recomputing it inside the sweep is pure waste.
+        The ``einsum`` form gets the column-wise sum of squares without building
+        a squared copy of the matrix as a temporary.
         """
-        column = design_matrix[:, column_index]
-
-        return target_values - design_matrix @ weights + column * weights[column_index]
+        return np.einsum("ij,ij->j", design_matrix, design_matrix)
 
     def _coordinate_optimum(
         self,
-        design_matrix: FloatArray,
-        weights: FloatArray,
-        target_values: FloatArray,
+        column: FloatArray,
+        residual: FloatArray,
+        weight: float,
+        column_norm: float,
         column_index: int,
     ) -> float:
         """The value this coefficient should take, with the others held fixed.
@@ -223,19 +216,23 @@ class LassoRegression(LinearFeatureRegressor):
         which is the same ratio ``SimpleLinearRegression`` uses. The L1 penalty
         then enters by shaving the numerator toward zero before the division,
         and that is what allows the result to come out at exactly zero.
+
+        The partial residual ``r_j = r + x_j * b_j`` is never actually built.
+        Expanding the numerator shows why it does not need to be::
+
+            x_j . (r + x_j * b_j)  =  x_j . r  +  (x_j . x_j) * b_j
+
+        so the same number falls out of one dot product against the residual we
+        are already carrying, plus a norm we precomputed. Materialising ``r_j``
+        instead means recomputing ``X b`` for every column of every sweep, which
+        is what turns an O(n p) sweep into an O(n p^2) one.
         """
-        column = design_matrix[:, column_index]
-        correlation = float(
-            column
-            @ self._partial_residual(
-                design_matrix, weights, target_values, column_index
-            )
-        )
+        correlation = float(column @ residual) + column_norm * weight
 
         if self._is_penalised(column_index):
             correlation = self._soft_threshold(correlation, self.penalty / 2)
 
-        return correlation / float(column @ column)
+        return correlation / column_norm
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Sweep the coefficients to their own optima until they settle.
@@ -255,8 +252,19 @@ class LassoRegression(LinearFeatureRegressor):
         Both exits are recorded: settling below ``tolerance`` (converged) or
         exhausting ``max_iterations`` (gave up). See ``converged_``.
         """
-        target_values = target_column.values
-        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
+        # Columns of a C-ordered matrix are strided, so every dot product below
+        # would read memory with a gap between elements. One transpose up front
+        # makes each column contiguous and pays for itself many sweeps over.
+        columns = np.asfortranarray(design_matrix)
+        parameter_count = columns.shape[1]
+
+        weights = np.zeros(parameter_count, dtype=np.float64)
+        column_norms = self._column_norms(columns)
+
+        # The residual is carried across the entire solve and repaired in place
+        # each time a coefficient moves, which is what keeps a sweep at O(n p).
+        # Starting from all-zero weights it is simply the target itself.
+        residual = np.array(target_column.values, dtype=np.float64)
 
         self._iterations_run = 0
         self._converged = False
@@ -264,14 +272,24 @@ class LassoRegression(LinearFeatureRegressor):
         for _ in range(self.max_iterations):
             largest_change = 0.0
 
-            for column_index in range(design_matrix.shape[1]):
-                previous_weight = weights[column_index]
-                weights[column_index] = self._coordinate_optimum(
-                    design_matrix, weights, target_values, column_index
+            for column_index in range(parameter_count):
+                column = columns[:, column_index]
+                previous_weight = float(weights[column_index])
+                new_weight = self._coordinate_optimum(
+                    column,
+                    residual,
+                    previous_weight,
+                    float(column_norms[column_index]),
+                    column_index,
                 )
-                largest_change = max(
-                    largest_change, abs(float(weights[column_index] - previous_weight))
-                )
+
+                change = new_weight - previous_weight
+                if change != 0.0:
+                    weights[column_index] = new_weight
+                    # Repair the residual for this one coefficient's movement.
+                    residual -= column * change
+
+                largest_change = max(largest_change, abs(change))
 
             self._iterations_run += 1
 

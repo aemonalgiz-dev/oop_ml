@@ -26,7 +26,7 @@ beside the data it describes keeps it out of the models.
 
 from __future__ import annotations
 
-from typing import Protocol, TypeAlias, runtime_checkable
+from typing import Protocol, TypeAlias, cast
 
 import numpy as np
 
@@ -41,7 +41,6 @@ from oop_ml.core.validation import (
 )
 
 
-@runtime_checkable
 class HasColumn(Protocol):
     """Anything that can supply an already-validated :class:`Column`.
 
@@ -51,6 +50,13 @@ class HasColumn(Protocol):
     dependency running one way only, where ``feature`` knows about ``column``
     and never the reverse, while still allowing a feature to be handed to
     anything that wants a column.
+
+    Deliberately not ``@runtime_checkable``. The decorator would let us write
+    ``isinstance(values, HasColumn)``, although for a single-member protocol
+    that call does nothing more than look for the attribute, and it does so
+    through ``inspect.getattr_static`` at roughly sixty times the cost of
+    ``hasattr``. :meth:`Column.of` sits on the hot path of every fit, predict
+    and evaluate in the library, so it asks for the attribute directly.
     """
 
     @property
@@ -107,10 +113,16 @@ class Column:
         if isinstance(values, Column):
             return values
 
-        if isinstance(values, HasColumn):
-            return values.column
+        # Structural check by attribute rather than by isinstance against the
+        # protocol; see the note on HasColumn for why.
+        carried_column = getattr(values, "column", None)
+        if isinstance(carried_column, Column):
+            return carried_column
 
-        return cls(values, role)
+        # Neither a Column nor anything carrying one, so what is left is raw
+        # input. The cast says only that, since ``getattr`` cannot narrow the
+        # type the way ``isinstance`` against the protocol used to.
+        return cls(cast(NumericInput, values), role)
 
     @property
     def values(self) -> FloatArray:
