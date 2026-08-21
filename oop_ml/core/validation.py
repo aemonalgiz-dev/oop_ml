@@ -19,7 +19,9 @@ from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
+    NonBinaryLabelsError,
     NonEqualArrayLengthError,
+    SingleClassError,
     TooFewValuesError,
 )
 from oop_ml.core.types import FloatArray, NumericInput
@@ -33,6 +35,7 @@ class ValueRole(StrEnum):
     ACTUAL_VALUES = "actual_values"
     PREDICTED_VALUES = "predicted_values"
     FEATURE_VALUES = "feature_values"
+    LABEL_VALUES = "label_values"
 
 
 def to_float_array(values: NumericInput, role: ValueRole) -> FloatArray:
@@ -89,4 +92,44 @@ def check_min_length(array: FloatArray, minimum_length: int, role: ValueRole) ->
     if len(array) < minimum_length:
         raise TooFewValuesError(
             f"{role} needs at least {minimum_length} samples, got {len(array)}"
+        )
+
+
+def check_is_binary(values: FloatArray, role: ValueRole) -> None:
+    """Raise unless every value is exactly 0 or exactly 1.
+
+    Binary classification needs a target it can read as "the event happened" or
+    "it did not". Anything else, whether that is a probability someone forgot to
+    threshold or a three-class label encoded as 0, 1 and 2, would be silently
+    reinterpreted by the arithmetic rather than rejected, so it is caught here.
+
+    Raises
+    ------
+    NonBinaryLabelsError
+        If any value is neither 0 nor 1.
+    """
+    if not bool(np.all((values == 0.0) | (values == 1.0))):
+        offenders = np.unique(values[(values != 0.0) & (values != 1.0)])
+        raise NonBinaryLabelsError(
+            f"{role} must contain only 0 or 1, found "
+            f"{', '.join(str(value) for value in offenders[:5])}"
+        )
+
+
+def check_has_both_classes(values: FloatArray, role: ValueRole) -> None:
+    """Raise unless both 0 and 1 appear at least once.
+
+    A target that is entirely one class has no boundary to find. Every
+    coefficient could be zero and the model would still be right on every row it
+    was shown, which tells you nothing and generalises to nothing.
+
+    Raises
+    ------
+    SingleClassError
+        If only one of the two classes is present.
+    """
+    if not (bool(np.any(values == 1.0)) and bool(np.any(values == 0.0))):
+        present = "1" if bool(np.any(values == 1.0)) else "0"
+        raise SingleClassError(
+            f"{role} contains only class {present}; a classifier needs both"
         )

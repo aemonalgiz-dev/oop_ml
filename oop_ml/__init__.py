@@ -18,7 +18,13 @@ whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
 
-from oop_ml.core.base import Estimator, Fittable, Regressor, Transformer
+from oop_ml.classification.linear_classifier import LinearClassifier
+from oop_ml.classification.logistic_regression import LogisticRegression
+from oop_ml.core.base import Classifier, Estimator, Fittable, Regressor, Transformer
+from oop_ml.core.classification_evaluation import (
+    ClassificationEvaluation,
+    ConfusionMatrix,
+)
 from oop_ml.core.coefficients import Coefficient, Coefficients
 from oop_ml.core.column import Column
 from oop_ml.core.evaluation import RegressionEvaluation
@@ -27,14 +33,17 @@ from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     MLLibError,
+    NonBinaryLabelsError,
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
     NotFittedError,
+    SingleClassError,
     TooFewValuesError,
     UndefinedMetricError,
 )
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
+from oop_ml.core.linear_model import LinearModel
 from oop_ml.core.types import (
     FloatArray,
     IndexArray,
@@ -81,18 +90,25 @@ __all__ = [
     "Coefficient",
     "Coefficients",
     "RegressionEvaluation",
+    "ClassificationEvaluation",
+    "ConfusionMatrix",
     # Base classes, for writing your own
     "Fittable",
     "Estimator",
     "Regressor",
+    "Classifier",
     "Transformer",
+    "LinearModel",
     "LinearFeatureRegressor",
+    "LinearClassifier",
     # Regression
     "SimpleLinearRegression",
     "MultipleLinearRegression",
     "RidgeRegression",
     "LassoRegression",
     "GradientDescentRegression",
+    # Classification
+    "LogisticRegression",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
@@ -117,4 +133,6 @@ __all__ = [
     "AllSameValuesError",
     "UndefinedMetricError",
     "NonUniqueFeaturesError",
+    "NonBinaryLabelsError",
+    "SingleClassError",
 ]

@@ -1,14 +1,14 @@
 """Datasets shared by the regression and preprocessing specs.
 
 Four test modules were each carrying their own copy of the same five points and
-the same expected answers. When a fixture is duplicated, the expected values
-drift out of step with it silently -- nothing fails, the two files simply stop
+the same expected answers. When a fixture is duplicated the expected values drift
+out of step with it silently, so nothing fails and the two files simply stop
 testing the same thing.
 
-Each dataset here is a :class:`LinearFixture`: the columns *and* the answer they
-are known to produce, kept together so a reader never has to hunt for where a
-magic number came from. Every figure was verified against a reference
-computation before being written down.
+Each dataset here pairs the columns with the answer they are known to produce,
+kept together so a reader never has to hunt for where a magic number came from.
+Every figure was verified against a reference computation before being written
+down.
 """
 
 from __future__ import annotations
@@ -148,3 +148,87 @@ STANDARDIZED_FIRST_PREDICTOR = [
 ]
 FIRST_PREDICTOR_MEAN = 1.4
 FIRST_PREDICTOR_STANDARD_DEVIATION = 1.019804
+
+
+class LabelledFixture:
+    """A classification dataset paired with the boundary it is known to give.
+
+    Parameters
+    ----------
+    predictor:
+        The single feature column, named ``hours``.
+    labels:
+        The 0/1 target, named ``passed``.
+    expected_intercept, expected_weight:
+        The unpenalised maximum-likelihood solution, verified against
+        scikit-learn to within 1.6e-09.
+    """
+
+    __slots__ = (
+        "_expected_intercept",
+        "_expected_weight",
+        "_labels",
+        "_predictor",
+    )
+
+    def __init__(
+        self,
+        predictor: NumericValues,
+        labels: NumericValues,
+        expected_intercept: float,
+        expected_weight: float,
+    ) -> None:
+        self._predictor = predictor
+        self._labels = labels
+        self._expected_intercept = expected_intercept
+        self._expected_weight = expected_weight
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """Fresh feature objects, in column order."""
+        return [Feature("hours", self._predictor)]
+
+    @property
+    def target_feature(self) -> Feature:
+        """A fresh 0/1 target feature."""
+        return Feature("passed", self._labels)
+
+    @property
+    def label_values(self) -> NumericValues:
+        """The raw labels."""
+        return self._labels
+
+    @property
+    def expected_intercept(self) -> float:
+        """The intercept maximum likelihood recovers from this data."""
+        return self._expected_intercept
+
+    @property
+    def expected_weight(self) -> float:
+        """The weight maximum likelihood recovers for ``hours``."""
+        return self._expected_weight
+
+
+OVERLAPPING_LABELS = LabelledFixture(
+    [0.5, 1.0, 2.0, 2.5, 3.0, 4.0, 4.5, 5.0],
+    # Deliberately not separable: one student passes on 2 hours and one fails on
+    # 4, which is what gives the likelihood a maximum to actually reach.
+    [0, 0, 1, 0, 1, 0, 1, 1],
+    expected_intercept=-2.4383,
+    expected_weight=0.8637,
+)
+"""Boundary at hours = 2.8231, odds multiplier exp(0.8637) = 2.3719, 6 of 8 right."""
+
+OVERLAPPING_LABELS_BOUNDARY = 2.8231
+OVERLAPPING_LABELS_ODDS_MULTIPLIER = 2.3719
+
+SEPARABLE_LABELS = LabelledFixture(
+    [0.5, 1.0, 2.0, 3.0, 4.0, 5.0],
+    # Perfectly separable, so no finite maximum likelihood estimate exists and
+    # the coefficients climb without limit. Any fit here must report
+    # converged_ = False rather than pretending it found something.
+    [0, 0, 0, 1, 1, 1],
+    expected_intercept=float("nan"),
+    expected_weight=float("nan"),
+)
+"""No finite solution. Used to pin the separation behaviour, never an answer."""
