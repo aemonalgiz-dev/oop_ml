@@ -232,7 +232,13 @@ class ClassificationEvaluation:
         float
             Between 0.0 and 1.0.
         """
-        raise NotImplementedError
+        matrix = self.confusion_matrix
+
+        return self._ratio(
+            matrix.true_positives + matrix.true_negatives,
+            matrix.n_samples,
+            "accuracy is undefined with no observations",
+        )
 
     @property
     def precision(self) -> float:
@@ -251,7 +257,13 @@ class ClassificationEvaluation:
             never fires has not made a wrong positive call, and it has not made
             a right one either.
         """
-        raise NotImplementedError
+        matrix = self.confusion_matrix
+
+        return self._ratio(
+            matrix.true_positives,
+            matrix.predicted_positive,
+            "precision is undefined when nothing was predicted positive",
+        )
 
     @property
     def recall(self) -> float:
@@ -268,7 +280,13 @@ class ClassificationEvaluation:
         UndefinedMetricError
             If there were no positive rows at all, leaving a zero denominator.
         """
-        raise NotImplementedError
+        matrix = self.confusion_matrix
+
+        return self._ratio(
+            matrix.true_positives,
+            matrix.actual_positive,
+            "recall is undefined when there are no positive rows",
+        )
 
     @property
     def f1_score(self) -> float:
@@ -288,7 +306,17 @@ class ClassificationEvaluation:
         UndefinedMetricError
             If either precision or recall is undefined, or if both are zero.
         """
-        raise NotImplementedError
+        # Not routed through _ratio: that guard is for counts, and a zero here
+        # means both metrics came out zero rather than a cell being empty.
+        precision = self.precision
+        recall = self.recall
+
+        if precision + recall == 0.0:
+            raise UndefinedMetricError(
+                "F1 is undefined when precision and recall are both zero"
+            )
+
+        return 2.0 * precision * recall / (precision + recall)
 
     @property
     def specificity(self) -> float:
@@ -303,7 +331,13 @@ class ClassificationEvaluation:
         UndefinedMetricError
             If there were no negative rows at all.
         """
-        raise NotImplementedError
+        matrix = self.confusion_matrix
+
+        return self._ratio(
+            matrix.true_negatives,
+            matrix.true_negatives + matrix.false_positives,
+            "specificity is undefined when there are no negative rows",
+        )
 
     def __repr__(self) -> str:
         matrix = self.confusion_matrix
