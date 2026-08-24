@@ -8,11 +8,19 @@ back off the head of the solution, pair the remaining weights with the names of
 the features they came from, and later evaluate ``b0 + sum(b_j x_j)`` by looking
 those weights up by name.
 
-That shared part lives here, and it deliberately says nothing about what the
-target is. Least squares fits against a number, logistic regression fits against
-a label, so if this class knew about targets at all it could only serve one of
-them. It knows about coefficients and about the design matrix, which is the
-part they genuinely share.
+That shared part lives here, including the fitting skeleton itself. An earlier
+version of this module argued that it should say nothing about the target at
+all, on the grounds that least squares fits against a number while logistic
+regression fits against a label. That reasoning confused two different things.
+Both of them fit against a :class:`~oop_ml.core.column.Column`; what differs is
+only which *constraints* that column has to satisfy, and a single abstract hook
+covers that. Holding the line cost three byte-identical copies of ``fit``, one
+per concrete frame, which is a worse trade than the one it was avoiding.
+
+So the skeleton is here and :meth:`LinearModel._validated_target_column` is the
+one seam in it. A regressor takes the column as it comes; a classifier insists
+it is binary and carries both classes. Neither has to restate the six lines
+around that decision.
 
 What sits on top of it is the task. ``LinearFeatureRegressor`` mixes this with
 ``Regressor``, and the classification frame mixes the very same thing with
@@ -22,13 +30,16 @@ which is why it can span two tasks that are not otherwise related.
 
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Sequence
+from typing import Self
 
 import numpy as np
 from pydantic import PrivateAttr
 
 from oop_ml.core.base import Fittable
 from oop_ml.core.coefficients import Coefficient, Coefficients
+from oop_ml.core.column import Column
 from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
@@ -82,6 +93,78 @@ class LinearModel(Fittable):
         self._check_fitted()
         assert self._intercept is not None
         return self._intercept
+
+    @abstractmethod
+    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+        """Return the coefficient vector for ``design_matrix`` against the target.
+
+        The one thing a linear model has to answer for itself, and the only
+        abstract method that carries an actual idea rather than plumbing.
+
+        Parameters
+        ----------
+        design_matrix:
+            ``X``, shape ``(n_samples, parameter_count)``. Already carries the
+            leading ones column when ``fit_intercept`` is set, so implementations
+            never handle the intercept as a special case.
+        target_column:
+            ``y``, already validated and aligned with the rows of ``X``.
+
+        Returns
+        -------
+        FloatArray
+            ``beta``, with one entry per column of ``design_matrix`` and in the
+            same order, the intercept coming first whenever there is one.
+        """
+
+    def _validated_target_column(self, target_values: Feature) -> Column:
+        """The target as a column, checked against whatever the task requires.
+
+        The seam between the two frames built on this class. The default is the
+        regression answer -- a :class:`~oop_ml.core.column.Column` is already
+        numeric, finite and non-empty, and least squares asks nothing further of
+        it. Classification overrides this to insist on 0/1 labels with both
+        classes present.
+
+        Parameters
+        ----------
+        target_values:
+            The target column as supplied to ``fit``.
+
+        Returns
+        -------
+        Column
+            The validated column, ready to hand to :meth:`_solve`.
+        """
+        return target_values.column
+
+    def _fit_linear_model(
+        self, input_values: Sequence[Feature], target_values: Feature
+    ) -> Self:
+        """Validate, solve, pair the weights with their names, mark fitted.
+
+        The whole of fitting a linear model, minus the two decisions a subclass
+        owns: what counts as a valid target
+        (:meth:`_validated_target_column`) and how ``beta`` is obtained
+        (:meth:`_solve`). Public ``fit`` methods delegate here rather than
+        restating it, so the order of the guards is fixed in one place.
+
+        Not itself named ``fit``, because the public method is where each task
+        documents the exceptions it raises, and those lists genuinely differ.
+        """
+        feature_set = FeatureSet(input_values)
+        feature_set.check_columns_vary()
+        feature_set.check_aligned_with(target_values)
+        feature_set.check_supports_parameter_count(self._parameter_count(feature_set))
+
+        solution = self._solve(
+            self._design_matrix(feature_set),
+            self._validated_target_column(target_values),
+        )
+        self._store_solution(feature_set, solution)
+
+        self._mark_fitted()
+        return self
 
     def _parameter_count(self, feature_set: FeatureSet) -> int:
         """How many unknowns the fit has to solve for.

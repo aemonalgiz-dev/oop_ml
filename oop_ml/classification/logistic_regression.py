@@ -120,16 +120,11 @@ separated dataset turns into a confidently meaningless model.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import Self
-
 import numpy as np
 from pydantic import Field, PrivateAttr
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.column import Column
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
 from oop_ml.core.logistic import sigmoid
 from oop_ml.core.types import FloatArray
 
@@ -313,51 +308,3 @@ class LogisticRegression(LinearClassifier):
             self._epochs_run += 1
 
         return weights
-
-    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
-        """Fit the boundary, delegating the ascent itself to :meth:`_solve`.
-
-        Parameters
-        ----------
-        input_values:
-            One or more predictor columns, all the same length as the target.
-            Their names key the learned coefficients and must be unique.
-        target_values:
-            The labels being classified, every one of them 0 or 1.
-
-        Returns
-        -------
-        Self
-            This model, so calls can chain.
-
-        Raises
-        ------
-        EmptyValuesError
-            If no features are supplied.
-        NonUniqueFeaturesError
-            If two features share a name.
-        NonEqualArrayLengthError
-            If any feature's length differs from the target's.
-        AllSameValuesError
-            If any predictor is constant.
-        TooFewValuesError
-            If there are fewer observations than parameters to estimate.
-        NonBinaryLabelsError
-            If the target holds anything other than 0 and 1.
-        SingleClassError
-            If the target holds only one of the two classes.
-        """
-        feature_set = FeatureSet(input_values)
-        feature_set.check_columns_vary()
-        feature_set.check_aligned_with(target_values)
-        feature_set.check_supports_parameter_count(self._parameter_count(feature_set))
-
-        target_column = target_values.column
-        target_column.check_is_binary()
-        target_column.check_has_both_classes()
-
-        solution = self._solve(self._design_matrix(feature_set), target_column)
-        self._store_solution(feature_set, solution)
-
-        self._mark_fitted()
-        return self

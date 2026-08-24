@@ -6,19 +6,22 @@ coefficient pairing come from :class:`~oop_ml.core.linear_model.LinearModel`;
 what this adds is the step from a linear predictor to a probability, and from a
 probability to a label.
 
-A subclass supplies its own ``fit``, its own ``_solve``, and its own
-``_sigmoid``. It should not have to think about thresholds or about matching
-features by name.
+A subclass supplies its own ``_solve`` and its own ``_sigmoid``, and nothing
+else. It should not have to think about thresholds, about matching features by
+name, or about the order of the guards in ``fit`` -- the last of which used to
+be copied into every concrete classifier until the copies started to drift.
 """
 
 from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
+from typing import Self
 
 import numpy as np
 
 from oop_ml.core.base import Classifier
+from oop_ml.core.column import Column
 from oop_ml.core.exceptions import UndefinedMetricError
 from oop_ml.core.feature import Feature
 from oop_ml.core.linear_model import LinearModel
@@ -41,6 +44,68 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
     @abstractmethod
     def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
         """Map the linear predictor onto a probability in ``[0, 1]``."""
+
+    def _validated_target_column(self, target_values: Feature) -> Column:
+        """The target, insisted upon as 0/1 labels carrying both classes.
+
+        Where classification tightens the regression contract. A boundary
+        fitted against labels that are not 0 or 1 would be answering a question
+        nobody asked, and one fitted against a single class has nothing to
+        discriminate between.
+
+        Raises
+        ------
+        NonBinaryLabelsError
+            If the target holds anything other than 0 and 1.
+        SingleClassError
+            If the target holds only one of the two classes.
+        """
+        target_column = super()._validated_target_column(target_values)
+        target_column.check_is_binary()
+        target_column.check_has_both_classes()
+
+        return target_column
+
+    def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
+        """Fit the boundary, delegating the solve itself to the subclass.
+
+        Parameters
+        ----------
+        input_values:
+            One or more predictor columns, all the same length as the target.
+            Their names key the learned coefficients and must be unique.
+        target_values:
+            The labels being classified, every one of them 0 or 1.
+
+        Returns
+        -------
+        Self
+            This model, so calls can chain.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two features share a name.
+        NonEqualArrayLengthError
+            If any feature's length differs from the target's.
+        AllSameValuesError
+            If any predictor is constant.
+        TooFewValuesError
+            If there are fewer observations than parameters to estimate.
+        NonBinaryLabelsError
+            If the target holds anything other than 0 and 1.
+        SingleClassError
+            If the target holds only one of the two classes.
+
+        Notes
+        -----
+        A subclass whose solver can fail in its own way documents that on its
+        ``_solve`` rather than here, since the failure belongs to the method
+        that can raise it.
+        """
+        return self._fit_linear_model(input_values, target_values)
 
     def predict_probability(self, input_values: Sequence[Feature]) -> FloatArray:
         """P(class is 1) for each observation.
