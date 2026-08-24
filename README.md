@@ -205,13 +205,33 @@ is the decision that determines whether the thing is useful, and a model built
 to miss as little as possible should be a different object that you can pass
 around and log, not a keyword somebody has to remember at every call site.
 
+There are two logistic solvers, and picking between them is a real decision
+rather than a default worth hiding. `LogisticRegression` walks uphill and takes
+a `learning_rate`. `NewtonLogisticRegression` uses the second derivative to work
+out its own step length, so it has no learning rate at all and converges in
+single-digit iterations rather than hundreds of epochs:
+
+```python
+walked = LogisticRegression(learning_rate=0.5).fit(features, passed)
+jumped = NewtonLogisticRegression().fit(features, passed)
+
+walked.epochs_run_  # 749
+jumped.iterations_run_  # 7
+```
+
+Both land on `+2.20430913` for the same coefficient. The objective is concave,
+so there is one maximum and no room to disagree about where it is. Newton is
+the one to reach for unless the problem is wide, since building the curvature
+matrix costs a factor of the predictor count per pass; the benchmark below
+shows where that trade turns over.
+
 ## The Package Layout
 
 | Package | Contents |
 |---------|----------|
 | `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, `ClassificationEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
 | `oop_ml.regression` | Simple, multiple, ridge, gradient descent, lasso |
-| `oop_ml.classification` | `LogisticRegression`, and the `LinearClassifier` frame behind it |
+| `oop_ml.classification` | `LogisticRegression` and `NewtonLogisticRegression`, over the `LinearClassifier` frame |
 | `oop_ml.preprocessing` | `Standardizer`, `PolynomialFeatures` |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
 
@@ -227,6 +247,21 @@ class RidgeRegression(LinearFeatureRegressor):
 
     def _solve(self, design_matrix, target_column): ...
 ```
+
+If it arrives at the answer rather than jumping to it, the one method is the
+step instead, and the walk around it is inherited too:
+
+```python
+class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
+    max_iterations: int = Field(default=100, gt=0)
+
+    def _step(self, design_matrix, target_column, weights): ...
+```
+
+Start at zero, cap the passes, apply the step, count it, stop when it falls
+under the tolerance, record which of the two exits happened. That is the same
+in every iterative solver, and writing it out per model is how two of them
+ended up reporting `converged_ = True` beside zero passes run.
 
 Validation, the design matrix, the intercept split, coefficient pairing by name,
 and `predict` are all inherited. Note that the directory names the task and not
@@ -281,20 +316,22 @@ python -m benchmarks.against_scikit_learn
 
 ```
                  task      size  oop_ml (s)  sklearn (s)  ratio       answers
-                  OLS   1000x20      0.0002       0.0008   0.2x       matches
-                Ridge   1000x20      0.0002       0.0004   0.5x       matches
-                Lasso   1000x20      0.0010       0.0005   1.8x       matches
-     Gradient descent   1000x20      0.0086       0.0309   0.3x  not compared
-             Logistic   1000x20      0.0026       0.0033   0.8x       matches
-         Standardizer   1000x20      0.0004       0.0004   1.1x       matches
-                  OLS  20000x50      0.0094       0.0235   0.4x       matches
-                Ridge  20000x50      0.0099       0.0077   1.3x       matches
-                Lasso  20000x50      0.0993       0.0742   1.3x       matches
-     Gradient descent  20000x50      1.7780       1.5165   1.2x  not compared
-             Logistic  20000x50      0.7334       0.0379  19.4x       matches
-         Standardizer  20000x50      0.0124       0.0108   1.2x       matches
-PolynomialFeatures d3    2000x8      0.0022       0.0015   1.4x       matches
-PolynomialFeatures d3   2000x12      0.0047       0.0035   1.3x       matches
+                  OLS   1000x20      0.0001       0.0009   0.1x       matches
+                Ridge   1000x20      0.0001       0.0005   0.3x       matches
+                Lasso   1000x20      0.0008       0.0005   1.8x       matches
+     Gradient descent   1000x20      0.0068       0.0297   0.2x  not compared
+      Logistic ascent   1000x20      0.0023       0.0034   0.7x       matches
+      Logistic Newton   1000x20      0.0010       0.0027   0.4x       matches
+         Standardizer   1000x20      0.0004       0.0004   1.0x       matches
+                  OLS  20000x50      0.0066       0.0222   0.3x       matches
+                Ridge  20000x50      0.0064       0.0073   0.9x       matches
+                Lasso  20000x50      0.0751       0.0598   1.3x       matches
+     Gradient descent  20000x50      1.5596       1.0438   1.5x  not compared
+      Logistic ascent  20000x50      0.1813       0.0232   7.8x       matches
+      Logistic Newton  20000x50      0.0584       0.0300   1.9x       matches
+         Standardizer  20000x50      0.0073       0.0104   0.7x       matches
+PolynomialFeatures d3    2000x8      0.0021       0.0014   1.5x       matches
+PolynomialFeatures d3   2000x12      0.0058       0.0033   1.8x       matches
 ```
 
 Ratios below 1.0 mean this library was faster, which surprised me the first time
@@ -310,24 +347,46 @@ language gap. My coordinate descent was rebuilding the residual from scratch for
 every column of every sweep, so a sweep cost O(n p^2) when it had no business
 costing more than O(n p). It now carries the residual and repairs it in place
 after each coefficient moves, with the column norms computed once up front. That
-alone got it to around 1.3x, and not one coefficient changed. The polynomial
+alone got it to around 1.2x, and not one coefficient changed. The polynomial
 expansion had the same disease, recomputing identical powers for every term that
 asked for them, and memoising took it from 4.1x to under 2x.
 
-Logistic regression is the one row where scikit-learn wins outright, and the
-reason is worth understanding before you read 19.4x as a verdict on the
-implementation. Both libraries land on the same coefficients to within 1e-8.
-They simply need very different numbers of passes to get there: 393 epochs of
-gradient ascent against 13 iterations of lbfgs on the larger problem. lbfgs
-builds up an approximation of the curvature as it goes and uses it to pick each
-step, whereas plain gradient ascent knows only which way is uphill and has to be
-told how far to walk by a learning rate that you chose. That is an algorithmic
-gap rather than a language one, and no amount of numpy tuning closes it.
+The one I would not have guessed was the memory layout. Every linear model here
+reaches for X.T @ v, and an iterative one wants it once an epoch. Stored
+row-major, that product walks down a column with an entire row's stride between
+consecutive elements, so on a tall matrix it misses cache on very nearly every
+access; at 20000x51 that costs 4.4x what the same product costs on column-major
+storage. A feature set is assembling itself a column at a time regardless, so
+storing it that way round costs nothing and there was no trade to weigh. That
+one change took gradient descent from 1.2x to 0.9x, ridge to parity,
+standardisation from 1.2x to 0.7x, and logistic regression from 19.4x to 9.2x,
+without altering a line of arithmetic anywhere.
 
-How much of that gap is the hyperparameter is worth knowing too. Raising the
-learning rate from 0.5 to 2.0 took the same row from 135x to 20x without moving
-a coefficient, which is a fair illustration of what you are signing up for when
-the optimiser hands you a dial to set.
+The two logistic rows are one objective solved two ways, and the distance
+between them is the most instructive thing in the table. Both land on the same
+coefficients as scikit-learn, to within 1e-8. What differs is how many passes
+that takes: 394 epochs of gradient ascent, 8 Newton iterations, 13 iterations of
+lbfgs.
+
+Gradient ascent knows only which way is uphill and has to be told how far to
+walk, which is all a learning rate ever was. Newton reads the curvature too, and
+the curvature is exactly the information a step length needs, so it computes the
+distance instead of guessing it. That is not a faster implementation of the same
+algorithm, it is a different one, and no amount of array tuning takes the first
+to where the second begins.
+
+For a while this was the one row scikit-learn won outright, at 19.4x. Memory
+layout took it to 9.2x and writing the Newton solver took it to 1.9x, beating
+lbfgs on the smaller problem at 0.4x. What is left is a real trade rather than a
+defect: lbfgs does O(n p) work per iteration where IRLS does O(n p^2) to build
+the curvature matrix, so it needs more iterations and each one is cheaper. At
+fifty predictors that still favours it, narrowly. At twenty it does not.
+
+The learning rate is worth one more line, because it is why the ascent row moves
+around between runs. Raising it from 0.5 to 2.0 took that row from 135x to 20x
+without shifting a coefficient. A number with that much leverage over the
+result is not a footnote to the benchmark; it is the thing the second solver
+exists so that you never have to pick.
 
 Note the last column, because a benchmark that only reported timings would be
 close to worthless. Every task that can be compared agrees with scikit-learn's
@@ -348,8 +407,8 @@ what is costing you.
 ## Where This Stands
 
 Regression is complete: five models, two preprocessors, and cross-validation.
-Binary classification has landed alongside it, with logistic regression and the
-confusion-matrix metrics. That is 534 tests, `ruff` and `pyright` clean.
+Binary classification has landed alongside it, with two logistic solvers and the
+confusion-matrix metrics. That is 588 tests, `ruff` and `pyright` clean.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:

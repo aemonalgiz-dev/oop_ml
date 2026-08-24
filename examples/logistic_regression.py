@@ -20,7 +20,7 @@ import numpy as np
 
 from examples.datasets import exam_outcomes, separable_outcomes
 from examples.reporting import Report, configure_logging_from_command_line
-from oop_ml import LogisticRegression, Standardizer
+from oop_ml import LogisticRegression, NewtonLogisticRegression, Standardizer
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +181,57 @@ def main() -> None:
         "is exactly why that number cannot be the thing you check. converged_ is\n"
         "the attribute that tells you the difference between a model that found\n"
         "an answer and one that merely ran out of patience."
+    )
+
+    report.heading("The same maximum, reached two ways")
+
+    walked = LogisticRegression(learning_rate=0.5, max_epochs=50_000, tolerance=1e-10)
+    walked.fit(scaled_features, data.target_feature)
+    jumped = NewtonLogisticRegression(tolerance=1e-10)
+    jumped.fit(scaled_features, data.target_feature)
+
+    report.table(
+        ["solver", "passes", "converged", "intercept", "hours_studied"],
+        [
+            [
+                "gradient ascent",
+                str(walked.epochs_run_),
+                str(walked.converged_),
+                f"{walked.intercept_:+.8f}",
+                f"{walked.coefficients_['hours_studied']:+.8f}",
+            ],
+            [
+                "Newton / IRLS",
+                str(jumped.iterations_run_),
+                str(jumped.converged_),
+                f"{jumped.intercept_:+.8f}",
+                f"{jumped.coefficients_['hours_studied']:+.8f}",
+            ],
+        ],
+    )
+
+    largest_disagreement = max(
+        abs(walked.intercept_ - jumped.intercept_),
+        max(
+            abs(walked.coefficients_[name] - jumped.coefficients_[name])
+            for name in (feature.name for feature in scaled_features)
+        ),
+    )
+    report.detail(f"largest disagreement between the two: {largest_disagreement:.2e}")
+
+    report.paragraph(
+        "One concave objective, so one maximum, and the two solvers agree on it\n"
+        "to well under a millionth. What differs is the number of passes it\n"
+        "took, because gradient ascent knows only which way is uphill and has\n"
+        "to be told how far to walk. Newton reads the curvature as well, which\n"
+        "is enough to compute the distance rather than guess it."
+    )
+
+    report.paragraph(
+        "That is also why one of these has a learning_rate and the other does\n"
+        "not. A learning rate is not a knob the method happens to expose; it\n"
+        "is a stand-in for information the method does not have, and a solver\n"
+        "that computes the curvature has no use for it."
     )
 
 
