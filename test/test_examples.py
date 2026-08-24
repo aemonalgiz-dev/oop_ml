@@ -11,7 +11,9 @@ are the library's behaviour, which the rest of the suite already pins down.
 import pytest
 
 from examples import (
+    classification_metrics,
     gradient_descent,
+    logistic_regression,
     model_selection,
     multiple_regression,
     polynomial_curves,
@@ -28,6 +30,8 @@ EXAMPLE_MODULES = [
     polynomial_curves,
     standardization,
     model_selection,
+    logistic_regression,
+    classification_metrics,
 ]
 
 

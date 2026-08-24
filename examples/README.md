@@ -1,6 +1,6 @@
 # Examples
 
-Seven runnable scripts, simplest first. Each one is written the way a user of
+Nine runnable scripts, simplest first. Each one is written the way a user of
 the installed package writes code — everything comes from the top-level
 `oop_ml` import, and no example reaches into the library's internal module
 paths. Reading one tells you what your own code should look like.
@@ -40,22 +40,21 @@ root rather than from anywhere.
 | 5 | `polynomial_curves` | Fitting a curve without changing the model at all, and what rising degree costs on held-out data. |
 | 6 | `standardization` | Why a penalty and a learning rate care about units when least squares does not — and where leakage gets in. |
 | 7 | `model_selection` | The capstone: hold out, cross-validate, choose, refit, report once. |
+| 8 | `logistic_regression` | The same API pointed at a label instead of a quantity, and how to read a coefficient that multiplies the odds. |
+| 9 | `classification_metrics` | Why accuracy is the wrong number on a rare class, and what moving the threshold buys and costs. |
 
 ## Supporting modules
 
 - `datasets.py` — synthetic data, each generator returning a `SyntheticRegression`
-  that pairs the data with the coefficients that produced it. The truth is
-  carried as `Coefficients`, the same type the models learn, so every example
-  can report the estimate beside the answer.
+  or a `SyntheticClassification` that pairs the data with the coefficients that
+  produced it. The truth is carried as `Coefficients`, the same type the models
+  learn, so every example can report the estimate beside the answer. The
+  classification generators draw labels from the true probability rather than
+  thresholding it, so the classes overlap the way real ones do.
 - `reporting.py` — the `Report` object every script writes through, plus the
   logging setup.
 
 ## Output and log levels
-
-Nothing here calls `print`. Each script writes through a `Report` bound to its
-own module logger, so output can be filtered, redirected, or silenced per
-example — and so a result is distinguishable from a complaint. The levels mean
-something specific:
 
 | Level | Carries |
 |-------|---------|
