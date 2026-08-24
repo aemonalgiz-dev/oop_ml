@@ -108,16 +108,17 @@ work, and the habit should not be carried to an objective that lacks it.
 from __future__ import annotations
 
 import numpy as np
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.column import Column
 from oop_ml.core.exceptions import SingularHessianError
+from oop_ml.core.iterative_solver import IterativeSolver
 from oop_ml.core.logistic import sigmoid
 from oop_ml.core.types import FloatArray
 
 
-class NewtonLogisticRegression(LinearClassifier):
+class NewtonLogisticRegression(IterativeSolver, LinearClassifier):
     """Logistic regression by Newton-Raphson, equivalently IRLS.
 
     Fits the same boundary as
@@ -148,49 +149,14 @@ class NewtonLogisticRegression(LinearClassifier):
     tolerance: float = Field(default=1e-10, gt=0.0)
     threshold: float = Field(default=0.5, gt=0.0, lt=1.0)
 
-    _iterations_run: int | None = PrivateAttr(default=None)
-    _converged: bool | None = PrivateAttr(default=None)
+    @property
+    def _pass_limit(self) -> int:
+        return self.max_iterations
 
     @property
     def iterations_run_(self) -> int:
-        """How many Newton steps the fit actually took.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._iterations_run is not None
-        return self._iterations_run
-
-    @property
-    def converged_(self) -> bool:
-        """Whether the steps settled, rather than running out of iterations.
-
-        Read the module docstring on separation before treating a ``False``
-        here as a near miss. It usually means there was no finite answer to
-        find, and this solver runs away from one faster than gradient ascent
-        does.
-
-        Raises
-        ------
-        NotFittedError
-            If accessed before ``fit``.
-        """
-        self._check_fitted()
-        assert self._converged is not None
-        return self._converged
-
-    def _has_converged(self, step: FloatArray) -> bool:
-        """Whether this iteration moved every coefficient less than ``tolerance``.
-
-        Measured on the step rather than on the change in the likelihood. Near
-        a maximum the likelihood is flat, so the improvement it reports goes as
-        the *square* of the coefficient error and reaches zero in floating
-        point while the coefficients are still visibly moving.
-        """
-        return bool(np.max(np.abs(step)) < self.tolerance)
+        """How many Newton steps the fit actually took."""
+        return self._completed_passes
 
     @staticmethod
     def _sigmoid(linear_predictor: FloatArray) -> FloatArray:
@@ -331,22 +297,19 @@ class NewtonLogisticRegression(LinearClassifier):
         """
         return design_matrix.T @ (design_matrix * variance_weights[:, None])
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
-        """Step to the vertex of the local parabola until the steps vanish.
+    def _step(
+        self,
+        design_matrix: FloatArray,
+        target_column: Column,
+        weights: FloatArray,
+    ) -> FloatArray:
+        """One Newton step: the gradient turned by the inverse curvature.
 
-        Each iteration pushes the current coefficients out to the rows to get
-        the probabilities, reads two things off them -- how wrong each row is
-        and how certain the model is about it -- and pulls both back into
-        coefficient space as a gradient and a curvature matrix. The step is the
-        small system those two define.
-
-        The step is applied before the convergence test rather than after.
-        Because the error left over goes as roughly 0.2 * step^2, taking a
-        final step of 1e-4 lands near 1e-9 instead of near 1e-4, and it has
-        already been paid for.
-
-        Does not set ``_fitted``. ``fit`` owns that, and only once the weights
-        have been paired with their feature names.
+        Push the current coefficients out to the rows to get the probabilities,
+        read two things off them -- how wrong each row is and how certain the
+        model is about it -- and pull both back into coefficient space as a
+        gradient and a curvature matrix. The step is then the small system
+        those two define.
 
         Raises
         ------
@@ -354,26 +317,10 @@ class NewtonLogisticRegression(LinearClassifier):
             If the weights collapse far enough that the system has no unique
             solution, which is separation in its terminal form.
         """
-        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
+        probabilities = self._sigmoid(design_matrix @ weights)
+        gradient = self._gradient(design_matrix, target_column.values, probabilities)
+        hessian_matrix = self._hessian_matrix(
+            design_matrix, self._variance_weights(probabilities)
+        )
 
-        self._iterations_run = 0
-        self._converged = False
-
-        for _ in range(self.max_iterations):
-            probabilities = self._sigmoid(design_matrix @ weights)
-            gradient = self._gradient(
-                design_matrix, target_column.values, probabilities
-            )
-            hessian_matrix = self._hessian_matrix(
-                design_matrix, self._variance_weights(probabilities)
-            )
-            step = self._solve_newton_system(hessian_matrix, gradient)
-
-            weights = weights + step
-            self._iterations_run += 1
-
-            if self._has_converged(step):
-                self._converged = True
-                break
-
-        return weights
+        return self._solve_newton_system(hessian_matrix, gradient)
