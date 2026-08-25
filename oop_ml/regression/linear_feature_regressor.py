@@ -24,9 +24,9 @@ from collections.abc import Sequence
 from typing import Self
 
 from oop_ml.core.base import Regressor
-from oop_ml.core.column import Column
-from oop_ml.core.feature import Feature
 from oop_ml.core.linear_model import LinearModel
+from oop_ml.data.column import Column
+from oop_ml.data.feature import Feature
 from oop_ml.types import FloatArray
 
 
@@ -34,7 +34,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
     """A hyperplane fit over named features; weights are read back by name.
 
     The feature-first API is this library's OOP alternative to an anonymous
-    design matrix: predictors arrive as :class:`~oop_ml.core.feature.Feature` objects
+    design matrix: predictors arrive as :class:`~oop_ml.data.feature.Feature` objects
     that keep their identity through fitting, so a coefficient is retrieved as
     ``model.coefficients["age"]`` rather than ``model.coef_[2]``.
 

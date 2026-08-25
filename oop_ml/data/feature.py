@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from oop_ml.core.column import Column
+from oop_ml.data.column import Column
 from oop_ml.exceptions import InvalidValuesError
 from oop_ml.types import FloatArray, NumericInput
 from oop_ml.validation import ValueRole

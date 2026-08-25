@@ -8,7 +8,7 @@ Aligned onto the shared ``core`` frame:
   construction only configures, fitting learns;
 * learned parameters live on private attributes and are read back through
   ``slope`` / ``intercept``, which raise ``NotFittedError`` before ``fit``;
-* inputs become :class:`~oop_ml.core.column.Column` objects at the boundary, so this
+* inputs become :class:`~oop_ml.data.column.Column` objects at the boundary, so this
   module never coerces an array itself, and the mean/deviation arithmetic the
   slope needs is asked of the column rather than recomputed here;
 * metrics are not re-exposed here. ``evaluate(input_values, actual_values)``
@@ -22,7 +22,7 @@ from typing import Self
 from pydantic import PrivateAttr
 
 from oop_ml.core.base import Regressor
-from oop_ml.core.column import Column
+from oop_ml.data.column import Column
 from oop_ml.types import FloatArray, NumericInput
 from oop_ml.validation import ValueRole
 

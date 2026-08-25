@@ -48,7 +48,7 @@ class HasColumn(Protocol):
     """Anything that can supply an already-validated :class:`Column`.
 
     This is structural rather than nominal, so
-    :class:`~oop_ml.core.feature.Feature` satisfies it purely by exposing
+    :class:`~oop_ml.data.feature.Feature` satisfies it purely by exposing
     ``column``, without importing anything from here. That is what keeps the
     dependency running one way only, where ``feature`` knows about ``column``
     and never the reverse, while still allowing a feature to be handed to
@@ -108,7 +108,7 @@ class Column:
 
         This is the idempotent entry point that every public boundary should
         be using. An already validated column, or anything carrying one such as
-        a :class:`~oop_ml.core.feature.Feature`, comes straight back with its
+        a :class:`~oop_ml.data.feature.Feature`, comes straight back with its
         own role intact, so handing one down through nested calls never
         re-coerces or re-copies it. Only genuinely raw input pays for
         validation.

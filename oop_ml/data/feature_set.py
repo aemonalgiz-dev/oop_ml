@@ -1,6 +1,6 @@
-"""A validated collection of :class:`~oop_ml.core.feature.Feature` columns.
+"""A validated collection of :class:`~oop_ml.data.feature.Feature` columns.
 
-Where a :class:`~oop_ml.core.feature.Feature` is one named column, a
+Where a :class:`~oop_ml.data.feature.Feature` is one named column, a
 :class:`FeatureSet` is the group of them that a model is fit on, and it owns the
 rules that only make sense across several columns at once. Names have to be
 unique, lengths have to match, and a predictor has to actually vary.
@@ -31,7 +31,7 @@ from collections.abc import Iterator, Sequence
 
 import numpy as np
 
-from oop_ml.core.feature import Feature
+from oop_ml.data.feature import Feature
 from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,

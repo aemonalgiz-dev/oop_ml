@@ -18,8 +18,8 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
+from oop_ml.data.feature import Feature
+from oop_ml.data.feature_set import FeatureSet
 from oop_ml.types import IndexArray
 
 

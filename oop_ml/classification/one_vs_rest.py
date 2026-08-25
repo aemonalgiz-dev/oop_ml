@@ -39,8 +39,8 @@ from pydantic import ConfigDict, PrivateAttr
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.base import MultiClassClassifier
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
+from oop_ml.data.feature import Feature
+from oop_ml.data.feature_set import FeatureSet
 from oop_ml.exceptions import InvalidValuesError
 from oop_ml.types import FloatArray
 

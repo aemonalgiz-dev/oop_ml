@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from oop_ml.core.column import Column, ColumnSource
+from oop_ml.data.column import Column, ColumnSource
 from oop_ml.exceptions import InvalidValuesError, UndefinedMetricError
 from oop_ml.types import FloatArray, IndexArray
 from oop_ml.validation import ValueRole

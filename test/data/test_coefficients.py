@@ -2,7 +2,7 @@
 
 import pytest
 
-from oop_ml.core.coefficients import Coefficient, Coefficients
+from oop_ml.data.coefficients import Coefficient, Coefficients
 from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,

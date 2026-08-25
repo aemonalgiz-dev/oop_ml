@@ -32,9 +32,9 @@ from typing import Generic, Self, TypeVar
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
 from oop_ml.core.classification_evaluation import ClassificationEvaluation
-from oop_ml.core.column import ColumnSource
 from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.core.multiclass_evaluation import MultiClassEvaluation
+from oop_ml.data.column import ColumnSource
 from oop_ml.exceptions import NotFittedError
 from oop_ml.types import FloatArray
 
@@ -45,7 +45,7 @@ TargetT = TypeVar("TargetT", bound=ColumnSource)
 """What a model is fit against.
 
 This one is bounded rather than free, because every target eventually has to
-become a :class:`~oop_ml.core.column.Column` in order to be scored, and raw
+become a :class:`~oop_ml.data.column.Column` in order to be scored, and raw
 values, a ``Column``, and a ``Feature`` can all manage that.
 """
 

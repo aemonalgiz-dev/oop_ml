@@ -79,8 +79,8 @@ from typing import Self
 from pydantic import PrivateAttr
 
 from oop_ml.core.base import Transformer
-from oop_ml.core.feature import Feature
-from oop_ml.core.feature_set import FeatureSet
+from oop_ml.data.feature import Feature
+from oop_ml.data.feature_set import FeatureSet
 from oop_ml.exceptions import InvalidValuesError
 from oop_ml.preprocessing.scaling import FeatureScaling, FeatureScalings
 
@@ -115,7 +115,7 @@ class Standardizer(Transformer[Sequence[Feature]]):
     def _compute_scaling(feature: Feature) -> FeatureScaling:
         """The centre and spread learned from one feature.
 
-        The statistics come off the feature's :class:`~oop_ml.core.column.Column`, which
+        The statistics come off the feature's :class:`~oop_ml.data.column.Column`, which
         already owns them, so the population against sample choice gets made in
         one place rather than being re-decided by every caller of ``np.std``.
 
@@ -168,11 +168,11 @@ class Standardizer(Transformer[Sequence[Feature]]):
     def fit(self, input_values: Sequence[Feature]) -> Self:
         """Learn each feature's mean and standard deviation.
 
-        Build a :class:`~oop_ml.core.feature_set.FeatureSet` first, because its
+        Build a :class:`~oop_ml.data.feature_set.FeatureSet` first, because its
         constructor rejects duplicate names, misaligned lengths, and constant
         columns, and a constant column is exactly the one that cannot be
         standardized, its spread being zero. Then pair each feature's name with
-        the statistics its :class:`~oop_ml.core.column.Column` already knows how
+        the statistics its :class:`~oop_ml.data.column.Column` already knows how
         to compute, and store the result as a
         :class:`~oop_ml.preprocessing.scaling.FeatureScalings`.
 
@@ -210,7 +210,7 @@ class Standardizer(Transformer[Sequence[Feature]]):
         ``predict`` follows. Ask
         each :class:`~oop_ml.preprocessing.scaling.FeatureScaling` to do the arithmetic
         rather than repeating the formula here, and return new
-        :class:`~oop_ml.core.feature.Feature` objects keeping their original names.
+        :class:`~oop_ml.data.feature.Feature` objects keeping their original names.
 
         Returns
         -------
