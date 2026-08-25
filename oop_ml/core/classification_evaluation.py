@@ -163,7 +163,7 @@ class ClassificationEvaluation:
         If either input contains a value that is not 0 or 1.
     """
 
-    __slots__ = ("_actual_column", "_predicted_column")
+    __slots__ = ("_actual_column", "_confusion_matrix", "_predicted_column")
 
     def __init__(
         self, actual_values: ColumnSource, predicted_values: ColumnSource
@@ -174,6 +174,14 @@ class ClassificationEvaluation:
         self._actual_column.check_equal_length(self._predicted_column)
         self._actual_column.check_is_binary()
         self._predicted_column.check_is_binary()
+
+        # Counted once, here, rather than on every metric read. Five metrics
+        # each rebuilding a table from the same two validated columns is four
+        # passes over the data that answer a question already answered, and
+        # f1_score alone used to do it twice.
+        self._confusion_matrix = ConfusionMatrix.of(
+            self._actual_column, self._predicted_column
+        )
 
     @property
     def actual_values(self) -> FloatArray:
@@ -193,7 +201,7 @@ class ClassificationEvaluation:
     @property
     def confusion_matrix(self) -> ConfusionMatrix:
         """The four counts, from which every metric below is derived."""
-        return ConfusionMatrix.of(self._actual_column, self._predicted_column)
+        return self._confusion_matrix
 
     @staticmethod
     def _ratio(numerator: int, denominator: int, undefined_because: str) -> float:
