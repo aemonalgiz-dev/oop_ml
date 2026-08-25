@@ -83,7 +83,7 @@ class TestConstruction:
 
 class TestNotFitted:
     @pytest.mark.parametrize(
-        "attribute", ["coefficients_", "intercept_", "iterations_run_", "converged_"]
+        "attribute", ["coefficients", "intercept", "iterations_run", "converged"]
     )
     def test_learned_attributes_raise_before_fit(self, attribute):
         with pytest.raises(NotFittedError):
@@ -296,10 +296,10 @@ class TestFitting:
     def test_recovers_the_known_coefficients(self):
         model = fitted_model()
 
-        assert model.intercept_ == pytest.approx(
+        assert model.intercept == pytest.approx(
             OVERLAPPING_LABELS.expected_intercept, abs=1e-4
         )
-        assert model.coefficients_["hours"] == pytest.approx(
+        assert model.coefficients["hours"] == pytest.approx(
             OVERLAPPING_LABELS.expected_weight, abs=1e-4
         )
 
@@ -312,9 +312,9 @@ class TestFitting:
         walked.fit(OVERLAPPING_LABELS.input_features, OVERLAPPING_LABELS.target_feature)
         jumped = fitted_model()
 
-        assert jumped.intercept_ == pytest.approx(walked.intercept_, abs=1e-7)
-        assert jumped.coefficients_["hours"] == pytest.approx(
-            walked.coefficients_["hours"], abs=1e-7
+        assert jumped.intercept == pytest.approx(walked.intercept, abs=1e-7)
+        assert jumped.coefficients["hours"] == pytest.approx(
+            walked.coefficients["hours"], abs=1e-7
         )
 
     def test_converges_in_single_digit_iterations(self):
@@ -322,13 +322,13 @@ class TestFitting:
         # hundred steps would have proved nothing worth proving.
         model = fitted_model()
 
-        assert model.converged_ is True
-        assert model.iterations_run_ <= 9
+        assert model.converged is True
+        assert model.iterations_run <= 9
 
     def test_the_iteration_cap_is_not_what_stopped_it(self):
         model = fitted_model()
 
-        assert model.iterations_run_ < model.max_iterations
+        assert model.iterations_run < model.max_iterations
 
     def test_fit_returns_self_for_chaining(self):
         model = NewtonLogisticRegression()
@@ -346,7 +346,7 @@ class TestFitting:
         loose = fitted_model(tolerance=1e-4)
         tight = fitted_model(tolerance=1e-13)
 
-        assert tight.iterations_run_ - loose.iterations_run_ <= 3
+        assert tight.iterations_run - loose.iterations_run <= 3
 
 
 class TestPredictions:
@@ -384,8 +384,8 @@ class TestSeparation:
         model = NewtonLogisticRegression(max_iterations=20)
         model.fit(SEPARABLE_LABELS.input_features, SEPARABLE_LABELS.target_feature)
 
-        assert model.converged_ is False
-        assert model.iterations_run_ == 20
+        assert model.converged is False
+        assert model.iterations_run == 20
 
     def test_coefficients_run_away_rather_than_settling(self):
         short = NewtonLogisticRegression(max_iterations=5)
@@ -393,9 +393,7 @@ class TestSeparation:
         long = NewtonLogisticRegression(max_iterations=20)
         long.fit(SEPARABLE_LABELS.input_features, SEPARABLE_LABELS.target_feature)
 
-        assert abs(long.coefficients_["hours"]) > 2.0 * abs(
-            short.coefficients_["hours"]
-        )
+        assert abs(long.coefficients["hours"]) > 2.0 * abs(short.coefficients["hours"])
 
     def test_it_diverges_faster_than_gradient_ascent_does(self):
         # Quadratic convergence toward an optimum that does not exist is
@@ -405,7 +403,7 @@ class TestSeparation:
         walked = LogisticRegression(learning_rate=0.5, max_epochs=20)
         walked.fit(SEPARABLE_LABELS.input_features, SEPARABLE_LABELS.target_feature)
 
-        assert abs(jumped.coefficients_["hours"]) > abs(walked.coefficients_["hours"])
+        assert abs(jumped.coefficients["hours"]) > abs(walked.coefficients["hours"])
 
 
 class TestWithoutIntercept:
@@ -413,6 +411,6 @@ class TestWithoutIntercept:
         model = NewtonLogisticRegression(fit_intercept=False)
         model.fit(OVERLAPPING_LABELS.input_features, OVERLAPPING_LABELS.target_feature)
 
-        assert model.intercept_ == 0.0
-        assert model.converged_ is True
-        assert "hours" in model.coefficients_
+        assert model.intercept == 0.0
+        assert model.converged is True
+        assert "hours" in model.coefficients

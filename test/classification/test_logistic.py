@@ -9,7 +9,7 @@ gradient is ``X.T (y - p)``, checked against central finite differences rather
 than against a formula restated in the test, since restating it would only prove
 the test and the code agree with each other. The second is separation: on data
 where the classes do not overlap there is no finite answer, and the model has to
-say so through ``converged_`` rather than hand back whatever it had reached.
+say so through ``converged`` rather than hand back whatever it had reached.
 """
 
 import numpy as np
@@ -115,7 +115,7 @@ class TestFitValidation:
 
 class TestBeforeFitting:
     @pytest.mark.parametrize(
-        "attribute", ["coefficients_", "intercept_", "epochs_run_", "converged_"]
+        "attribute", ["coefficients", "intercept", "epochs_run", "converged"]
     )
     def test_reading_a_fitted_attribute_raises(self, attribute):
         with pytest.raises(NotFittedError):
@@ -200,18 +200,18 @@ class TestFittedModel:
     def test_recovers_the_known_coefficients(self):
         model = fitted_model()
 
-        assert model.intercept_ == pytest.approx(
+        assert model.intercept == pytest.approx(
             OVERLAPPING_LABELS.expected_intercept, abs=1e-3
         )
-        assert model.coefficients_["hours"] == pytest.approx(
+        assert model.coefficients["hours"] == pytest.approx(
             OVERLAPPING_LABELS.expected_weight, abs=1e-3
         )
 
     def test_reports_that_it_converged(self):
         model = fitted_model()
 
-        assert model.converged_ is True
-        assert 0 < model.epochs_run_ <= 20_000
+        assert model.converged is True
+        assert 0 < model.epochs_run <= 20_000
 
     def test_probabilities_are_in_the_unit_interval_and_increase_with_hours(self):
         model = fitted_model()
@@ -270,13 +270,13 @@ class TestFittedModel:
 class TestSeparation:
     def test_a_separable_target_never_converges(self):
         # No finite maximum likelihood estimate exists, so the walk cannot
-        # settle. Reporting converged_ = True here would be a lie, and the
+        # settle. Reporting converged = True here would be a lie, and the
         # coefficients it stopped at are not an answer.
         model = LogisticRegression(learning_rate=0.5, max_epochs=500, tolerance=1e-10)
         model.fit(SEPARABLE_LABELS.input_features, SEPARABLE_LABELS.target_feature)
 
-        assert model.converged_ is False
-        assert model.epochs_run_ == 500
+        assert model.converged is False
+        assert model.epochs_run == 500
 
     def test_the_coefficients_keep_growing_with_more_epochs(self):
         shorter = LogisticRegression(learning_rate=0.5, max_epochs=200, tolerance=1e-12)
@@ -287,7 +287,7 @@ class TestSeparation:
         )
         longer.fit(SEPARABLE_LABELS.input_features, SEPARABLE_LABELS.target_feature)
 
-        assert abs(longer.coefficients_["hours"]) > abs(shorter.coefficients_["hours"])
+        assert abs(longer.coefficients["hours"]) > abs(shorter.coefficients["hours"])
 
     def test_it_still_classifies_the_training_rows_perfectly(self):
         # The fit is meaningless as an estimate and still separates the data,

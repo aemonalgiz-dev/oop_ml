@@ -48,7 +48,7 @@ class TestConstruction:
 class TestBeforeFit:
     def test_terms_raise_before_fit(self):
         with pytest.raises(NotFittedError):
-            _ = PolynomialFeatures().terms_
+            _ = PolynomialFeatures().terms
 
     def test_transform_raises_before_fit(self):
         with pytest.raises(NotFittedError):
@@ -78,7 +78,7 @@ class TestTermGeneration:
         ],
     )
     def test_orders_by_degree_then_by_feature(self, degree, expected_names):
-        assert list(fitted_expansion(degree).terms_.names) == expected_names
+        assert list(fitted_expansion(degree).terms.names) == expected_names
 
     @pytest.mark.parametrize(
         ("degree", "expected_names"),
@@ -91,7 +91,7 @@ class TestTermGeneration:
         self, degree, expected_names
     ):
         assert (
-            list(fitted_expansion(degree, include_interactions=False).terms_.names)
+            list(fitted_expansion(degree, include_interactions=False).terms.names)
             == expected_names
         )
 
@@ -109,10 +109,10 @@ class TestTermGeneration:
 
         expansion = PolynomialFeatures(degree=degree).fit(features)
 
-        assert expansion.terms_.n_terms == expected_count
+        assert expansion.terms.n_terms == expected_count
 
     def test_degree_one_is_the_original_features(self):
-        assert list(fitted_expansion(1).terms_.names) == ["x1", "x2"]
+        assert list(fitted_expansion(1).terms.names) == ["x1", "x2"]
 
 
 class TestFitValidation:
@@ -162,7 +162,7 @@ class TestTransform:
 
         expanded = expansion.transform(TWO_PREDICTORS)
 
-        assert [feature.name for feature in expanded] == list(expansion.terms_.names)
+        assert [feature.name for feature in expanded] == list(expansion.terms.names)
 
     def test_matches_features_by_name_not_position(self):
         expansion = fitted_expansion()
@@ -170,7 +170,7 @@ class TestTransform:
         reversed_order = expansion.transform(list(reversed(TWO_PREDICTORS)))
 
         assert [feature.name for feature in reversed_order] == list(
-            expansion.terms_.names
+            expansion.terms.names
         )
 
     def test_applies_to_held_out_rows_of_a_different_length(self):
@@ -210,9 +210,9 @@ class TestFittingACurve:
         expansion = PolynomialFeatures(degree=2).fit([inputs])
         model = MultipleLinearRegression().fit(expansion.transform([inputs]), targets)
 
-        assert model.intercept_ == pytest.approx(2.0)
-        assert model.coefficients_["x1"] == pytest.approx(3.0)
-        assert model.coefficients_["x1^2"] == pytest.approx(-1.0)
+        assert model.intercept == pytest.approx(2.0)
+        assert model.coefficients["x1"] == pytest.approx(3.0)
+        assert model.coefficients["x1^2"] == pytest.approx(-1.0)
 
     def test_coefficients_are_readable_by_term_name(self):
         expansion = PolynomialFeatures(degree=2).fit(SINGLE_PREDICTOR)
@@ -222,4 +222,4 @@ class TestFittingACurve:
             expansion.transform(SINGLE_PREDICTOR), targets
         )
 
-        assert "x1^2" in model.coefficients_
+        assert "x1^2" in model.coefficients

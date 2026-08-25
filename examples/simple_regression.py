@@ -39,7 +39,7 @@ def main() -> None:
     model.fit(predictor_values, target_values)
 
     report.line("true    : intercept=4.000  slope=2.500")
-    report.line(f"fitted  : intercept={model.intercept_:.3f}  slope={model.slope_:.3f}")
+    report.line(f"fitted  : intercept={model.intercept:.3f}  slope={model.slope:.3f}")
 
     report.heading("Reading the fit")
 

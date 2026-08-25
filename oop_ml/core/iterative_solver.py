@@ -18,7 +18,7 @@ step, count the pass, stop when the step is smaller than the tolerance, and
 record which of the two exits happened. Getting that bookkeeping subtly wrong is
 easy and quiet, which is the argument for writing it once. Two of the three
 copies used to increment the counter *after* the convergence break, so a fit
-that settled immediately reported ``converged_ = True`` alongside zero passes
+that settled immediately reported ``converged = True`` alongside zero passes
 run.
 
 Naming
@@ -120,7 +120,7 @@ class IterativeSolver(LinearModel):
         return self._passes_run
 
     @property
-    def converged_(self) -> bool:
+    def converged(self) -> bool:
         """Whether the walk settled, rather than running out of passes.
 
         ``False`` means the coefficients were still moving when the cap was

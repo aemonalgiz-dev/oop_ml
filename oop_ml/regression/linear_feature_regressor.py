@@ -36,7 +36,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
     The feature-first API is this library's OOP alternative to an anonymous
     design matrix: predictors arrive as :class:`~oop_ml.core.feature.Feature` objects
     that keep their identity through fitting, so a coefficient is retrieved as
-    ``model.coefficients_["age"]`` rather than ``model.coef_[2]``.
+    ``model.coefficients["age"]`` rather than ``model.coef_[2]``.
 
     Subclasses implement :meth:`_solve` and nothing else.
 
@@ -45,7 +45,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
     fit_intercept:
         Learn a bias term (default), i.e. prepend a ones column to ``X``. When
         ``False`` the column is omitted and the hyperplane is forced through the
-        origin, with ``intercept_`` reported as ``0.0``.
+        origin, with ``intercept`` reported as ``0.0``.
     """
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
@@ -83,7 +83,7 @@ class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature])
     def predict(self, input_values: Sequence[Feature]) -> FloatArray:
         """Evaluate the fitted hyperplane on the given features.
 
-        Computes ``intercept_ + sum(coefficients_[name] * values)`` over the
+        Computes ``intercept + sum(coefficients[name] * values)`` over the
         features, matched to the fitted coefficients *by name* rather than by
         position, so a caller may pass them in whatever order is convenient
         although they do have to supply exactly the names seen during ``fit``.

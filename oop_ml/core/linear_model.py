@@ -55,7 +55,7 @@ class LinearModel(Fittable):
         Learn a bias term, which is the default. Setting it prepends a ones
         column to ``X`` so the bias is solved for like any other coefficient.
         With it off, the column is omitted, the surface is forced through the
-        origin, and ``intercept_`` reports ``0.0``.
+        origin, and ``intercept`` reports ``0.0``.
     """
 
     fit_intercept: bool = True
@@ -64,10 +64,10 @@ class LinearModel(Fittable):
     _coefficients: Coefficients | None = PrivateAttr(default=None)
 
     @property
-    def coefficients_(self) -> Coefficients:
+    def coefficients(self) -> Coefficients:
         """The learned weights, available once ``fit`` has run.
 
-        You can read one by name, as in ``model.coefficients_["age"]``, or
+        You can read one by name, as in ``model.coefficients["age"]``, or
         iterate the :class:`~oop_ml.core.coefficients.Coefficient` objects
         themselves. The collection is immutable, so handing it out to a caller
         cannot corrupt the fitted state.
@@ -82,7 +82,7 @@ class LinearModel(Fittable):
         return self._coefficients
 
     @property
-    def intercept_(self) -> float:
+    def intercept(self) -> float:
         """Learned bias term, or ``0.0`` when ``fit_intercept`` is ``False``.
 
         Raises
@@ -224,7 +224,7 @@ class LinearModel(Fittable):
     def _check_names_match_the_fit(self, input_values: Sequence[Feature]) -> None:
         """Raise unless exactly the fitted feature names were supplied."""
         supplied_names = {feature.name for feature in input_values}
-        fitted_names = {coefficient.name for coefficient in self.coefficients_}
+        fitted_names = {coefficient.name for coefficient in self.coefficients}
 
         if supplied_names != fitted_names:
             raise InvalidValuesError(
@@ -233,7 +233,7 @@ class LinearModel(Fittable):
             )
 
     def _linear_predictor(self, input_values: Sequence[Feature]) -> FloatArray:
-        """``intercept_ + sum(coefficients_[name] * values)`` over the features.
+        """``intercept + sum(coefficients[name] * values)`` over the features.
 
         For a regressor this is already the prediction. For a classifier it is
         the log-odds, which still has to go through a sigmoid before it means
@@ -265,10 +265,8 @@ class LinearModel(Fittable):
 
         # Matching by name rather than by position is what lets the caller pass
         # the features in any order, and no design matrix is rebuilt here.
-        predictions = np.full(reference_column.n_samples, self.intercept_)
+        predictions = np.full(reference_column.n_samples, self.intercept)
         for feature in input_values:
-            predictions = (
-                predictions + self.coefficients_[feature.name] * feature.values
-            )
+            predictions = predictions + self.coefficients[feature.name] * feature.values
 
         return predictions

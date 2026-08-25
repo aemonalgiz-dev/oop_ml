@@ -45,9 +45,9 @@ def main() -> None:
     model = LogisticRegression(learning_rate=0.5, max_epochs=50_000, tolerance=1e-10)
     model.fit(scaled_features, data.target_feature)
 
-    report.line(f"converged : {model.converged_} after {model.epochs_run_} epochs")
-    report.line(f"intercept : {model.intercept_:.4f}")
-    for coefficient in model.coefficients_:
+    report.line(f"converged : {model.converged} after {model.epochs_run} epochs")
+    report.line(f"intercept : {model.intercept:.4f}")
+    for coefficient in model.coefficients:
         report.line(f"{coefficient.name:<14}: {coefficient.value:+.4f}")
 
     report.paragraph(
@@ -95,7 +95,7 @@ def main() -> None:
                 f"{coefficient.value:+.4f}",
                 f"{model.odds_multiplier_for(coefficient.name):.4f}",
             ]
-            for coefficient in model.coefficients_
+            for coefficient in model.coefficients
         ],
     )
 
@@ -103,12 +103,12 @@ def main() -> None:
     # not, which is the whole reason the model is built on log-odds. Vary one
     # standardised feature and hold the other at zero, which on a standardised
     # column is its mean.
-    strongest = max(model.coefficients_, key=lambda weight: abs(weight.value))
+    strongest = max(model.coefficients, key=lambda weight: abs(weight.value))
     rows = []
     previous_probability = None
     previous_odds = None
     for standard_deviations in [-1.0, 0.0, 1.0, 2.0]:
-        log_odds = model.intercept_ + strongest.value * standard_deviations
+        log_odds = model.intercept + strongest.value * standard_deviations
         probability = 1.0 / (1.0 + np.exp(-log_odds))
         odds = probability / (1.0 - probability)
 
@@ -153,9 +153,9 @@ def main() -> None:
         rows.append(
             [
                 str(model_run.max_epochs),
-                str(model_run.epochs_run_),
-                str(model_run.converged_),
-                f"{model_run.coefficients_['hours_studied']:.4f}",
+                str(model_run.epochs_run),
+                str(model_run.converged),
+                f"{model_run.coefficients['hours_studied']:.4f}",
                 f"{training_accuracy:.4f}",
             ]
         )
@@ -166,8 +166,7 @@ def main() -> None:
     )
 
     growth = (
-        long_run.coefficients_["hours_studied"]
-        / short_run.coefficients_["hours_studied"]
+        long_run.coefficients["hours_studied"] / short_run.coefficients["hours_studied"]
     )
     report.warn(
         f"neither run converged, and the coefficient grew by a factor of "
@@ -178,7 +177,7 @@ def main() -> None:
 
     report.paragraph(
         "Both runs score a perfect 1.0000 on the rows they were fitted to, which\n"
-        "is exactly why that number cannot be the thing you check. converged_ is\n"
+        "is exactly why that number cannot be the thing you check. converged is\n"
         "the attribute that tells you the difference between a model that found\n"
         "an answer and one that merely ran out of patience."
     )
@@ -195,25 +194,25 @@ def main() -> None:
         [
             [
                 "gradient ascent",
-                str(walked.epochs_run_),
-                str(walked.converged_),
-                f"{walked.intercept_:+.8f}",
-                f"{walked.coefficients_['hours_studied']:+.8f}",
+                str(walked.epochs_run),
+                str(walked.converged),
+                f"{walked.intercept:+.8f}",
+                f"{walked.coefficients['hours_studied']:+.8f}",
             ],
             [
                 "Newton / IRLS",
-                str(jumped.iterations_run_),
-                str(jumped.converged_),
-                f"{jumped.intercept_:+.8f}",
-                f"{jumped.coefficients_['hours_studied']:+.8f}",
+                str(jumped.iterations_run),
+                str(jumped.converged),
+                f"{jumped.intercept:+.8f}",
+                f"{jumped.coefficients['hours_studied']:+.8f}",
             ],
         ],
     )
 
     largest_disagreement = max(
-        abs(walked.intercept_ - jumped.intercept_),
+        abs(walked.intercept - jumped.intercept),
         max(
-            abs(walked.coefficients_[name] - jumped.coefficients_[name])
+            abs(walked.coefficients[name] - jumped.coefficients[name])
             for name in (feature.name for feature in scaled_features)
         ),
     )

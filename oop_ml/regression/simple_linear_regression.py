@@ -7,7 +7,7 @@ Aligned onto the shared ``core`` frame:
 * data arrives in ``fit(input_values, target_values)``, not the constructor --
   construction only configures, fitting learns;
 * learned parameters live on private attributes and are read back through
-  ``slope_`` / ``intercept_``, which raise ``NotFittedError`` before ``fit``;
+  ``slope`` / ``intercept``, which raise ``NotFittedError`` before ``fit``;
 * inputs become :class:`~oop_ml.core.column.Column` objects at the boundary, so this
   module never coerces an array itself, and the mean/deviation arithmetic the
   slope needs is asked of the column rather than recomputed here;
@@ -33,28 +33,28 @@ MINIMUM_SAMPLES = 2
 class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
     """Least-squares line over a single predictor.
 
-    Predicts ``intercept_ + slope_ * input_value`` for each observation.
+    Predicts ``intercept + slope * input_value`` for each observation.
     """
 
     _slope: float | None = PrivateAttr(default=None)
     _intercept: float | None = PrivateAttr(default=None)
 
     @property
-    def slope_(self) -> float:
+    def slope(self) -> float:
         """Learned slope (available after ``fit``)."""
         self._check_fitted()
         assert self._slope is not None
         return self._slope
 
     @property
-    def intercept_(self) -> float:
+    def intercept(self) -> float:
         """Learned intercept (available after ``fit``)."""
         self._check_fitted()
         assert self._intercept is not None
         return self._intercept
 
     def fit(self, input_values: NumericInput, target_values: NumericInput) -> Self:
-        """Learn ``slope_`` and ``intercept_`` from the training pairs."""
+        """Learn ``slope`` and ``intercept`` from the training pairs."""
         input_column = Column.of(input_values, ValueRole.INPUT_VALUES)
         target_column = Column.of(target_values, ValueRole.TARGET_VALUES)
 
@@ -81,4 +81,4 @@ class SimpleLinearRegression(Regressor[NumericInput, NumericInput]):
 
         input_column = Column.of(input_values, ValueRole.INPUT_VALUES)
 
-        return input_column.values * self.slope_ + self.intercept_
+        return input_column.values * self.slope + self.intercept

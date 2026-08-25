@@ -50,7 +50,7 @@ class TestConstruction:
 
     def test_coefficients_raise_before_fit(self):
         with pytest.raises(NotFittedError):
-            _ = RidgeRegression().coefficients_
+            _ = RidgeRegression().coefficients
 
 
 class TestPenaltySweep:
@@ -62,9 +62,9 @@ class TestPenaltySweep:
     ):
         model = fitted_model(penalty)
 
-        assert model.intercept_ == pytest.approx(intercept, abs=1e-6)
-        assert model.coefficients_["x1"] == pytest.approx(first_weight, abs=1e-6)
-        assert model.coefficients_["x2"] == pytest.approx(second_weight, abs=1e-6)
+        assert model.intercept == pytest.approx(intercept, abs=1e-6)
+        assert model.coefficients["x1"] == pytest.approx(first_weight, abs=1e-6)
+        assert model.coefficients["x2"] == pytest.approx(second_weight, abs=1e-6)
 
     def test_zero_penalty_reproduces_ordinary_least_squares(self):
         ridge = fitted_model(penalty=0.0)
@@ -72,21 +72,21 @@ class TestPenaltySweep:
             EXACT_PLANE.input_features, EXACT_PLANE.target_feature
         )
 
-        assert ridge.intercept_ == pytest.approx(ordinary.intercept_)
-        assert ridge.coefficients_["x1"] == pytest.approx(ordinary.coefficients_["x1"])
-        assert ridge.coefficients_["x2"] == pytest.approx(ordinary.coefficients_["x2"])
+        assert ridge.intercept == pytest.approx(ordinary.intercept)
+        assert ridge.coefficients["x1"] == pytest.approx(ordinary.coefficients["x1"])
+        assert ridge.coefficients["x2"] == pytest.approx(ordinary.coefficients["x2"])
 
     @pytest.mark.parametrize("feature_name", ["x1", "x2"])
     def test_shrinkage_is_monotone_in_the_penalty(self, feature_name):
         weights = [
-            abs(fitted_model(penalty).coefficients_[feature_name])
+            abs(fitted_model(penalty).coefficients[feature_name])
             for penalty, *_ in PENALTY_SWEEP
         ]
 
         assert weights == sorted(weights, reverse=True)
 
     def test_shrinks_toward_but_never_to_zero(self):
-        assert fitted_model(penalty=1000.0).coefficients_["x1"] > 0.0
+        assert fitted_model(penalty=1000.0).coefficients["x1"] > 0.0
 
 
 class TestInterceptIsNotPenalised:
@@ -99,9 +99,9 @@ class TestInterceptIsNotPenalised:
             EXACT_PLANE.input_features, EXACT_PLANE.shifted_target(offset)
         )
 
-        assert shifted.intercept_ == pytest.approx(base.intercept_ + offset)
-        assert shifted.coefficients_["x1"] == pytest.approx(base.coefficients_["x1"])
-        assert shifted.coefficients_["x2"] == pytest.approx(base.coefficients_["x2"])
+        assert shifted.intercept == pytest.approx(base.intercept + offset)
+        assert shifted.coefficients["x1"] == pytest.approx(base.coefficients["x1"])
+        assert shifted.coefficients["x2"] == pytest.approx(base.coefficients["x2"])
 
 
 class TestWithoutIntercept:
@@ -115,9 +115,9 @@ class TestWithoutIntercept:
             ORIGIN_PLANE.input_features, ORIGIN_PLANE.target_feature
         )
 
-        assert model.intercept_ == pytest.approx(0.0)
-        assert model.coefficients_["x1"] == pytest.approx(first_weight, abs=1e-6)
-        assert model.coefficients_["x2"] == pytest.approx(second_weight, abs=1e-6)
+        assert model.intercept == pytest.approx(0.0)
+        assert model.coefficients["x1"] == pytest.approx(first_weight, abs=1e-6)
+        assert model.coefficients["x2"] == pytest.approx(second_weight, abs=1e-6)
 
 
 class TestCollinearFeatures:
@@ -133,6 +133,6 @@ class TestCollinearFeatures:
             [first, collinear], EXACT_PLANE.target_feature
         )
 
-        assert model.coefficients_["x1"] == pytest.approx(
-            model.coefficients_["x2"] / multiplier, abs=1e-6
+        assert model.coefficients["x1"] == pytest.approx(
+            model.coefficients["x2"] / multiplier, abs=1e-6
         )

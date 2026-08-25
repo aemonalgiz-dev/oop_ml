@@ -65,7 +65,7 @@ class TestConstruction:
 
 class TestBeforeFit:
     @pytest.mark.parametrize(
-        "attribute", ["coefficients_", "intercept_", "iterations_run_", "converged_"]
+        "attribute", ["coefficients", "intercept", "iterations_run", "converged"]
     )
     def test_learned_attributes_raise_before_fit(self, attribute):
         with pytest.raises(NotFittedError):
@@ -113,9 +113,9 @@ class TestPenaltySweep:
     ):
         model = fitted_model(penalty)
 
-        assert model.intercept_ == pytest.approx(intercept, abs=1e-6)
-        assert model.coefficients_["x1"] == pytest.approx(first_weight, abs=1e-6)
-        assert model.coefficients_["x2"] == pytest.approx(second_weight, abs=1e-6)
+        assert model.intercept == pytest.approx(intercept, abs=1e-6)
+        assert model.coefficients["x1"] == pytest.approx(first_weight, abs=1e-6)
+        assert model.coefficients["x2"] == pytest.approx(second_weight, abs=1e-6)
 
     def test_zero_penalty_reproduces_ordinary_least_squares(self):
         lasso = fitted_model(penalty=0.0)
@@ -123,14 +123,14 @@ class TestPenaltySweep:
             EXACT_PLANE.input_features, EXACT_PLANE.target_feature
         )
 
-        assert lasso.intercept_ == pytest.approx(ordinary.intercept_)
-        assert lasso.coefficients_["x1"] == pytest.approx(ordinary.coefficients_["x1"])
-        assert lasso.coefficients_["x2"] == pytest.approx(ordinary.coefficients_["x2"])
+        assert lasso.intercept == pytest.approx(ordinary.intercept)
+        assert lasso.coefficients["x1"] == pytest.approx(ordinary.coefficients["x1"])
+        assert lasso.coefficients["x2"] == pytest.approx(ordinary.coefficients["x2"])
 
     @pytest.mark.parametrize("feature_name", ["x1", "x2"])
     def test_shrinkage_is_monotone_in_the_penalty(self, feature_name):
         weights = [
-            abs(fitted_model(penalty).coefficients_[feature_name])
+            abs(fitted_model(penalty).coefficients[feature_name])
             for penalty, *_ in PENALTY_SWEEP
         ]
 
@@ -141,21 +141,21 @@ class TestFeatureSelection:
     def test_a_large_enough_penalty_zeroes_one_feature_exactly(self):
         model = fitted_model(PENALTY_THAT_ZEROES_ONE)
 
-        assert model.coefficients_["x2"] == 0.0
-        assert model.coefficients_["x1"] != 0.0
+        assert model.coefficients["x2"] == 0.0
+        assert model.coefficients["x1"] != 0.0
 
     def test_a_larger_penalty_zeroes_every_feature(self):
         model = fitted_model(PENALTY_THAT_ZEROES_BOTH)
 
-        assert model.coefficients_["x1"] == 0.0
-        assert model.coefficients_["x2"] == 0.0
+        assert model.coefficients["x1"] == 0.0
+        assert model.coefficients["x2"] == 0.0
 
     def test_with_no_slopes_left_the_intercept_is_the_target_mean(self):
         # Predicting a constant, the best constant is the mean -- and the
         # unpenalised intercept is free to go there.
         model = fitted_model(PENALTY_THAT_ZEROES_BOTH)
 
-        assert model.intercept_ == pytest.approx(EXACT_PLANE.target_feature.column.mean)
+        assert model.intercept == pytest.approx(EXACT_PLANE.target_feature.column.mean)
 
     @pytest.mark.parametrize("penalty", [PENALTY_THAT_ZEROES_ONE, 40.0, 100.0])
     def test_ridge_never_reaches_zero_where_lasso_does(self, penalty):
@@ -165,29 +165,29 @@ class TestFeatureSelection:
             EXACT_PLANE.input_features, EXACT_PLANE.target_feature
         )
 
-        assert ridge.coefficients_["x1"] != 0.0
-        assert ridge.coefficients_["x2"] != 0.0
+        assert ridge.coefficients["x1"] != 0.0
+        assert ridge.coefficients["x2"] != 0.0
 
 
 class TestConvergence:
     def test_reports_convergence(self):
         model = fitted_model()
 
-        assert model.converged_ is True
-        assert model.iterations_run_ <= model.max_iterations
+        assert model.converged is True
+        assert model.iterations_run <= model.max_iterations
 
     def test_stopping_early_is_reported_not_hidden(self):
         model = LassoRegression(penalty=1.0, max_iterations=1, tolerance=1e-15).fit(
             EXACT_PLANE.input_features, EXACT_PLANE.target_feature
         )
 
-        assert model.converged_ is False
-        assert model.iterations_run_ == 1
+        assert model.converged is False
+        assert model.iterations_run == 1
 
     def test_converges_well_inside_the_iteration_cap(self):
         model = fitted_model()
 
-        assert model.iterations_run_ < model.max_iterations
+        assert model.iterations_run < model.max_iterations
 
     @pytest.mark.parametrize(
         ("lighter_penalty", "heavier_penalty"), [(1.0, 12.0), (12.0, 16.0)]
@@ -196,8 +196,8 @@ class TestConvergence:
         # Coefficients clamped to zero stop moving, so the sweeps settle sooner:
         # 137 sweeps at penalty 1, 47 at penalty 12, 2 once everything is zeroed.
         assert (
-            fitted_model(heavier_penalty).iterations_run_
-            < fitted_model(lighter_penalty).iterations_run_
+            fitted_model(heavier_penalty).iterations_run
+            < fitted_model(lighter_penalty).iterations_run
         )
 
 
@@ -210,14 +210,14 @@ class TestWithoutIntercept:
             ORIGIN_PLANE.input_features, ORIGIN_PLANE.target_feature
         )
 
-        assert model.intercept_ == pytest.approx(0.0)
-        assert model.coefficients_["x1"] == pytest.approx(first_weight, abs=1e-6)
-        assert model.coefficients_["x2"] == pytest.approx(second_weight, abs=1e-6)
+        assert model.intercept == pytest.approx(0.0)
+        assert model.coefficients["x1"] == pytest.approx(first_weight, abs=1e-6)
+        assert model.coefficients["x2"] == pytest.approx(second_weight, abs=1e-6)
 
     def test_a_huge_penalty_zeroes_everything(self):
         model = LassoRegression(penalty=60.0, fit_intercept=False).fit(
             ORIGIN_PLANE.input_features, ORIGIN_PLANE.target_feature
         )
 
-        assert model.coefficients_["x1"] == 0.0
-        assert model.coefficients_["x2"] == 0.0
+        assert model.coefficients["x1"] == 0.0
+        assert model.coefficients["x2"] == 0.0

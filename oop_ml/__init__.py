@@ -10,7 +10,7 @@ import::
         [Feature("area", areas), Feature("baths", baths)],
         Feature("price", prices),
     )
-    model.coefficients_["area"]
+    model.coefficients["area"]
 
 The full paths still work and are what the library itself uses internally, so
 reach for ``from oop_ml.regression.ridge_regression import RidgeRegression``

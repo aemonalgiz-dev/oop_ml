@@ -39,9 +39,9 @@ def main() -> None:
     model.fit(data.input_features, data.target_feature)
 
     report.coefficients(
-        model.coefficients_,
+        model.coefficients,
         data.true_coefficients,
-        model.intercept_,
+        model.intercept,
         data.true_intercept,
     )
     report.evaluation(
@@ -50,12 +50,12 @@ def main() -> None:
 
     report.heading("Coefficients are addressed by name, never by position")
 
-    report.line(f"rooms       : {model.coefficients_['rooms']:.3f} per room")
+    report.line(f"rooms       : {model.coefficients['rooms']:.3f} per room")
     report.line(
-        f"age_years   : {model.coefficients_.value_for('age_years'):.3f} per year"
+        f"age_years   : {model.coefficients.value_for('age_years'):.3f} per year"
     )
-    report.line(f"'rooms' known to the model : {'rooms' in model.coefficients_}")
-    report.line(f"'garden' known to the model: {'garden' in model.coefficients_}")
+    report.line(f"'rooms' known to the model : {'rooms' in model.coefficients}")
+    report.line(f"'garden' known to the model: {'garden' in model.coefficients}")
 
     report.paragraph(
         "Each weight is a *partial* effect: the change in y per unit of that\n"

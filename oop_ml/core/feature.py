@@ -6,7 +6,7 @@ three was, and I did not want that memory to live outside the model. A
 two things a bare numpy column cannot.
 
 The first is coefficients addressed by name rather than by position. A model
-built from features exposes ``model.coefficients_["age"]`` instead of
+built from features exposes ``model.coefficients["age"]`` instead of
 ``model.coef_[2]``, so the variable keeps its identity the whole way through
 fitting and out the other side.
 

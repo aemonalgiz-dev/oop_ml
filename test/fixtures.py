@@ -226,7 +226,7 @@ SEPARABLE_LABELS = LabelledFixture(
     [0.5, 1.0, 2.0, 3.0, 4.0, 5.0],
     # Perfectly separable, so no finite maximum likelihood estimate exists and
     # the coefficients climb without limit. Any fit here must report
-    # converged_ = False rather than pretending it found something.
+    # converged = False rather than pretending it found something.
     [0, 0, 0, 1, 1, 1],
     expected_intercept=float("nan"),
     expected_weight=float("nan"),

@@ -37,7 +37,7 @@ def fitted_standardizer() -> Standardizer:
 class TestBeforeFit:
     def test_scalings_raise_before_fit(self):
         with pytest.raises(NotFittedError):
-            _ = Standardizer().scalings_
+            _ = Standardizer().scalings
 
     def test_transform_raises_before_fit(self):
         with pytest.raises(NotFittedError):
@@ -49,7 +49,7 @@ class TestBeforeFit:
 
 class TestFit:
     def test_learns_a_scaling_per_feature(self):
-        scalings = fitted_standardizer().scalings_
+        scalings = fitted_standardizer().scalings
 
         assert {scaling.name for scaling in scalings} == {"x1", "x2"}
 
@@ -61,7 +61,7 @@ class TestFit:
         self, feature_name, expected_mean, expected_spread
     ):
         # Population spread: sqrt(sum_of_squared_deviations / n), not / (n - 1).
-        scaling = fitted_standardizer().scalings_[feature_name]
+        scaling = fitted_standardizer().scalings[feature_name]
 
         assert scaling.mean == pytest.approx(expected_mean)
         assert scaling.standard_deviation == pytest.approx(expected_spread, abs=1e-6)

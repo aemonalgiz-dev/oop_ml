@@ -184,7 +184,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         UndefinedMetricError
             If this feature's coefficient is zero, leaving no crossing.
         """
-        coefficient = self.coefficients_[feature_name]
+        coefficient = self.coefficients[feature_name]
 
         if coefficient == 0.0:
             raise UndefinedMetricError(
@@ -194,7 +194,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
 
         log_odds_cut = float(np.log(self.threshold / (1.0 - self.threshold)))
 
-        return float((log_odds_cut - self.intercept_) / coefficient)
+        return float((log_odds_cut - self.intercept) / coefficient)
 
     def odds_multiplier_for(self, feature_name: str) -> float:
         """What one more unit of this feature does to the odds: ``exp(b_j)``.
@@ -208,4 +208,4 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         NotFittedError
             If called before ``fit``.
         """
-        return float(np.exp(self.coefficients_[feature_name]))
+        return float(np.exp(self.coefficients[feature_name]))

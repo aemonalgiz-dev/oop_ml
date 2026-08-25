@@ -41,8 +41,8 @@ def main() -> None:
     least_squares = MultipleLinearRegression()
     least_squares.fit(collinear.input_features, collinear.target_feature)
 
-    first_weight = least_squares.coefficients_["first"]
-    second_weight = least_squares.coefficients_["second"]
+    first_weight = least_squares.coefficients["first"]
+    second_weight = least_squares.coefficients["second"]
 
     report.line("true    : first= 3.000  second=-2.000  (sum  1.000)")
     report.line(
@@ -62,8 +62,8 @@ def main() -> None:
         rows.append(
             [
                 f"{penalty:g}",
-                f"{model.coefficients_['first']:.4f}",
-                f"{model.coefficients_['second']:.4f}",
+                f"{model.coefficients['first']:.4f}",
+                f"{model.coefficients['second']:.4f}",
                 f"{score:.4f}",
             ]
         )
@@ -78,7 +78,7 @@ def main() -> None:
         model = LassoRegression(penalty=penalty)
         model.fit(collinear.input_features, collinear.target_feature)
 
-        if not model.converged_:
+        if not model.converged:
             concerns.append(
                 f"penalty={penalty:g} exhausted all {model.max_iterations} sweeps "
                 f"without converging; its coefficients are wherever the walk had "
@@ -88,10 +88,10 @@ def main() -> None:
         rows.append(
             [
                 f"{penalty:g}",
-                f"{model.coefficients_['first']:.4f}",
-                f"{model.coefficients_['second']:.4f}",
-                str(model.iterations_run_),
-                str(model.converged_),
+                f"{model.coefficients['first']:.4f}",
+                f"{model.coefficients['second']:.4f}",
+                str(model.iterations_run),
+                str(model.converged),
             ]
         )
 
@@ -124,10 +124,10 @@ def main() -> None:
         rows.append(
             [
                 f"{penalty:g}",
-                str(sum(1 for weight in ridge.coefficients_ if weight.value == 0.0)),
-                str(sum(1 for weight in lasso.coefficients_ if weight.value == 0.0)),
-                f"{lasso.coefficients_['signal_a']:.3f}",
-                f"{lasso.coefficients_['signal_b']:.3f}",
+                str(sum(1 for weight in ridge.coefficients if weight.value == 0.0)),
+                str(sum(1 for weight in lasso.coefficients if weight.value == 0.0)),
+                f"{lasso.coefficients['signal_a']:.3f}",
+                f"{lasso.coefficients['signal_b']:.3f}",
             ]
         )
 
@@ -142,9 +142,7 @@ def main() -> None:
 
     heaviest = LassoRegression(penalty=5.0)
     heaviest.fit(sparse.input_features, sparse.target_feature)
-    survivors = [
-        weight.name for weight in heaviest.coefficients_ if weight.value != 0.0
-    ]
+    survivors = [weight.name for weight in heaviest.coefficients if weight.value != 0.0]
     surviving_noise = [name for name in survivors if name.startswith("noise")]
 
     report.line(f"\nstill standing at penalty=5: {survivors}")

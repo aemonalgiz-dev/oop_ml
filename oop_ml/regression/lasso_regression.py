@@ -139,7 +139,7 @@ class LassoRegression(LinearFeatureRegressor):
     _converged: bool | None = PrivateAttr(default=None)
 
     @property
-    def iterations_run_(self) -> int:
+    def iterations_run(self) -> int:
         """How many full sweeps the last fit took.
 
         Raises
@@ -152,7 +152,7 @@ class LassoRegression(LinearFeatureRegressor):
         return self._iterations_run
 
     @property
-    def converged_(self) -> bool:
+    def converged(self) -> bool:
         """Whether the last fit stopped on ``tolerance`` rather than the cap.
 
         ``False`` means the coefficients were still moving when
@@ -250,7 +250,7 @@ class LassoRegression(LinearFeatureRegressor):
         see. That is what makes this descent rather than a fixed-point iteration.
 
         Both exits are recorded: settling below ``tolerance`` (converged) or
-        exhausting ``max_iterations`` (gave up). See ``converged_``.
+        exhausting ``max_iterations`` (gave up). See ``converged``.
         """
         # Columns of a C-ordered matrix are strided, so every dot product below
         # would read memory with a gap between elements. One transpose up front

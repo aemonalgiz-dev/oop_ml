@@ -46,7 +46,7 @@ class TestConstruction:
 
 
 class TestBeforeFit:
-    @pytest.mark.parametrize("attribute", ["coefficients_", "intercept_"])
+    @pytest.mark.parametrize("attribute", ["coefficients", "intercept"])
     def test_learned_attributes_raise_before_fit(self, attribute):
         with pytest.raises(NotFittedError):
             getattr(MultipleLinearRegression(), attribute)
@@ -70,14 +70,12 @@ class TestFit:
     def test_recovers_the_known_solution(self, fixture, fit_intercept):
         model = fitted_model(fixture, fit_intercept)
 
-        assert model.intercept_ == pytest.approx(fixture.expected_intercept)
-        assert model.coefficients_["x1"] == pytest.approx(fixture.expected_first_weight)
-        assert model.coefficients_["x2"] == pytest.approx(
-            fixture.expected_second_weight
-        )
+        assert model.intercept == pytest.approx(fixture.expected_intercept)
+        assert model.coefficients["x1"] == pytest.approx(fixture.expected_first_weight)
+        assert model.coefficients["x2"] == pytest.approx(fixture.expected_second_weight)
 
     def test_coefficients_keyed_by_feature_name(self):
-        learned = fitted_model().coefficients_
+        learned = fitted_model().coefficients
 
         assert {coefficient.name for coefficient in learned} == {"x1", "x2"}
 

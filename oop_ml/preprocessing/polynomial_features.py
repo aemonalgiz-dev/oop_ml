@@ -94,7 +94,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
     _terms: PolynomialTerms | None = PrivateAttr(default=None)
 
     @property
-    def terms_(self) -> PolynomialTerms:
+    def terms(self) -> PolynomialTerms:
         """The expansion learned during ``fit`` (available after ``fit``).
 
         Fixing the terms at fit time is what makes ``transform`` reproducible,
@@ -137,7 +137,7 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
             If a feature seen during ``fit`` is missing.
         """
         supplied_names = {feature.name for feature in input_values}
-        missing_names = set(self.terms_.source_feature_names) - supplied_names
+        missing_names = set(self.terms.source_feature_names) - supplied_names
 
         if missing_names:
             raise InvalidValuesError(
@@ -258,4 +258,4 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
         self._check_fitted()
         self._check_names_were_learned(input_values)
 
-        return self.terms_.expand(input_values)
+        return self.terms.expand(input_values)

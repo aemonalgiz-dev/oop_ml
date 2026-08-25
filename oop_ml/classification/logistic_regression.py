@@ -60,7 +60,7 @@ The shape is identical: a residual, projected back through the design matrix.
 The only difference is that ``p`` has been through a sigmoid on the way. This is
 the reason ``GradientDescentRegression`` was worth building first, since the
 walk, the learning rate, the convergence test and the reporting of
-``epochs_run_`` all transfer, and the one line that changes is where ``p`` comes
+``epochs_run`` all transfer, and the one line that changes is where ``p`` comes
 from.
 
 There is a sanity check hiding in it. At ``b = 0`` every ``p`` is exactly 0.5,
@@ -112,7 +112,7 @@ ever attaining a maximum. This is not an exotic case either; it turns up
 routinely with few rows or many features, and it is the reason scikit-learn
 regularises by default rather than offering an unpenalised fit as the norm.
 
-``converged_`` is therefore load-bearing here in a way it is not for ridge. A
+``converged`` is therefore load-bearing here in a way it is not for ridge. A
 run that quietly exhausted ``max_epochs`` with coefficients still climbing has
 not found an answer, and reporting its numbers as though it had is how a
 separated dataset turns into a confidently meaningless model.
@@ -164,7 +164,7 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
         return self.max_epochs
 
     @property
-    def epochs_run_(self) -> int:
+    def epochs_run(self) -> int:
         """How many epochs the ascent actually took."""
         return self._completed_passes
 

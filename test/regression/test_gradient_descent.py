@@ -50,9 +50,7 @@ class TestConstruction:
 
 
 class TestBeforeFit:
-    @pytest.mark.parametrize(
-        "attribute", ["epochs_run_", "converged_", "coefficients_"]
-    )
+    @pytest.mark.parametrize("attribute", ["epochs_run", "converged", "coefficients"])
     def test_learned_attributes_raise_before_fit(self, attribute):
         with pytest.raises(NotFittedError):
             getattr(GradientDescentRegression(), attribute)
@@ -64,24 +62,24 @@ class TestConvergence:
         # The step size changes how long the walk takes, never where it ends.
         model = converged_model(learning_rate)
 
-        assert model.intercept_ == pytest.approx(
+        assert model.intercept == pytest.approx(
             EXACT_PLANE.expected_intercept, abs=1e-6
         )
-        assert model.coefficients_["x1"] == pytest.approx(
+        assert model.coefficients["x1"] == pytest.approx(
             EXACT_PLANE.expected_first_weight, abs=1e-6
         )
-        assert model.coefficients_["x2"] == pytest.approx(
+        assert model.coefficients["x2"] == pytest.approx(
             EXACT_PLANE.expected_second_weight, abs=1e-6
         )
 
     def test_reports_convergence(self):
         model = converged_model()
 
-        assert model.converged_ is True
-        assert model.epochs_run_ < model.max_epochs
+        assert model.converged is True
+        assert model.epochs_run < model.max_epochs
 
     def test_a_larger_step_needs_fewer_epochs(self):
-        assert converged_model(0.1).epochs_run_ < converged_model(0.01).epochs_run_
+        assert converged_model(0.1).epochs_run < converged_model(0.01).epochs_run
 
     @pytest.mark.parametrize(
         ("first_values", "second_values", "expected"),
@@ -103,15 +101,15 @@ class TestEpochCap:
             learning_rate=0.05, max_epochs=max_epochs
         ).fit(EXACT_PLANE.input_features, EXACT_PLANE.target_feature)
 
-        assert model.converged_ is False
-        assert model.epochs_run_ == max_epochs
+        assert model.converged is False
+        assert model.epochs_run == max_epochs
 
     def test_more_epochs_get_closer(self):
         def error_after(max_epochs: int) -> float:
             model = GradientDescentRegression(
                 learning_rate=0.05, max_epochs=max_epochs, tolerance=1e-15
             ).fit(EXACT_PLANE.input_features, EXACT_PLANE.target_feature)
-            return abs(model.coefficients_["x1"] - EXACT_PLANE.expected_first_weight)
+            return abs(model.coefficients["x1"] - EXACT_PLANE.expected_first_weight)
 
         assert error_after(500) < error_after(50)
 
@@ -122,17 +120,17 @@ class TestEpochCap:
             EXACT_PLANE.input_features, EXACT_PLANE.target_feature
         )
 
-        assert model.converged_ is False
+        assert model.converged is False
 
 
 class TestWithoutIntercept:
     def test_is_forced_through_the_origin(self):
         model = converged_model(fixture=ORIGIN_PLANE, fit_intercept=False)
 
-        assert model.intercept_ == pytest.approx(ORIGIN_PLANE.expected_intercept)
-        assert model.coefficients_["x1"] == pytest.approx(
+        assert model.intercept == pytest.approx(ORIGIN_PLANE.expected_intercept)
+        assert model.coefficients["x1"] == pytest.approx(
             ORIGIN_PLANE.expected_first_weight, abs=1e-6
         )
-        assert model.coefficients_["x2"] == pytest.approx(
+        assert model.coefficients["x2"] == pytest.approx(
             ORIGIN_PLANE.expected_second_weight, abs=1e-6
         )

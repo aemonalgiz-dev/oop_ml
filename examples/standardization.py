@@ -44,7 +44,7 @@ def main() -> None:
         ["feature", "mean", "sd"],
         [
             [scaling.name, f"{scaling.mean:.3f}", f"{scaling.standard_deviation:.3f}"]
-            for scaling in standardizer.scalings_
+            for scaling in standardizer.scalings
         ],
     )
 
@@ -68,10 +68,10 @@ def main() -> None:
         rows.append(
             [
                 f"{penalty:g}",
-                f"{raw_model.coefficients_['floor_area_sqm']:.4f}",
-                f"{raw_model.coefficients_['bathrooms']:.4f}",
-                f"{scaled_model.coefficients_['floor_area_sqm']:.4f}",
-                f"{scaled_model.coefficients_['bathrooms']:.4f}",
+                f"{raw_model.coefficients['floor_area_sqm']:.4f}",
+                f"{raw_model.coefficients['bathrooms']:.4f}",
+                f"{scaled_model.coefficients['floor_area_sqm']:.4f}",
+                f"{scaled_model.coefficients['bathrooms']:.4f}",
             ]
         )
 

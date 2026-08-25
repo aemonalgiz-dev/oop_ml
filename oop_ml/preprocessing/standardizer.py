@@ -95,10 +95,10 @@ class Standardizer(Transformer[Sequence[Feature]]):
     _scalings: FeatureScalings | None = PrivateAttr(default=None)
 
     @property
-    def scalings_(self) -> FeatureScalings:
+    def scalings(self) -> FeatureScalings:
         """The statistics learned per feature (available after ``fit``).
 
-        You can read one by name, as in ``standardizer.scalings_["age"].mean``,
+        You can read one by name, as in ``standardizer.scalings["age"].mean``,
         or iterate the
         :class:`~oop_ml.preprocessing.scaling.FeatureScaling` objects directly.
 
@@ -156,7 +156,7 @@ class Standardizer(Transformer[Sequence[Feature]]):
         InvalidValuesError
             If a supplied feature was never seen during ``fit``.
         """
-        learned_names = {scaling.name for scaling in self.scalings_}
+        learned_names = {scaling.name for scaling in self.scalings}
         unknown_names = {feature.name for feature in input_values} - learned_names
 
         if unknown_names:
@@ -229,7 +229,7 @@ class Standardizer(Transformer[Sequence[Feature]]):
 
         return [
             Feature(
-                feature.name, self.scalings_[feature.name].standardize(feature.values)
+                feature.name, self.scalings[feature.name].standardize(feature.values)
             )
             for feature in input_values
         ]
