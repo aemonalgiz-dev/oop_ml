@@ -37,6 +37,7 @@ from oop_ml.core.validation import (
     check_has_both_classes,
     check_has_variance,
     check_is_binary,
+    check_is_label_encoded,
     check_min_length,
     check_non_empty,
     to_float_array,
@@ -191,6 +192,25 @@ class Column:
         needs it rather than enforced on every column that happens to exist.
         """
         check_is_binary(self._values, self._role)
+
+    def check_is_label_encoded(self) -> None:
+        """Raise unless the values are whole class positions ``0 .. n - 1``.
+
+        The multi-class counterpart to :meth:`check_is_binary`, and a fitting
+        rule in the same way: asked for by the classifier that needs it rather
+        than enforced on every column that happens to exist.
+        """
+        check_is_label_encoded(self._values, self._role)
+
+    @property
+    def n_classes(self) -> int:
+        """How many distinct values the column holds.
+
+        Only meaningful once :meth:`check_is_label_encoded` has passed, at
+        which point the classes are ``0 .. n_classes - 1`` and this is also the
+        width of a probability matrix over them.
+        """
+        return int(np.unique(self._values).size)
 
     def check_has_both_classes(self) -> None:
         """Raise :class:`~oop_ml.core.exceptions.SingleClassError` if one-sided."""

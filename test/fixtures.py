@@ -13,6 +13,8 @@ down.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from oop_ml.core.feature import Feature
 from oop_ml.core.types import NumericValues
 
@@ -232,3 +234,186 @@ SEPARABLE_LABELS = LabelledFixture(
     expected_weight=float("nan"),
 )
 """No finite solution. Used to pin the separation behaviour, never an answer."""
+
+
+class MultiClassFixture:
+    """A three-class dataset paired with the softmax solution it is known to give.
+
+    Parameters
+    ----------
+    first, second:
+        The two predictor columns, named ``first`` and ``second``.
+    classes:
+        The target, named ``outcome``, holding whole class positions 0, 1, 2.
+    expected_weights:
+        The reference-class maximum likelihood solution, one row per learned
+        class in the order ``(intercept, first, second)``. Class 0 is the
+        reference and is not listed because it is zero by construction.
+    """
+
+    __slots__ = ("_classes", "_expected_weights", "_first", "_second")
+
+    def __init__(
+        self,
+        first: Sequence[float],
+        second: Sequence[float],
+        classes: Sequence[int],
+        expected_weights: Sequence[Sequence[float]],
+    ) -> None:
+        self._first = list(first)
+        self._second = list(second)
+        self._classes = list(classes)
+        self._expected_weights = [list(row) for row in expected_weights]
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two predictors."""
+        return [Feature("first", self._first), Feature("second", self._second)]
+
+    @property
+    def target_feature(self) -> Feature:
+        """The class positions."""
+        return Feature("outcome", [float(value) for value in self._classes])
+
+    @property
+    def class_values(self) -> list[int]:
+        """The classes as plain integers, for building expected tables by hand."""
+        return list(self._classes)
+
+    @property
+    def n_classes(self) -> int:
+        """How many classes the fixture spans."""
+        return len(set(self._classes))
+
+    @property
+    def expected_weights(self) -> list[list[float]]:
+        """The learned classes' weights: ``(intercept, first, second)`` each."""
+        return [list(row) for row in self._expected_weights]
+
+
+THREE_CLASSES = MultiClassFixture(
+    [
+        2.5829,
+        0.0501,
+        3.6526,
+        0.3855,
+        3.4657,
+        -1.8207,
+        2.1585,
+        2.9271,
+        1.2587,
+        0.5089,
+        2.0575,
+        2.3023,
+        -0.159,
+        -1.3553,
+        -0.2526,
+        0.6366,
+        4.7236,
+        0.5183,
+        -1.2959,
+        2.428,
+        0.4565,
+        -1.1956,
+        2.7278,
+        3.2783,
+        -0.1199,
+        -1.05,
+        0.4067,
+        -0.6217,
+        0.6105,
+        0.2705,
+        2.5055,
+        1.4226,
+        -0.4719,
+        -1.5237,
+        0.4265,
+        5.5203,
+    ],
+    [
+        -3.378,
+        0.4393,
+        3.4796,
+        -3.2911,
+        1.6466,
+        3.04,
+        0.2084,
+        -1.7078,
+        2.3597,
+        -0.3528,
+        1.7067,
+        0.312,
+        -2.2101,
+        1.0514,
+        2.2669,
+        0.071,
+        1.7615,
+        -2.3433,
+        0.917,
+        -0.1782,
+        1.914,
+        -0.9272,
+        0.1553,
+        1.9767,
+        -1.1199,
+        -1.4911,
+        0.4628,
+        -0.0878,
+        2.8605,
+        0.8031,
+        3.9973,
+        3.1061,
+        0.7988,
+        -2.5163,
+        -2.1749,
+        3.6196,
+    ],
+    # Twelve of each class, deliberately overlapping: every class is reachable
+    # from the others, so the likelihood has a finite maximum. A cleaner
+    # separation would give no answer at all to compare against.
+    [
+        1,
+        1,
+        2,
+        0,
+        2,
+        0,
+        0,
+        1,
+        2,
+        1,
+        2,
+        2,
+        0,
+        0,
+        2,
+        1,
+        1,
+        0,
+        1,
+        1,
+        2,
+        0,
+        2,
+        1,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        2,
+        0,
+        0,
+        0,
+        1,
+        2,
+    ],
+    expected_weights=[
+        [-0.355987, 0.919134, 0.114455],
+        [-1.409842, 0.992247, 0.995121],
+    ],
+)
+"""Reached by Newton in 7 iterations; 25 of 36 right, so accuracy 0.694444."""
+
+THREE_CLASSES_ACCURACY = 0.694444

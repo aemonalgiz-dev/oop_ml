@@ -20,10 +20,21 @@ name that this surface does not re-export.
 
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic_regression import LogisticRegression
+from oop_ml.classification.multinomial_logistic_regression import (
+    MultinomialLogisticRegression,
+)
 from oop_ml.classification.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
-from oop_ml.core.base import Classifier, Estimator, Fittable, Regressor, Transformer
+from oop_ml.classification.one_vs_rest import OneVsRestClassifier
+from oop_ml.core.base import (
+    Classifier,
+    Estimator,
+    Fittable,
+    MultiClassClassifier,
+    Regressor,
+    Transformer,
+)
 from oop_ml.core.classification_evaluation import (
     ClassificationEvaluation,
     ConfusionMatrix,
@@ -48,6 +59,10 @@ from oop_ml.core.exceptions import (
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
 from oop_ml.core.linear_model import LinearModel
+from oop_ml.core.multiclass_evaluation import (
+    MultiClassConfusionMatrix,
+    MultiClassEvaluation,
+)
 from oop_ml.core.types import (
     FloatArray,
     IndexArray,
@@ -96,11 +111,14 @@ __all__ = [
     "RegressionEvaluation",
     "ClassificationEvaluation",
     "ConfusionMatrix",
+    "MultiClassEvaluation",
+    "MultiClassConfusionMatrix",
     # Base classes, for writing your own
     "Fittable",
     "Estimator",
     "Regressor",
     "Classifier",
+    "MultiClassClassifier",
     "Transformer",
     "LinearModel",
     "LinearFeatureRegressor",
@@ -114,6 +132,8 @@ __all__ = [
     # Classification
     "LogisticRegression",
     "NewtonLogisticRegression",
+    "MultinomialLogisticRegression",
+    "OneVsRestClassifier",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",

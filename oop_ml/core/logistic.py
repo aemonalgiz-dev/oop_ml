@@ -41,3 +41,34 @@ def sigmoid(linear_predictor: FloatArray) -> FloatArray:
     """
     decay = np.exp(-np.abs(linear_predictor))
     return np.where(linear_predictor >= 0.0, 1.0, decay) / (1.0 + decay)
+
+
+def softmax(scores: FloatArray) -> FloatArray:
+    """Normalise each row of ``scores`` into a distribution over the columns.
+
+    The multi-class generalisation of :func:`sigmoid`, and the same trap wearing
+    different clothes. Written literally, ``exp(z) / sum(exp(z))`` overflows to
+    ``inf / inf`` and hands back ``nan`` once any score passes about 709: at
+    ``z = 800`` the naive form gives ``[nan, 0, 0]`` for what is plainly
+    ``[1, 0, 0]``.
+
+    Subtracting the row maximum first fixes it exactly rather than
+    approximately. The constant cancels between numerator and denominator, for
+    the same reason that adding a constant to every class's weights leaves the
+    probabilities untouched, and it guarantees the largest exponent is
+    ``exp(0)``.
+
+    Parameters
+    ----------
+    scores:
+        ``(n_samples, n_classes)``, one score per class per row.
+
+    Returns
+    -------
+    FloatArray
+        The same shape, every row non-negative and summing to 1.
+    """
+    shifted = scores - np.max(scores, axis=1, keepdims=True)
+    exponentiated = np.exp(shifted)
+
+    return exponentiated / np.sum(exponentiated, axis=1, keepdims=True)

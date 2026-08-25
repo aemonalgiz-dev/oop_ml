@@ -116,6 +116,43 @@ def check_is_binary(values: FloatArray, role: ValueRole) -> None:
         )
 
 
+def check_is_label_encoded(values: FloatArray, role: ValueRole) -> None:
+    """Raise unless every value is a whole class position in ``0 .. n - 1``.
+
+    A multi-class target holds positions, not quantities. Insisting they run
+    densely from zero means class ``k`` is column ``k`` of a probability matrix,
+    with no lookup table to keep in step -- and a gap in the run is nearly
+    always a filtered dataset rather than a decision.
+
+    Raises
+    ------
+    NonBinaryLabelsError
+        If a value is negative or is not a whole number.
+    SingleClassError
+        If fewer than two classes are present, or the classes present do not
+        form a dense run from zero.
+    """
+    if values.size and (np.any(values < 0.0) or np.any(values != np.floor(values))):
+        raise NonBinaryLabelsError(
+            f"{role} must hold whole class positions starting at 0, "
+            f"and holds at least one value that is negative or fractional"
+        )
+
+    present = np.unique(values)
+
+    if present.size < 2:
+        raise SingleClassError(
+            f"{role} holds only class {present.tolist()}, so there is nothing "
+            f"to discriminate between"
+        )
+
+    if not np.array_equal(present, np.arange(present.size, dtype=np.float64)):
+        raise SingleClassError(
+            f"{role} must use every class from 0 to {present.size - 1}; "
+            f"got {present.tolist()}, which leaves a gap"
+        )
+
+
 def check_has_both_classes(values: FloatArray, role: ValueRole) -> None:
     """Raise unless both 0 and 1 appear at least once.
 
