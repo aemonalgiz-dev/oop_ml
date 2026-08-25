@@ -81,10 +81,10 @@ from oop_ml.model_selection.splitting import (
     Splits,
     TrainTestSplitter,
 )
-from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
-from oop_ml.preprocessing.polynomial_features import PolynomialFeatures
-from oop_ml.preprocessing.scaling import FeatureScaling, FeatureScalings
-from oop_ml.preprocessing.standardizer import Standardizer
+from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
+from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
+from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
+from oop_ml.preprocessing.standardization.standardizer import Standardizer
 from oop_ml.regression.least_squares.gradient_descent_regression import (
     GradientDescentRegression,
 )

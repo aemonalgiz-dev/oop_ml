@@ -15,7 +15,7 @@ from oop_ml.core.exceptions import (
     NonEqualArrayLengthError,
     NotFittedError,
 )
-from oop_ml.preprocessing.standardizer import Standardizer
+from oop_ml.preprocessing.standardization.standardizer import Standardizer
 from test.fixtures import (
     EXACT_PLANE,
     FIRST_PREDICTOR,

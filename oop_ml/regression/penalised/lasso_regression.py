@@ -86,7 +86,7 @@ Worse here than for ridge. The threshold ``penalty / 2`` is compared against
 ``x_j . r_j``, whose size depends on the units of ``x_j``, so which features get
 zeroed becomes an artifact of measurement rather than of signal. Lasso on
 unstandardized columns is actively misleading; run
-:class:`~oop_ml.preprocessing.standardizer.Standardizer` first.
+:class:`~oop_ml.preprocessing.standardization.standardizer.Standardizer` first.
 
 Worked example
 --------------
