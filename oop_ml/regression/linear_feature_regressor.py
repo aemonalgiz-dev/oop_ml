@@ -23,8 +23,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Self
 
-from oop_ml.core.base import Regressor
-from oop_ml.core.linear_model import LinearModel
+from oop_ml.base.estimator import Regressor
+from oop_ml.base.linear_model import LinearModel
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature
 from oop_ml.types import FloatArray

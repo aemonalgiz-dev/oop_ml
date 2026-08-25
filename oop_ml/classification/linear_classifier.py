@@ -2,7 +2,7 @@
 
 Everything here is task-level plumbing that any linear classifier wants and none
 of them should write twice. The design matrix, the intercept split and the
-coefficient pairing come from :class:`~oop_ml.core.linear_model.LinearModel`;
+coefficient pairing come from :class:`~oop_ml.base.linear_model.LinearModel`;
 what this adds is the step from a linear predictor to a probability, and from a
 probability to a label.
 
@@ -20,8 +20,8 @@ from typing import Self
 
 import numpy as np
 
-from oop_ml.core.base import Classifier
-from oop_ml.core.linear_model import LinearModel
+from oop_ml.base.estimator import Classifier
+from oop_ml.base.linear_model import LinearModel
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature
 from oop_ml.exceptions import UndefinedMetricError

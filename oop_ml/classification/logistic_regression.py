@@ -23,7 +23,7 @@ Invert that and the probability comes back through the sigmoid::
 Notice what has not changed. The model is still linear in the coefficients, so
 the design matrix, the ones column standing in for the bias, and pairing weights
 with feature names all carry across untouched. That is why this shares
-:class:`~oop_ml.core.linear_model.LinearModel` with the regressors and why
+:class:`~oop_ml.base.linear_model.LinearModel` with the regressors and why
 "linear" was never a statement about the shape of the predictions.
 
 Why not least squares
@@ -122,9 +122,9 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from oop_ml.base.iterative_solver import IterativeSolver
 from oop_ml.classification.linear_classifier import LinearClassifier
-from oop_ml.core.iterative_solver import IterativeSolver
-from oop_ml.core.logistic import sigmoid
+from oop_ml.classification.logistic import sigmoid
 from oop_ml.data.column import Column
 from oop_ml.types import FloatArray
 
@@ -151,7 +151,7 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
         of the real positives at the cost of more false alarms, which is the
         precision against recall trade made explicit as a number.
     fit_intercept:
-        Inherited from :class:`~oop_ml.core.linear_model.LinearModel`.
+        Inherited from :class:`~oop_ml.base.linear_model.LinearModel`.
     """
 
     learning_rate: float = Field(default=0.1, gt=0.0)

@@ -292,12 +292,17 @@ cared about.
 
 | Package | Contents |
 |---------|----------|
-| `oop_ml.core` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `RegressionEvaluation`, `ClassificationEvaluation`,
-`MultiClassEvaluation`, and the generic `Estimator[InputT, TargetT]` hierarchy |
+| `oop_ml.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients` — the vocabulary every other package speaks |
+| `oop_ml.evaluation` | `RegressionEvaluation`, `ClassificationEvaluation`, `MultiClassEvaluation` |
+| `oop_ml.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel` and `IterativeSolver` frames |
 | `oop_ml.regression` | Simple, multiple, ridge, gradient descent, lasso |
 | `oop_ml.classification` | `LogisticRegression`, `NewtonLogisticRegression`, `MultinomialLogisticRegression`, `OneVsRestClassifier` |
 | `oop_ml.preprocessing` | `Standardizer`, `PolynomialFeatures` |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
+
+`types`, `exceptions` and `validation` sit at the top level rather than in any
+of those, because every package imports them and a module everything depends on
+belongs to nothing in particular.
 
 All of it is re-exported from the top level, so `from oop_ml import Feature` is
 all that most code needs, though the full path is there whenever you want to be

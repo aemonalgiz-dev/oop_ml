@@ -2,7 +2,7 @@
 
 Aligned onto the shared ``core`` frame:
 
-* inherits :class:`~oop_ml.core.base.Regressor`, so fitted-state tracking, the
+* inherits :class:`~oop_ml.base.estimator.Regressor`, so fitted-state tracking, the
   ``fit``/``predict`` contract, ``evaluate``, and ``score`` come from one place;
 * data arrives in ``fit(input_values, target_values)``, not the constructor --
   construction only configures, fitting learns;
@@ -22,7 +22,7 @@ from typing import Self
 
 from pydantic import PrivateAttr
 
-from oop_ml.core.base import Regressor
+from oop_ml.base.estimator import Regressor
 from oop_ml.data.column import Column
 from oop_ml.types import FloatArray, NumericInput
 from oop_ml.validation import ValueRole

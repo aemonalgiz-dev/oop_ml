@@ -78,7 +78,7 @@ from typing import Self
 
 from pydantic import PrivateAttr
 
-from oop_ml.core.base import Transformer
+from oop_ml.base.estimator import Transformer
 from oop_ml.data.feature import Feature
 from oop_ml.data.feature_set import FeatureSet
 from oop_ml.exceptions import InvalidValuesError

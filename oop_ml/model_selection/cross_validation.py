@@ -46,7 +46,7 @@ from collections.abc import Iterator, Sequence
 
 from pydantic import BaseModel, ConfigDict
 
-from oop_ml.core.base import Regressor
+from oop_ml.base.estimator import Regressor
 from oop_ml.data.feature import Feature
 from oop_ml.evaluation.regression import RegressionEvaluation
 from oop_ml.exceptions import EmptyValuesError
