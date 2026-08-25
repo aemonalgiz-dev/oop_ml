@@ -52,8 +52,8 @@ the whole way down, and that is the entire argument for held-out evaluation.
 
 Degree is therefore a complexity dial, and turning it up always improves the fit
 you can measure while eventually destroying the one you care about. Pair it with
-:class:`~oop_ml.regression.ridge_regression.RidgeRegression` or
-:class:`~oop_ml.regression.lasso_regression.LassoRegression` to keep the extra
+:class:`~oop_ml.regression.penalised.ridge_regression.RidgeRegression` or
+:class:`~oop_ml.regression.penalised.lasso_regression.LassoRegression` to keep the extra
 freedom in check, and with
 :class:`~oop_ml.preprocessing.standardizer.Standardizer` because ``x ** 9`` on raw
 units produces columns whose scales differ by orders of magnitude.

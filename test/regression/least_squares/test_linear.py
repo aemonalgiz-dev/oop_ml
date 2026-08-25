@@ -19,7 +19,9 @@ from oop_ml.core.exceptions import (
     UndefinedMetricError,
 )
 from oop_ml.core.types import NumericValues
-from oop_ml.regression.simple_linear_regression import SimpleLinearRegression
+from oop_ml.regression.least_squares.simple_linear_regression import (
+    SimpleLinearRegression,
+)
 
 TRAINING_INPUTS: NumericValues = [1, 2, 3, 4]
 TRAINING_TARGETS: NumericValues = [5, 7, 9, 11]

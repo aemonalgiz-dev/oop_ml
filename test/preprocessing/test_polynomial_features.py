@@ -18,7 +18,9 @@ from oop_ml.core.exceptions import (
     NotFittedError,
 )
 from oop_ml.preprocessing.polynomial_features import PolynomialFeatures
-from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
+from oop_ml.regression.least_squares.multiple_feature_regression import (
+    MultipleLinearRegression,
+)
 
 SINGLE_PREDICTOR = [Feature("x1", [1, 2, 3, 4])]
 TWO_PREDICTORS = [Feature("x1", [1, 2, 3]), Feature("x2", [4, 5, 6])]

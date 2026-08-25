@@ -10,7 +10,9 @@ import pytest
 
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import NotFittedError
-from oop_ml.regression.gradient_descent_regression import GradientDescentRegression
+from oop_ml.regression.least_squares.gradient_descent_regression import (
+    GradientDescentRegression,
+)
 from test.fixtures import EXACT_PLANE, ORIGIN_PLANE
 
 CONVERGED_SETTINGS = {"max_epochs": 50_000, "tolerance": 1e-12}

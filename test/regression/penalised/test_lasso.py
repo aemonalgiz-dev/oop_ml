@@ -9,9 +9,11 @@ self-consistent.
 import pytest
 
 from oop_ml.core.exceptions import NotFittedError
-from oop_ml.regression.lasso_regression import LassoRegression
-from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
-from oop_ml.regression.ridge_regression import RidgeRegression
+from oop_ml.regression.least_squares.multiple_feature_regression import (
+    MultipleLinearRegression,
+)
+from oop_ml.regression.penalised.lasso_regression import LassoRegression
+from oop_ml.regression.penalised.ridge_regression import RidgeRegression
 from test.fixtures import EXACT_PLANE, ORIGIN_PLANE
 
 # penalty -> (intercept, x1 weight, x2 weight) on the exact plane.

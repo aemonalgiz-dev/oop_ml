@@ -13,7 +13,7 @@ import::
     model.coefficients["area"]
 
 The full paths still work and are what the library itself uses internally, so
-reach for ``from oop_ml.regression.ridge_regression import RidgeRegression``
+reach for ``from oop_ml.regression.penalised.ridge_regression import RidgeRegression``
 whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
@@ -85,12 +85,18 @@ from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
 from oop_ml.preprocessing.polynomial_features import PolynomialFeatures
 from oop_ml.preprocessing.scaling import FeatureScaling, FeatureScalings
 from oop_ml.preprocessing.standardizer import Standardizer
-from oop_ml.regression.gradient_descent_regression import GradientDescentRegression
-from oop_ml.regression.lasso_regression import LassoRegression
+from oop_ml.regression.least_squares.gradient_descent_regression import (
+    GradientDescentRegression,
+)
+from oop_ml.regression.least_squares.multiple_feature_regression import (
+    MultipleLinearRegression,
+)
+from oop_ml.regression.least_squares.simple_linear_regression import (
+    SimpleLinearRegression,
+)
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
-from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
-from oop_ml.regression.ridge_regression import RidgeRegression
-from oop_ml.regression.simple_linear_regression import SimpleLinearRegression
+from oop_ml.regression.penalised.lasso_regression import LassoRegression
+from oop_ml.regression.penalised.ridge_regression import RidgeRegression
 
 __all__ = [
     # Type aliases, for annotating your own code
