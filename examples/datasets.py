@@ -415,3 +415,46 @@ def rare_event(
         weights={"risk_score": 2.8},
         generator=generator,
     )
+
+
+def iris_like_species(
+    sample_count: int = 300, random_seed: int = 4
+) -> SyntheticClassification:
+    """Three species over two measurements, deliberately unbalanced.
+
+    Roughly 55 / 30 / 15, because a balanced target hides the whole reason
+    macro and micro averaging both exist. Two of the three overlap heavily and
+    the third is easier, so the per-class recalls come apart and a single
+    accuracy figure stops being an answer.
+
+    The classes are whole positions 0, 1, 2 -- the encoding every multi-class
+    model in the library expects, so that class ``k`` is column ``k`` of a
+    probability matrix with no lookup table to keep in step.
+    """
+    generator = np.random.default_rng(random_seed)
+    shares = (0.55, 0.30, 0.15)
+    centres = ((5.0, 3.4), (5.9, 2.8), (6.6, 3.0))
+    spreads = (0.45, 0.40, 0.35)
+
+    lengths, widths, species = [], [], []
+    for index, (share, centre, spread) in enumerate(
+        zip(shares, centres, spreads, strict=True)
+    ):
+        count = int(round(sample_count * share))
+        lengths.append(generator.normal(centre[0], spread, size=count))
+        widths.append(generator.normal(centre[1], spread * 0.6, size=count))
+        species.append(np.full(count, float(index)))
+
+    order = generator.permutation(sum(len(part) for part in species))
+
+    return SyntheticClassification(
+        Dataset(
+            [
+                Feature("sepal_length", np.concatenate(lengths)[order]),
+                Feature("sepal_width", np.concatenate(widths)[order]),
+            ],
+            Feature("species", np.concatenate(species)[order]),
+        ),
+        float("nan"),
+        Coefficients([Coefficient("sepal_length", float("nan"))]),
+    )

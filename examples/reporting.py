@@ -40,6 +40,7 @@ from oop_ml import (
     Coefficients,
     CrossValidationResult,
     MLLibError,
+    MultiClassEvaluation,
     RegressionEvaluation,
     UndefinedMetricError,
 )
@@ -222,6 +223,43 @@ class Report:
             return f"{metric():.4f}"
         except UndefinedMetricError:
             return "undefined"
+
+    def class_table(self, label: str, evaluation: MultiClassEvaluation) -> None:
+        """The K x K table, then each class's own precision and recall.
+
+        Per class rather than pooled, because that is the fact a single number
+        hides: a model can be excellent on the common class and useless on the
+        rare one and still look respectable overall.
+        """
+        matrix = evaluation.confusion_matrix
+        classes = range(evaluation.n_classes)
+
+        self.line(f"{label}: {matrix.n_samples} rows, {evaluation.n_classes} classes")
+        self.table(
+            ["actual vs predicted"] + [f"as {index}" for index in classes],
+            [
+                [f"class {row}"]
+                + [str(matrix.counts[row][column]) for column in classes]
+                for row in classes
+            ],
+        )
+        self.table(
+            ["class", "rows", "precision", "recall", "f1"],
+            [
+                [
+                    str(index),
+                    str(matrix.actually_are(index)),
+                    self._or_undefined(
+                        lambda index=index: evaluation.precision_for(index)
+                    ),
+                    self._or_undefined(
+                        lambda index=index: evaluation.recall_for(index)
+                    ),
+                    self._or_undefined(lambda index=index: evaluation.f1_for(index)),
+                ]
+                for index in classes
+            ],
+        )
 
     def cross_validation(self, label: str, result: CrossValidationResult) -> None:
         """Mean and spread together -- the mean alone is half the story."""
