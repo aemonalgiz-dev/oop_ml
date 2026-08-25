@@ -18,12 +18,12 @@ scoring identically. Pinning the reference is what makes the fit reproducible.
 import numpy as np
 import pytest
 
+from oop_ml.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.classification.logistic import softmax
-from oop_ml.classification.logistic_regression import LogisticRegression
-from oop_ml.classification.multinomial_logistic_regression import (
+from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
-from oop_ml.classification.one_vs_rest import OneVsRestClassifier
+from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,

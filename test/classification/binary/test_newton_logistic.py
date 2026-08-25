@@ -17,8 +17,10 @@ which is what makes undamped Newton safe on this objective.
 import numpy as np
 import pytest
 
-from oop_ml.classification.logistic_regression import LogisticRegression
-from oop_ml.classification.newton_logistic_regression import NewtonLogisticRegression
+from oop_ml.classification.binary.logistic_regression import LogisticRegression
+from oop_ml.classification.binary.newton_logistic_regression import (
+    NewtonLogisticRegression,
+)
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,

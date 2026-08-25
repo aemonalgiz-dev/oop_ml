@@ -15,7 +15,7 @@ say so through ``converged`` rather than hand back whatever it had reached.
 import numpy as np
 import pytest
 
-from oop_ml.classification.logistic_regression import LogisticRegression
+from oop_ml.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,

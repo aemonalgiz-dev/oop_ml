@@ -24,7 +24,7 @@ which is precisely the class you were most likely to care about.
 Where it earns its place is breadth. Any binary classifier at all can be
 wrapped, including ones with no multi-class formulation of their own, and each
 fit is independent so they parallelise perfectly. Prefer
-:class:`~oop_ml.classification.multinomial_logistic_regression.MultinomialLogisticRegression`
+:class:`~oop_ml.classification.multiclass.multinomial_logistic_regression.MultinomialLogisticRegression`
 when the model has a genuine multi-class form, and reach for this when it does
 not.
 """
