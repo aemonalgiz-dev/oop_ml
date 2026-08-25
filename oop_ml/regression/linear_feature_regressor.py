@@ -27,7 +27,7 @@ from oop_ml.core.base import Regressor
 from oop_ml.core.column import Column
 from oop_ml.core.feature import Feature
 from oop_ml.core.linear_model import LinearModel
-from oop_ml.core.types import FloatArray
+from oop_ml.types import FloatArray
 
 
 class LinearFeatureRegressor(LinearModel, Regressor[Sequence[Feature], Feature]):

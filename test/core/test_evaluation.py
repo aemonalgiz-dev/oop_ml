@@ -9,12 +9,12 @@ import pytest
 
 from oop_ml.core.column import Column
 from oop_ml.core.evaluation import RegressionEvaluation
-from oop_ml.core.exceptions import (
+from oop_ml.exceptions import (
     EmptyValuesError,
     NonEqualArrayLengthError,
     UndefinedMetricError,
 )
-from oop_ml.core.validation import ValueRole
+from oop_ml.validation import ValueRole
 
 
 class TestConstruction:

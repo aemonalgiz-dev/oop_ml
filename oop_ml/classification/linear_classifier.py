@@ -22,10 +22,10 @@ import numpy as np
 
 from oop_ml.core.base import Classifier
 from oop_ml.core.column import Column
-from oop_ml.core.exceptions import UndefinedMetricError
 from oop_ml.core.feature import Feature
 from oop_ml.core.linear_model import LinearModel
-from oop_ml.core.types import FloatArray
+from oop_ml.exceptions import UndefinedMetricError
+from oop_ml.types import FloatArray
 
 
 class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):

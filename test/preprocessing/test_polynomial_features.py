@@ -8,7 +8,8 @@ intercept already supplies.
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
@@ -16,7 +17,6 @@ from oop_ml.core.exceptions import (
     NonUniqueFeaturesError,
     NotFittedError,
 )
-from oop_ml.core.feature import Feature
 from oop_ml.preprocessing.polynomial_features import PolynomialFeatures
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 

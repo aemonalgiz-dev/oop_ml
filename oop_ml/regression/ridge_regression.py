@@ -95,8 +95,8 @@ import numpy as np
 from pydantic import Field
 
 from oop_ml.core.column import Column
-from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
+from oop_ml.types import FloatArray
 
 
 class RidgeRegression(LinearFeatureRegressor):

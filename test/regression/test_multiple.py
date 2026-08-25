@@ -8,7 +8,8 @@ through-the-origin plane for the no-intercept path.
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonEqualArrayLengthError,
@@ -16,7 +17,6 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     TooFewValuesError,
 )
-from oop_ml.core.feature import Feature
 from oop_ml.regression.multiple_feature_regression import MultipleLinearRegression
 from test.fixtures import (
     DISPLACED_PLANE,

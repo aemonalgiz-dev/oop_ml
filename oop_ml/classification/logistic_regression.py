@@ -126,7 +126,7 @@ from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.core.column import Column
 from oop_ml.core.iterative_solver import IterativeSolver
 from oop_ml.core.logistic import sigmoid
-from oop_ml.core.types import FloatArray
+from oop_ml.types import FloatArray
 
 
 class LogisticRegression(IterativeSolver, LinearClassifier):

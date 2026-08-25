@@ -20,7 +20,7 @@ import numpy as np
 
 from oop_ml.core.feature import Feature
 from oop_ml.core.feature_set import FeatureSet
-from oop_ml.core.types import IndexArray
+from oop_ml.types import IndexArray
 
 
 class Dataset:

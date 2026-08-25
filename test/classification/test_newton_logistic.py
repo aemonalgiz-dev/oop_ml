@@ -19,7 +19,8 @@ import pytest
 
 from oop_ml.classification.logistic_regression import LogisticRegression
 from oop_ml.classification.newton_logistic_regression import NewtonLogisticRegression
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     NonBinaryLabelsError,
@@ -29,7 +30,6 @@ from oop_ml.core.exceptions import (
     SingleClassError,
     SingularHessianError,
 )
-from oop_ml.core.feature import Feature
 from test.fixtures import (
     OVERLAPPING_LABELS,
     OVERLAPPING_LABELS_BOUNDARY,

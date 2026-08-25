@@ -8,13 +8,13 @@ by hand.
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     AllSameValuesError,
     InvalidValuesError,
     NonEqualArrayLengthError,
     NotFittedError,
 )
-from oop_ml.core.feature import Feature
 from oop_ml.preprocessing.standardizer import Standardizer
 from test.fixtures import (
     EXACT_PLANE,

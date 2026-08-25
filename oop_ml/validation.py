@@ -15,7 +15,7 @@ from enum import StrEnum
 
 import numpy as np
 
-from oop_ml.core.exceptions import (
+from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,
@@ -24,7 +24,7 @@ from oop_ml.core.exceptions import (
     SingleClassError,
     TooFewValuesError,
 )
-from oop_ml.core.types import FloatArray, NumericInput
+from oop_ml.types import FloatArray, NumericInput
 
 
 class ValueRole(StrEnum):

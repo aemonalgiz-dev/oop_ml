@@ -3,12 +3,12 @@
 import numpy as np
 import pytest
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonUniqueFeaturesError,
 )
-from oop_ml.core.feature import Feature
 from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
 
 INPUT_FEATURES = [Feature("x1", [1, 2, 3]), Feature("x2", [4, 5, 6])]

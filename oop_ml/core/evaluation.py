@@ -23,9 +23,9 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.column import Column, ColumnSource
-from oop_ml.core.exceptions import UndefinedMetricError
-from oop_ml.core.types import FloatArray
-from oop_ml.core.validation import ValueRole
+from oop_ml.exceptions import UndefinedMetricError
+from oop_ml.types import FloatArray
+from oop_ml.validation import ValueRole
 
 
 class RegressionEvaluation:

@@ -14,7 +14,7 @@ from oop_ml.core.classification_evaluation import (
     ClassificationEvaluation,
     ConfusionMatrix,
 )
-from oop_ml.core.exceptions import (
+from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonBinaryLabelsError,

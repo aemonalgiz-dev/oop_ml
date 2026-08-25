@@ -54,7 +54,7 @@ from pydantic import Field, PrivateAttr
 
 from oop_ml.core.column import Column
 from oop_ml.core.linear_model import LinearModel
-from oop_ml.core.types import FloatArray
+from oop_ml.types import FloatArray
 
 
 class IterativeSolver(LinearModel):

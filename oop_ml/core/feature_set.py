@@ -31,16 +31,16 @@ from collections.abc import Iterator, Sequence
 
 import numpy as np
 
-from oop_ml.core.exceptions import (
+from oop_ml.core.feature import Feature
+from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
     TooFewValuesError,
 )
-from oop_ml.core.feature import Feature
-from oop_ml.core.types import FloatArray
-from oop_ml.core.validation import ValueRole, check_has_variance
+from oop_ml.types import FloatArray
+from oop_ml.validation import ValueRole, check_has_variance
 
 
 class FeatureSet:

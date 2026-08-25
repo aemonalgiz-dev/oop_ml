@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 
-from oop_ml.core.exceptions import (
+from oop_ml.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonUniqueFeaturesError,
