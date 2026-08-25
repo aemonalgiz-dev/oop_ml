@@ -295,9 +295,12 @@ cared about.
 | `oop_ml.core.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients` — the vocabulary every other package speaks |
 | `oop_ml.core.evaluation` | `RegressionEvaluation`, `ClassificationEvaluation`, `MultiClassEvaluation` |
 | `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel` and `IterativeSolver` frames |
-| `oop_ml.regression` | Simple, multiple, ridge, gradient descent, lasso |
-| `oop_ml.classification` | `LogisticRegression`, `NewtonLogisticRegression`, `MultinomialLogisticRegression`, `OneVsRestClassifier` |
-| `oop_ml.preprocessing` | `Standardizer`, `PolynomialFeatures` |
+| `oop_ml.regression.least_squares` | Simple, multiple, gradient descent — squared error and nothing added to it |
+| `oop_ml.regression.penalised` | Ridge and lasso, where the *shape* of the penalty is the whole difference |
+| `oop_ml.classification.binary` | `LogisticRegression` and `NewtonLogisticRegression`, one objective and two solvers |
+| `oop_ml.classification.multiclass` | `MultinomialLogisticRegression` and `OneVsRestClassifier` |
+| `oop_ml.preprocessing.standardization` | `Standardizer` and the `FeatureScalings` it learns |
+| `oop_ml.preprocessing.polynomial` | `PolynomialFeatures` and the `PolynomialTerms` it builds |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
 
 `oop_ml.core` is everything that is not a model, split by what a thing is
