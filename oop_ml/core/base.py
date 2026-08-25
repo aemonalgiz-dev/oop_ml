@@ -31,10 +31,10 @@ from typing import Generic, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
-from oop_ml.core.classification_evaluation import ClassificationEvaluation
-from oop_ml.core.evaluation import RegressionEvaluation
-from oop_ml.core.multiclass_evaluation import MultiClassEvaluation
 from oop_ml.data.column import ColumnSource
+from oop_ml.evaluation.classification import ClassificationEvaluation
+from oop_ml.evaluation.multiclass import MultiClassEvaluation
+from oop_ml.evaluation.regression import RegressionEvaluation
 from oop_ml.exceptions import NotFittedError
 from oop_ml.types import FloatArray
 
@@ -145,7 +145,7 @@ class Classifier(Estimator[InputT, TargetT]):
     get the same label.
 
     Scoring differs as well. R^2 is meaningless on labels, so ``evaluate``
-    returns a :class:`~oop_ml.core.classification_evaluation.ClassificationEvaluation`
+    returns a :class:`~oop_ml.evaluation.classification.ClassificationEvaluation`
     built on a confusion matrix instead.
     """
 

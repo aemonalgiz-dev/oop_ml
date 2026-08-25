@@ -134,7 +134,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
 
         Returning floats rather than booleans is deliberate: the labels go
         straight into a
-        :class:`~oop_ml.core.classification_evaluation.ClassificationEvaluation`,
+        :class:`~oop_ml.evaluation.classification.ClassificationEvaluation`,
         which validates them as a 0/1 ``Column`` like any other.
 
         Raises

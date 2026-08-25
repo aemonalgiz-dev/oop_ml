@@ -8,8 +8,8 @@ fold was fitted on the wrong rows.
 
 import pytest
 
-from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.data.feature import Feature
+from oop_ml.evaluation.regression import RegressionEvaluation
 from oop_ml.exceptions import EmptyValuesError, TooFewValuesError
 from oop_ml.model_selection.cross_validation import (
     CrossValidation,

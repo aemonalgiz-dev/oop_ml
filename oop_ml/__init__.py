@@ -35,20 +35,20 @@ from oop_ml.core.base import (
     Regressor,
     Transformer,
 )
-from oop_ml.core.classification_evaluation import (
-    ClassificationEvaluation,
-    ConfusionMatrix,
-)
-from oop_ml.core.evaluation import RegressionEvaluation
 from oop_ml.core.linear_model import LinearModel
-from oop_ml.core.multiclass_evaluation import (
-    MultiClassConfusionMatrix,
-    MultiClassEvaluation,
-)
 from oop_ml.data.coefficients import Coefficient, Coefficients
 from oop_ml.data.column import Column
 from oop_ml.data.feature import Feature
 from oop_ml.data.feature_set import FeatureSet
+from oop_ml.evaluation.classification import (
+    ClassificationEvaluation,
+    ConfusionMatrix,
+)
+from oop_ml.evaluation.multiclass import (
+    MultiClassConfusionMatrix,
+    MultiClassEvaluation,
+)
+from oop_ml.evaluation.regression import RegressionEvaluation
 from oop_ml.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
