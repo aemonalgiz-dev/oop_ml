@@ -2,9 +2,9 @@
 
 import pytest
 
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.exceptions import (
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
     InvalidValuesError,

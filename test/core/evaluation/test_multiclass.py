@@ -14,11 +14,11 @@ that made them differ would have computed something else entirely.
 import numpy as np
 import pytest
 
-from oop_ml.evaluation.multiclass import (
+from oop_ml.core.evaluation.multiclass import (
     MultiClassConfusionMatrix,
     MultiClassEvaluation,
 )
-from oop_ml.exceptions import (
+from oop_ml.core.exceptions import (
     InvalidValuesError,
     NonBinaryLabelsError,
     NonEqualArrayLengthError,

@@ -16,13 +16,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
 
-from oop_ml.data.feature import Feature
-from oop_ml.exceptions import (
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
     NonUniqueFeaturesError,
 )
-from oop_ml.types import FloatArray
+from oop_ml.core.types import FloatArray
 
 
 class FeaturePowers:

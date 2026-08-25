@@ -86,14 +86,14 @@ from typing import Self
 import numpy as np
 from pydantic import Field, PrivateAttr
 
-from oop_ml.base.estimator import MultiClassClassifier
 from oop_ml.classification.logistic import softmax
-from oop_ml.data.coefficients import Coefficient, Coefficients
-from oop_ml.data.column import Column
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.exceptions import InvalidValuesError
-from oop_ml.types import FloatArray
+from oop_ml.core.base.estimator import MultiClassClassifier
+from oop_ml.core.data.coefficients import Coefficient, Coefficients
+from oop_ml.core.data.column import Column
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.types import FloatArray
 
 
 class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feature]):

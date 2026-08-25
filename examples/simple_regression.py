@@ -6,9 +6,9 @@ there is nothing to name -- and it shows the three-call shape every estimator
 shares: construct, ``fit``, then ask.
 
 The thing to notice is what ``evaluate`` returns. Not a float, and not a tuple of
-metrics: a :class:`~oop_ml.evaluation.regression.RegressionEvaluation` that has already
-aligned the predictions with the truth. Metrics are read off it as properties, so
-predicting twice to get two numbers is impossible by construction.
+metrics: a :class:`~oop_ml.core.evaluation.regression.RegressionEvaluation`
+that has already aligned the predictions with the truth. Metrics are read off it as
+properties, so predicting twice to get two numbers is impossible by construction.
 """
 
 from __future__ import annotations

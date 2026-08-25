@@ -38,9 +38,9 @@ from collections.abc import Iterator, Sequence
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from oop_ml.exceptions import EmptyValuesError, TooFewValuesError
+from oop_ml.core.exceptions import EmptyValuesError, TooFewValuesError
+from oop_ml.core.types import IndexArray
 from oop_ml.model_selection.dataset import Dataset, DataSplit
-from oop_ml.types import IndexArray
 
 
 class Splits:

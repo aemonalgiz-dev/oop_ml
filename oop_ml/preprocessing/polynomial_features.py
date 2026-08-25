@@ -68,10 +68,10 @@ from typing import Self
 
 from pydantic import Field, PrivateAttr
 
-from oop_ml.base.estimator import Transformer
-from oop_ml.data.feature import Feature
-from oop_ml.data.feature_set import FeatureSet
-from oop_ml.exceptions import InvalidValuesError
+from oop_ml.core.base.estimator import Transformer
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.preprocessing.polynomial import PolynomialTerm, PolynomialTerms
 
 

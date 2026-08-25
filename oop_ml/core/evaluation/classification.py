@@ -23,10 +23,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from oop_ml.data.column import Column, ColumnSource
-from oop_ml.exceptions import InvalidValuesError, UndefinedMetricError
-from oop_ml.types import FloatArray
-from oop_ml.validation import ValueRole
+from oop_ml.core.data.column import Column, ColumnSource
+from oop_ml.core.exceptions import InvalidValuesError, UndefinedMetricError
+from oop_ml.core.types import FloatArray
+from oop_ml.core.validation import ValueRole
 
 
 class ConfusionMatrix:
@@ -139,10 +139,11 @@ class ConfusionMatrix:
 class ClassificationEvaluation:
     """What a classifier predicted, against what actually happened.
 
-    The counterpart to :class:`~oop_ml.evaluation.regression.RegressionEvaluation`,
-    and deliberately a sibling of it rather than a subclass. The two share the
-    idea of pairing predictions with truth and nothing else; there is no metric
-    they have in common, and no caller who wants one would accept the other.
+    The counterpart to
+    :class:`~oop_ml.core.evaluation.regression.RegressionEvaluation`, and
+    deliberately a sibling of it rather than a subclass. The two share the idea of
+    pairing predictions with truth and nothing else; there is no metric they have in
+    common, and no caller who wants one would accept the other.
 
     Parameters
     ----------

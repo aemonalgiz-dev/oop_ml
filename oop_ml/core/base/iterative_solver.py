@@ -52,9 +52,9 @@ from abc import abstractmethod
 import numpy as np
 from pydantic import Field, PrivateAttr
 
-from oop_ml.base.linear_model import LinearModel
-from oop_ml.data.column import Column
-from oop_ml.types import FloatArray
+from oop_ml.core.base.linear_model import LinearModel
+from oop_ml.core.data.column import Column
+from oop_ml.core.types import FloatArray
 
 
 class IterativeSolver(LinearModel):

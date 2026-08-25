@@ -2,17 +2,18 @@
 
 Aligned onto the shared ``core`` frame:
 
-* inherits :class:`~oop_ml.base.estimator.Regressor`, so fitted-state tracking, the
+* inherits :class:`~oop_ml.core.base.estimator.Regressor`, so fitted-state tracking, the
   ``fit``/``predict`` contract, ``evaluate``, and ``score`` come from one place;
 * data arrives in ``fit(input_values, target_values)``, not the constructor --
   construction only configures, fitting learns;
 * learned parameters live on private attributes and are read back through
   ``slope`` / ``intercept``, which raise ``NotFittedError`` before ``fit``;
-* inputs become :class:`~oop_ml.data.column.Column` objects at the boundary, so this
+* inputs become :class:`~oop_ml.core.data.column.Column` objects at the
+boundary, so this
   module never coerces an array itself, and the mean/deviation arithmetic the
   slope needs is asked of the column rather than recomputed here;
 * metrics are not re-exposed here. ``evaluate(input_values, actual_values)``
-  returns a :class:`~oop_ml.evaluation.regression.RegressionEvaluation`
+  returns a :class:`~oop_ml.core.evaluation.regression.RegressionEvaluation`
   carrying residuals, RSS, MSE, TSS and R^2 off a single ``predict``, so that
   there is one way to ask the question and every other regressor answers it
   identically.
@@ -22,10 +23,10 @@ from typing import Self
 
 from pydantic import PrivateAttr
 
-from oop_ml.base.estimator import Regressor
-from oop_ml.data.column import Column
-from oop_ml.types import FloatArray, NumericInput
-from oop_ml.validation import ValueRole
+from oop_ml.core.base.estimator import Regressor
+from oop_ml.core.data.column import Column
+from oop_ml.core.types import FloatArray, NumericInput
+from oop_ml.core.validation import ValueRole
 
 MINIMUM_SAMPLES = 2
 """Two points determine a line, and anything fewer cannot pin down a slope."""

@@ -46,10 +46,10 @@ from collections.abc import Iterator, Sequence
 
 from pydantic import BaseModel, ConfigDict
 
-from oop_ml.base.estimator import Regressor
-from oop_ml.data.feature import Feature
-from oop_ml.evaluation.regression import RegressionEvaluation
-from oop_ml.exceptions import EmptyValuesError
+from oop_ml.core.base.estimator import Regressor
+from oop_ml.core.data.feature import Feature
+from oop_ml.core.evaluation.regression import RegressionEvaluation
+from oop_ml.core.exceptions import EmptyValuesError
 from oop_ml.model_selection.dataset import Dataset
 from oop_ml.model_selection.splitting import KFold
 
@@ -60,8 +60,8 @@ class CrossValidationResult:
     Parameters
     ----------
     fold_evaluations:
-        One :class:`~oop_ml.evaluation.regression.RegressionEvaluation` per fold, each
-        computed on that fold's held-out rows.
+        One :class:`~oop_ml.core.evaluation.regression.RegressionEvaluation`
+        per fold, each computed on that fold's held-out rows.
 
     Raises
     ------
@@ -144,11 +144,10 @@ class CrossValidation(BaseModel):
     ) -> CrossValidationResult:
         """Cross-validate ``model`` over ``dataset``.
 
-        For each split the folds produce: fit the model on
-        ``split.training``, then evaluate it on ``split.testing``, which holds
-        rows the fit never saw. Collect one
-        :class:`~oop_ml.evaluation.regression.RegressionEvaluation` per fold
-        and return them as a :class:`CrossValidationResult`.
+        For each split the folds produce: fit the model on ``split.training``, then
+        evaluate it on ``split.testing``, which holds rows the fit never saw. Collect
+        one :class:`~oop_ml.core.evaluation.regression.RegressionEvaluation`
+        per fold and return them as a :class:`CrossValidationResult`.
 
         ``Regressor.evaluate(input_values, actual_values)`` produces the
         evaluation in one call, so each fold is a fit followed by an evaluate.
