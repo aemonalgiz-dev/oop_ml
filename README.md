@@ -707,9 +707,9 @@ metrics behind a closed enum. That is 973 passing tests, `ruff` and `pyright`
 clean.
 
 **Decision trees are scaffolded, not finished.** The package layout, the node
-types, the criteria and the full specification are in; eight method bodies are
-not, so 95 tests are deliberately red and every one of them fails with
-`NotImplementedError`. That is the working order in this repository -- the
+types, the criteria, the split search and the recursion that grows the tree are
+in; the two methods that build a leaf are not, so 58 tests are deliberately red
+and every one of them fails with `NotImplementedError`. That is the working order in this repository -- the
 failing spec is written first and is checked to be satisfiable before any body
 is written -- so if you have cloned this at exactly the wrong moment, that is
 what you are looking at rather than a broken build.
