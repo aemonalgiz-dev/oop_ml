@@ -56,6 +56,11 @@ from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import LeafNode, TreeNode
+from oop_ml.core.tree.search import (
+    SplitCandidate,
+    SplitRejection,
+    SplitSearch,
+)
 from oop_ml.core.tree.split import GAIN_TIE_TOLERANCE, Split
 from oop_ml.core.types import FloatArray
 
@@ -198,6 +203,75 @@ class TreeModel(Fittable):
             return np.empty(0, dtype=np.float64)
 
         return (distinct[:-1] + distinct[1:]) / 2.0
+
+    def split_search(
+        self, feature_matrix: FloatArray, target_values: FloatArray
+    ) -> SplitSearch:
+        """Every candidate this node considered, kept or not, and why.
+
+        The observed route. :meth:`_best_split` answers the same question and
+        discards its working; this keeps all of it, in the order it was
+        scanned, so a step-by-step explanation has something to walk.
+
+        Deliberately slower. It scores candidates that :meth:`_best_split`
+        excludes without scoring -- a split leaving a child too small still
+        gets a gain here, because "excluded despite scoring well" is the
+        case worth seeing and hiding the number would conceal it. Sized for
+        looking at, not for the twenty-thousand-row fit in an application.
+
+        Parameters
+        ----------
+        feature_matrix:
+            ``(n_rows, n_features)`` for the rows at this node.
+        target_values:
+            ``(n_rows,)``, aligned with them.
+
+        Returns
+        -------
+        SplitSearch
+            Iterable over every candidate. ``search.best`` is the same answer
+            :meth:`_best_split` returns, and a test asserts that.
+        """
+        assert self._feature_names is not None
+
+        candidates: list[SplitCandidate] = []
+
+        for index, name in enumerate(self._feature_names):
+            column = feature_matrix[:, index]
+
+            for threshold in self._candidate_thresholds(column):
+                goes_left = column < threshold
+                rows_left = int(goes_left.sum())
+                rows_right = int(column.size) - rows_left
+
+                gain = self._impurity.gain(
+                    target_values,
+                    target_values[goes_left],
+                    target_values[~goes_left],
+                )
+
+                if (
+                    rows_left < self.min_samples_leaf
+                    or rows_right < self.min_samples_leaf
+                ):
+                    rejection = SplitRejection.TOO_FEW_ROWS
+                elif gain == 0.0:
+                    rejection = SplitRejection.NO_GAIN
+                elif gain < self.min_impurity_decrease:
+                    rejection = SplitRejection.BELOW_MINIMUM_DECREASE
+                else:
+                    rejection = SplitRejection.ADMITTED
+
+                candidates.append(
+                    SplitCandidate(
+                        Split(index, name, float(threshold), gain),
+                        rejection,
+                        rows_left,
+                        rows_right,
+                    )
+                )
+
+        return SplitSearch(candidates)
 
     def _best_split(
         self, feature_matrix: FloatArray, target_values: FloatArray
