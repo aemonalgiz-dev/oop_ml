@@ -63,7 +63,7 @@ from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
-from oop_ml.core.exceptions import InvalidValuesError, TooFewValuesError
+from oop_ml.core.exceptions import TooFewValuesError
 from oop_ml.core.types import FloatArray, IndexArray
 
 
@@ -228,16 +228,7 @@ class NeighbourModel(Fittable):
         self._check_fitted()
         assert self._feature_names is not None
 
-        by_name = {feature.name: feature for feature in input_values}
-        if set(by_name) != set(self._feature_names):
-            raise InvalidValuesError(
-                f"expected features {', '.join(sorted(self._feature_names))}; "
-                f"got {', '.join(sorted(by_name))}"
-            )
-
-        return FeatureSet(
-            [by_name[name] for name in self._feature_names]
-        ).feature_matrix
+        return FeatureSet.matching(self._feature_names, input_values).feature_matrix
 
     def _neighbour_targets(self, input_values: Sequence[Feature]) -> FloatArray:
         """The target values of each query's nearest neighbours.

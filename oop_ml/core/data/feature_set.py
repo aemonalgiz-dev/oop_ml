@@ -89,6 +89,56 @@ class FeatureSet:
         for index, feature in enumerate(self._features):
             self._feature_matrix[:, index] = feature.values
 
+    @classmethod
+    def matching(
+        cls, feature_names: Sequence[str], features: Sequence[Feature]
+    ) -> FeatureSet:
+        """The supplied features, put back into the order a fit saw them in.
+
+        Every model here matches its inputs by name rather than by position,
+        so a caller can hand ``predict`` the same columns in any arrangement.
+        The names must match *exactly*: a missing column leaves the model
+        unevaluable, and an unexpected one means the caller believes something
+        about this model that is not true.
+
+        Parameters
+        ----------
+        feature_names:
+            The names the fit saw, in the order it saw them.
+        features:
+            The columns supplied now, in any order.
+
+        Returns
+        -------
+        FeatureSet
+            The same columns, ordered to ``feature_names``.
+
+        Raises
+        ------
+        EmptyValuesError
+            If no features are supplied.
+        NonUniqueFeaturesError
+            If two supplied features share a name.
+        NonEqualArrayLengthError
+            If the supplied columns are not all the same length.
+        InvalidValuesError
+            If the supplied names do not match the fitted ones exactly.
+        """
+        # Uniqueness first, and deliberately before the dictionary is built:
+        # two columns sharing a name would collapse into one entry, and the
+        # set comparison below would then pass while a column went missing.
+        cls._check_features_are_present(features)
+        cls._check_names_are_unique(features)
+
+        by_name = {feature.name: feature for feature in features}
+        if set(by_name) != set(feature_names):
+            raise InvalidValuesError(
+                f"expected features {', '.join(sorted(feature_names))}; "
+                f"got {', '.join(sorted(by_name))}"
+            )
+
+        return cls([by_name[name] for name in feature_names])
+
     @property
     def n_samples(self) -> int:
         """Number of observations (rows) shared by every column."""
