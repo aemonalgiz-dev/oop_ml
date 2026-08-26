@@ -417,3 +417,85 @@ THREE_CLASSES = MultiClassFixture(
 """Reached by Newton in 7 iterations; 25 of 36 right, so accuracy 0.694444."""
 
 THREE_CLASSES_ACCURACY = 0.694444
+
+
+class NeighbourFixture:
+    """A three-by-three grid, small enough to check the neighbours by eye.
+
+    Two predictors on identical scales, holding both a quantity and a class per
+    row, so one fixture serves the regressor and the classifier and any
+    disagreement between them is about combining rather than about finding.
+
+    Parameters
+    ----------
+    first, second:
+        Grid coordinates, named ``first`` and ``second``.
+    quantity:
+        A continuous target, named ``quantity``.
+    classes:
+        A three-class target, named ``outcome``.
+    """
+
+    __slots__ = ("_classes", "_first", "_quantity", "_second")
+
+    def __init__(
+        self,
+        first: Sequence[float],
+        second: Sequence[float],
+        quantity: Sequence[float],
+        classes: Sequence[int],
+    ) -> None:
+        self._first = list(first)
+        self._second = list(second)
+        self._quantity = list(quantity)
+        self._classes = list(classes)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two grid coordinates."""
+        return [Feature("first", self._first), Feature("second", self._second)]
+
+    @property
+    def quantity_feature(self) -> Feature:
+        """The continuous target."""
+        return Feature("quantity", self._quantity)
+
+    @property
+    def class_feature(self) -> Feature:
+        """The three-class target."""
+        return Feature("outcome", [float(value) for value in self._classes])
+
+    @property
+    def quantity_values(self) -> list[float]:
+        """The continuous target as plain floats."""
+        return list(self._quantity)
+
+    @property
+    def class_values(self) -> list[int]:
+        """The classes as plain integers."""
+        return list(self._classes)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows the grid holds."""
+        return len(self._first)
+
+
+NEIGHBOUR_GRID = NeighbourFixture(
+    [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
+    [0.0, 1.0, 2.0, 0.0, 1.0, 2.0, 0.0, 1.0, 2.0],
+    [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0],
+    # Three classes laid out in bands, so a query in the middle draws
+    # neighbours from more than one of them.
+    [0, 0, 1, 0, 1, 1, 2, 2, 2],
+)
+"""Verified by hand: from (0.4, 0.4) the three nearest are rows 0, 1 and 3."""
+
+# From (0.4, 0.4), on either metric, the nearest three are rows 0, 1, 3.
+NEIGHBOUR_QUERY = (0.4, 0.4)
+NEIGHBOUR_QUERY_NEAREST_THREE = (0, 1, 3)
+NEIGHBOUR_QUERY_MEAN_OF_THREE = 23.333333333333332
+
+# From (1.0, 1.0) with k=5 the classes tie 2-2-1, which is the tie-break case.
+NEIGHBOUR_TIE_QUERY = (1.0, 1.0)
+NEIGHBOUR_TIE_SHARES = (0.4, 0.4, 0.2)

@@ -27,6 +27,9 @@ from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
 from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
+from oop_ml.classification.neighbours.k_nearest_classifier import (
+    KNearestNeighboursClassifier,
+)
 from oop_ml.core.base.estimator import (
     Classifier,
     Estimator,
@@ -36,10 +39,21 @@ from oop_ml.core.base.estimator import (
     Transformer,
 )
 from oop_ml.core.base.linear_model import LinearModel
+from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.distance.calculations import (
+    BroadcastDistance,
+    CanberraDistance,
+    CosineDistance,
+    Distance,
+    EuclideanDistance,
+    HammingDistance,
+    MinkowskiDistance,
+)
+from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
@@ -95,6 +109,9 @@ from oop_ml.regression.least_squares.simple_linear_regression import (
     SimpleLinearRegression,
 )
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
+from oop_ml.regression.neighbours.k_nearest_regressor import (
+    KNearestNeighboursRegressor,
+)
 from oop_ml.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.regression.penalised.ridge_regression import RidgeRegression
 
@@ -128,6 +145,15 @@ __all__ = [
     "Transformer",
     "LinearModel",
     "LinearFeatureRegressor",
+    "NeighbourModel",
+    "DistanceMetric",
+    "Distance",
+    "BroadcastDistance",
+    "MinkowskiDistance",
+    "EuclideanDistance",
+    "CosineDistance",
+    "HammingDistance",
+    "CanberraDistance",
     "LinearClassifier",
     # Regression
     "SimpleLinearRegression",
@@ -135,11 +161,13 @@ __all__ = [
     "RidgeRegression",
     "LassoRegression",
     "GradientDescentRegression",
+    "KNearestNeighboursRegressor",
     # Classification
     "LogisticRegression",
     "NewtonLogisticRegression",
     "MultinomialLogisticRegression",
     "OneVsRestClassifier",
+    "KNearestNeighboursClassifier",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
