@@ -288,17 +288,135 @@ easily be twenty; wherever macro sits well below micro, the model is failing a
 class too small to dent the overall figure, which is usually the class somebody
 cared about.
 
+## Models That Learn Nothing
+
+Every model above ends up holding a handful of numbers that stand in for the
+data. `fit` does the work, the training rows are discarded, and `predict` is
+arithmetic on coefficients. Nearest neighbours inverts all three. `fit`
+validates its inputs and remembers them, and every decision waits until you
+ask a question.
+
+```python
+from oop_ml import KNearestNeighboursClassifier, DistanceMetric
+
+model = KNearestNeighboursClassifier(n_neighbours=5)
+model.fit(features, species)
+
+model.predict(new_features)  # majority vote among the 5 nearest rows
+model.predict_probabilities(new_features)  # each class's share of those 5
+model.n_remembered  # 300 — the model's size, which no other model here has
+```
+
+What that buys is shape. Nothing constrains the decision surface, so a class
+sitting in a ring around another one is read straight off the rows. On exactly
+that data, [examples/nearest_neighbours.py](examples/nearest_neighbours.py)
+reports:
+
+```
+                       model  test accuracy
+          LogisticRegression         0.5100
+KNearestNeighboursClassifier         0.9100
+```
+
+The linear model did not error, and it did not fail to converge. It fitted the
+best straight line available and the best straight line available is worth
+nothing when the boundary is a circle.
+
+Multi-class comes free, which is worth pausing on given how much machinery the
+previous section needed. There is no reference class here, no flat ridge in a
+likelihood, no one-vs-rest wrapper and no softmax — a vote does not care how
+many candidates are on the ballot. Two classes and twenty are the same code,
+because all that machinery existed to make *parameters* identifiable, and there
+are no parameters.
+
+### What it costs
+
+Three things, and none of them is optional.
+
+**`k` is the entire bias-variance dial.** At `k=1` every training row is its own
+nearest neighbour, so training accuracy is 1.0 by construction and means
+precisely nothing:
+
+```
+  k  train accuracy  test accuracy
+  1          1.0000         0.8500
+  3          0.9267         0.9000
+  5          0.9100         0.9100
+ 15          0.8933         0.9000
+ 51          0.8833         0.8700
+300          0.5167         0.4500
+```
+
+Training accuracy falls the whole way down that table while test accuracy
+rises, peaks and only then falls. The two columns disagree about the best model
+over most of the range, and wherever they disagree the training column is the
+wrong one.
+
+**Standardising stops being a convenience.** Distance is a sum over the
+features, so a column measured in larger numbers drowns one measured in
+smaller. Predicting temperature from the hour of day, with a junk pressure
+column in pascals sitting beside it:
+
+```
+      inputs  test R^2
+ as supplied   -0.0051
+standardised    0.8898
+```
+
+Every other model here would have shrunk the useless column toward zero on the
+evidence. This one has no coefficients to shrink and no way to notice.
+
+**The metric is not a tuning knob, it is the model.** Six are built in, and
+they disagree by a lot:
+
+```
+   metric  test R^2
+euclidean    0.8898
+manhattan    0.9037
+chebyshev    0.8713
+   cosine    0.6126
+  hamming   -2.5184
+ canberra    0.8156
+```
+
+`EUCLIDEAN`, `MANHATTAN` and `CHEBYSHEV` are one formula at `p = 2`, `1` and
+infinity, so raising `p` shifts weight onto whichever single feature disagrees
+most. The other three are genuinely different questions. `COSINE` compares
+direction and ignores magnitude, which is why `(1, 1, 1)` and `(3, 3, 3)` are
+at distance 0. `HAMMING` asks only whether two values are *equal*, making it
+the only one of the six that means anything on categorical codes — and, on the
+continuous columns above, the only one that scores worse than predicting the
+mean. `CANBERRA` divides each gap by the size of the values involved, which
+makes it the one option that tolerates unstandardised input.
+
+The enum names six; the calculation behind it takes any `p`, and any object
+with a `between` method is accepted:
+
+```python
+from oop_ml import MinkowskiDistance
+
+KNearestNeighboursRegressor(metric=MinkowskiDistance(3))
+```
+
+There is also a fourth cost that no amount of care removes: the model cannot
+extrapolate. Query past the edge of the training data and every neighbour is on
+the same side, so the answer is their mean and stays their mean forever. A
+linear model extends its line instead — confidently, and just as unfoundedly.
+
 ## The Package Layout
 
 | Package | Contents |
 |---------|----------|
 | `oop_ml.core.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients` — the vocabulary every other package speaks |
 | `oop_ml.core.evaluation` | `RegressionEvaluation`, `ClassificationEvaluation`, `MultiClassEvaluation` |
-| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel` and `IterativeSolver` frames |
+| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel`, `IterativeSolver` and `NeighbourModel` frames |
+| `oop_ml.core.distance` | `DistanceMetric` and the six `Distance` calculations behind it |
 | `oop_ml.regression.least_squares` | Simple, multiple, gradient descent — squared error and nothing added to it |
 | `oop_ml.regression.penalised` | Ridge and lasso, where the *shape* of the penalty is the whole difference |
+| `oop_ml.regression.neighbours` | `KNearestNeighboursRegressor` — no assumed shape, no coefficients |
 | `oop_ml.classification.binary` | `LogisticRegression` and `NewtonLogisticRegression`, one objective and two solvers |
 | `oop_ml.classification.multiclass` | `MultinomialLogisticRegression` and `OneVsRestClassifier` |
+| `oop_ml.classification.neighbours` | `KNearestNeighboursClassifier`, where any number of classes is the same code |
 | `oop_ml.preprocessing.standardization` | `Standardizer` and the `FeatureScalings` it learns |
 | `oop_ml.preprocessing.polynomial` | `PolynomialFeatures` and the `PolynomialTerms` it builds |
 | `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
@@ -359,13 +477,20 @@ this same machinery, right down to the design matrix and the intercept split.
   `model.coefficients_`. The suffix is a scikit-learn habit that exists to mark
   fitted state, and `NotFittedError` already does that job at the moment it
   matters, with a message instead of a naming convention you have to know.
+- A hyperparameter you misspell raises rather than being ignored. Pydantic's
+  default is to drop an unrecognised keyword, which for hyperparameters means
+  silently keeping the default — and a default is by construction a plausible
+  number, so `RidgeRegression(alpha=2.0)` would fit an unpenalised model and
+  report perfectly reasonable-looking coefficients. This is not hypothetical: an
+  example in this repository was written against the wrong field name and ran
+  quietly on the wrong train/test split until a type checker pointed at it.
 - Public methods hand back Python floats rather than numpy scalars.
 - Everything is typed, and the package ships a `py.typed` marker so that your
   type checker sees the annotations instead of treating all of this as untyped.
 
 ## Examples
 
-There are ten runnable scripts in [examples/](examples/), and each one is
+There are eleven runnable scripts in [examples/](examples/), and each one is
 written the way you would write your own code against the installed package
 rather than against the library's internals.
 
@@ -392,23 +517,27 @@ python -m benchmarks.against_scikit_learn
 ```
 
 ```
-                 task      size  oop_ml (s)  sklearn (s)  ratio       answers
-                  OLS   1000x20      0.0001       0.0009   0.1x       matches
-                Ridge   1000x20      0.0001       0.0005   0.3x       matches
-                Lasso   1000x20      0.0008       0.0005   1.8x       matches
-     Gradient descent   1000x20      0.0068       0.0297   0.2x  not compared
-      Logistic ascent   1000x20      0.0023       0.0034   0.7x       matches
-      Logistic Newton   1000x20      0.0010       0.0027   0.4x       matches
-         Standardizer   1000x20      0.0004       0.0004   1.0x       matches
-                  OLS  20000x50      0.0066       0.0222   0.3x       matches
-                Ridge  20000x50      0.0064       0.0073   0.9x       matches
-                Lasso  20000x50      0.0751       0.0598   1.3x       matches
-     Gradient descent  20000x50      1.5596       1.0438   1.5x  not compared
-      Logistic ascent  20000x50      0.1813       0.0232   7.8x       matches
-      Logistic Newton  20000x50      0.0584       0.0300   1.9x       matches
-         Standardizer  20000x50      0.0073       0.0104   0.7x       matches
-PolynomialFeatures d3    2000x8      0.0021       0.0014   1.5x       matches
-PolynomialFeatures d3   2000x12      0.0058       0.0033   1.8x       matches
+                 task           size  oop_ml (s)  sklearn (s)  ratio       answers
+                  OLS        1000x20      0.0003       0.0017   0.2x       matches
+                Ridge        1000x20      0.0003       0.0010   0.3x       matches
+                Lasso        1000x20      0.0030       0.0037   0.8x       matches
+     Gradient descent        1000x20      0.0172       0.0671   0.3x  not compared
+      Logistic ascent        1000x20      0.0049       0.0059   0.8x       matches
+      Logistic Newton        1000x20      0.0015       0.0042   0.3x       matches
+         Standardizer        1000x20      0.0011       0.0009   1.1x       matches
+                  OLS       20000x50      0.0198       0.0452   0.4x       matches
+                Ridge       20000x50      0.0111       0.0161   0.7x       matches
+                Lasso       20000x50      0.2102       0.1792   1.2x       matches
+     Gradient descent       20000x50      2.4369       3.8955   0.6x  not compared
+      Logistic ascent       20000x50      0.6059       0.0646   9.4x       matches
+      Logistic Newton       20000x50      0.0940       0.0753   1.2x       matches
+         Standardizer       20000x50      0.0131       0.0191   0.7x       matches
+PolynomialFeatures d3         2000x8      0.0093       0.0041   2.3x       matches
+PolynomialFeatures d3        2000x12      0.0125       0.0056   2.2x       matches
+       k-NN regressor   5000x20 q500      0.0761       0.0107   7.1x       matches
+      k-NN classifier   5000x20 q500      0.0600       0.0096   6.3x       matches
+       k-NN regressor  20000x20 q500      0.2619       0.0167  15.7x       matches
+      k-NN classifier  20000x20 q500      0.2304       0.0166  13.8x       matches
 ```
 
 Ratios below 1.0 mean this library was faster, which surprised me the first time
@@ -465,6 +594,70 @@ without shifting a coefficient. A number with that much leverage over the
 result is not a footnote to the benchmark; it is the thing the second solver
 exists so that you never have to pick.
 
+The four neighbour rows are the ones this library loses, and they are worth
+reading because the reason is not the one I expected.
+
+They started far worse. The first implementation computed distance by pairing
+every query against every remembered row and reducing over the features, which
+is the honest translation of the definition and builds an
+`(n_queries, n_remembered, n_features)` array to do it — 1.6 GB, for an answer
+occupying 80 MB. Expanding the square into `||a||^2 - 2 a.b + ||b||^2` turns
+the expensive part into one matrix multiply and never builds that array at all,
+which measured 12x quicker. Counting the votes was a second, smaller find:
+`np.add.at` is the correct way to accumulate into repeated indices and also a
+slow one, and flattening the two-dimensional tally into a single `bincount` ran
+5.7x faster. Together those took prediction from 3.56s to 0.32s at
+20000 remembered rows.
+
+The expansion has a well-known catch, which is why it is not simply the obvious
+thing to do. Recovering a small number by subtracting two large nearly-equal
+ones loses it: on two points 1e-06 apart with coordinates near 1e06 the naive
+form returns exactly `0.0`, a 100% error, and can go slightly negative so that
+the square root yields `nan` for a point measured against itself. Both symptoms
+come from the coordinates being far from the origin rather than from the points
+being close together, so subtracting the remembered rows' mean from both inputs
+first removes them — it shifts every point equally, leaving all distances
+unchanged. On that same pathological pair the centred form is exact to the last
+bit, and across random data the largest relative error against the definition
+was 3.5e-16.
+
+What is left is a fused-kernel gap. scikit-learn never materialises the
+distance matrix at all; it keeps a per-query heap of the k smallest while
+streaming the distances past it, in Cython, across threads. numpy has no way to
+express that — every intermediate is a real array — so 160 MB gets written and
+read back before the selection even starts.
+
+The interesting part is what does *not* close it. The textbook answer to a slow
+brute-force sweep is a spatial index, and at twenty features it is dramatically
+worse:
+
+```
+ dims     brute   kd_tree   verdict
+    2    0.0158    0.0038   tree wins (0.2x)
+    4    0.0141    0.0073   tree wins (0.5x)
+    8    0.0147    0.0906   brute wins (6.2x)
+   12    0.0155    0.2979   brute wins (19.3x)
+   16    0.0149    0.4995   brute wins (33.4x)
+   20    0.0153    0.6246   brute wins (40.8x)
+   30    0.0173    0.8681   brute wins (50.1x)
+```
+
+Those are both scikit-learn, the same library against itself, and its `auto`
+setting picks brute force from eight dimensions upward for exactly this reason.
+A KD-tree earns its keep by pruning branches that cannot contain a nearer
+point, and that pruning needs some points to be meaningfully closer than
+others. Sample a thousand uniform points and the gap between the nearest and
+the farthest, relative to the nearest, falls from 4390.95 in one dimension to
+2.61 in ten and 0.28 in two hundred. By the time everything is nearly
+equidistant there is nothing left to prune, and the tree is a slower way to
+visit every point anyway. The crossover here sits between four and eight
+features, which is a good deal lower than most descriptions of KD-trees
+suggest.
+
+So the remaining gap is an implementation gap and an honest one, unlike the
+logistic row above it, where the fix was a different algorithm. Both answers
+agree exactly with scikit-learn's, the classifier's labels included.
+
 Note the last column, because a benchmark that only reported timings would be
 close to worthless. Every task that can be compared agrees with scikit-learn's
 coefficients to within 1e-6, exact zeros in the lasso solution included, once
@@ -483,10 +676,11 @@ what is costing you.
 
 ## Where This Stands
 
-Regression is complete: five models, two preprocessors, and cross-validation.
+Regression is complete: six models, two preprocessors, and cross-validation.
 Classification has landed alongside it: two binary logistic solvers, softmax and
 one-vs-rest for more than two classes, and the confusion-matrix metrics for
-both. That is 688 tests, `ruff` and `pyright` clean.
+both. Nearest neighbours now covers both tasks from one frame, with six distance
+metrics behind a closed enum. That is 888 tests, `ruff` and `pyright` clean.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:
@@ -504,3 +698,11 @@ yet, in the order it will matter if you are putting this into an application:
    the binary one can jump. Its Hessian has cross-class blocks and is
    `(K-1)p` square, so Newton there is a judgement call rather than the clear
    win it was at two classes.
+5. **Distance-weighted neighbours.** Every neighbour currently counts the same
+   regardless of how near it is. Weighting by inverse distance is a genuine
+   improvement and also a different model — it has no `k` at which it stops
+   caring, and it needs a rule for a query sitting exactly on a training row,
+   where the weight is infinite.
+6. **Trees.** The other non-parametric family, and the one that gets to a
+   non-linear boundary without carrying the training set around or depending on
+   the units its inputs arrived in.
