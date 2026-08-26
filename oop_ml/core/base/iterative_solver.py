@@ -54,6 +54,7 @@ from pydantic import Field, PrivateAttr
 
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
+from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 
 
@@ -148,6 +149,48 @@ class IterativeSolver(LinearModel):
         units the caller reads back, and needs no reference value.
         """
         return bool(np.max(np.abs(step)) < self.tolerance)
+
+    def solver_path(
+        self, design_matrix: FloatArray, target_column: Column
+    ) -> SolverPath:
+        """Every pass of the walk, rather than only where it ended.
+
+        The observed route beside :meth:`_solve`. Same starting point, same
+        step, same convergence test -- it keeps the trajectory instead of
+        overwriting it, so a convergence plot or a step-by-step explanation
+        has something to draw.
+
+        Records rather than mutates. ``passes_run`` and ``converged`` on the
+        model describe the fit, and a call here is not one, so a model that
+        has been fitted still reports what its fit did.
+
+        Parameters
+        ----------
+        design_matrix:
+            ``(n_rows, n_parameters)``, as ``_solve`` takes it.
+        target_column:
+            The target, validated.
+
+        Returns
+        -------
+        SolverPath
+            Iterable over the passes. ``path.result`` is the same array
+            ``_solve`` returns, and a test asserts that.
+        """
+        weights = np.zeros(design_matrix.shape[1], dtype=np.float64)
+        steps: list[SolverStep] = []
+        stopped = SolverStop.PASS_LIMIT_REACHED
+
+        for pass_number in range(1, self._pass_limit + 1):
+            step = self._step(design_matrix, target_column, weights)
+            steps.append(SolverStep(pass_number, weights, step))
+            weights = weights + step
+
+            if self._has_converged(step):
+                stopped = SolverStop.CONVERGED
+                break
+
+        return SolverPath(steps, weights, stopped)
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Walk from zero until the steps stop mattering.

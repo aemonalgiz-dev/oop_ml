@@ -109,6 +109,7 @@ import numpy as np
 from pydantic import Field, PrivateAttr
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -233,6 +234,69 @@ class LassoRegression(LinearFeatureRegressor):
             correlation = self._soft_threshold(correlation, self.penalty / 2)
 
         return correlation / column_norm
+
+    def solver_path(
+        self, design_matrix: FloatArray, target_column: Column
+    ) -> SolverPath:
+        """Every sweep of the coordinate descent, rather than only its end.
+
+        The observed route beside :meth:`_solve`. One recorded step per sweep,
+        holding the coefficients it began with and what the whole sweep moved
+        them by -- which is the level a reader wants, since a sweep is the
+        unit that converges and a single coordinate move is not.
+
+        The same :class:`~oop_ml.core.solving.path.SolverPath` the gradient
+        walks produce. A sweep and an epoch are the same shape of thing: start
+        somewhere, move, test whether the movement still matters. Sharing the
+        record lets a lasso and a gradient descent be compared directly.
+
+        Records rather than mutates, so ``iterations_run`` and ``converged``
+        keep describing the model's own fit.
+
+        Returns
+        -------
+        SolverPath
+            ``path.result`` is the same array :meth:`_solve` returns.
+        """
+        columns = np.asfortranarray(design_matrix)
+        parameter_count = columns.shape[1]
+
+        weights = np.zeros(parameter_count, dtype=np.float64)
+        column_norms = self._column_norms(columns)
+        residual = np.array(target_column.values, dtype=np.float64)
+
+        steps: list[SolverStep] = []
+        stopped = SolverStop.PASS_LIMIT_REACHED
+
+        for sweep_number in range(1, self.max_iterations + 1):
+            began_with = weights.copy()
+            largest_change = 0.0
+
+            for column_index in range(parameter_count):
+                column = columns[:, column_index]
+                previous_weight = float(weights[column_index])
+                new_weight = self._coordinate_optimum(
+                    column,
+                    residual,
+                    previous_weight,
+                    float(column_norms[column_index]),
+                    column_index,
+                )
+
+                change = new_weight - previous_weight
+                if change != 0.0:
+                    weights[column_index] = new_weight
+                    residual -= column * change
+
+                largest_change = max(largest_change, abs(change))
+
+            steps.append(SolverStep(sweep_number, began_with, weights - began_with))
+
+            if largest_change < self.tolerance:
+                stopped = SolverStop.CONVERGED
+                break
+
+        return SolverPath(steps, weights, stopped)
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Sweep the coefficients to their own optima until they settle.

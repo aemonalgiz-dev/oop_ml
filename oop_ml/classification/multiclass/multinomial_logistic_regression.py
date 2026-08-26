@@ -93,6 +93,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 
 
@@ -329,6 +330,47 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
     def _has_converged(self, step: FloatArray) -> bool:
         """Whether this epoch moved every coefficient less than ``tolerance``."""
         return bool(np.max(np.abs(step)) < self.tolerance)
+
+    def solver_path(
+        self, design_matrix: FloatArray, target_column: Column
+    ) -> SolverPath:
+        """Every epoch of the ascent, rather than only where it stopped.
+
+        The observed route beside :meth:`_solve`. The weights here are a
+        matrix -- one row per class above the reference -- and the record
+        keeps them at that shape, so a step shows every class moving at once
+        rather than a flattened vector nobody can read.
+
+        Records rather than mutates, so ``epochs_run`` and ``converged`` keep
+        describing the model's own fit.
+
+        Returns
+        -------
+        SolverPath
+            ``path.result`` is the same array :meth:`_solve` returns.
+        """
+        assert self._n_classes is not None
+
+        indicator = self._indicator_matrix(target_column, self._n_classes)
+        weights = np.zeros((self._n_classes - 1, design_matrix.shape[1]))
+
+        steps: list[SolverStep] = []
+        stopped = SolverStop.PASS_LIMIT_REACHED
+
+        for epoch_number in range(1, self.max_epochs + 1):
+            probabilities = softmax(self._scores(design_matrix, weights))
+            step = self.learning_rate * self._gradient(
+                design_matrix, indicator, probabilities
+            )
+
+            steps.append(SolverStep(epoch_number, weights, step))
+            weights = weights + step
+
+            if self._has_converged(step):
+                stopped = SolverStop.CONVERGED
+                break
+
+        return SolverPath(steps, weights, stopped)
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Walk uphill from zero until the coefficients settle.
