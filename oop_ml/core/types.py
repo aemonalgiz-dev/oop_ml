@@ -15,5 +15,7 @@ NumericValues: TypeAlias = Sequence[Numeric]
 FloatArray: TypeAlias = NDArray[np.float64]
 # Row positions, for selecting a subset of observations.
 IndexArray: TypeAlias = NDArray[np.intp]
+# Which rows satisfy a condition, for splitting a set of observations in two.
+MaskArray: TypeAlias = NDArray[np.bool_]
 # What public methods accept: a plain sequence of numbers OR a float array.
 NumericInput: TypeAlias = NumericValues | FloatArray
