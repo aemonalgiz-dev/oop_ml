@@ -30,6 +30,9 @@ from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
 from oop_ml.classification.neighbours.k_nearest_classifier import (
     KNearestNeighboursClassifier,
 )
+from oop_ml.classification.trees.decision_tree_classifier import (
+    DecisionTreeClassifier,
+)
 from oop_ml.core.base.estimator import (
     Classifier,
     Estimator,
@@ -40,6 +43,7 @@ from oop_ml.core.base.estimator import (
 )
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.base.neighbour_model import NeighbourModel
+from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
@@ -77,6 +81,20 @@ from oop_ml.core.exceptions import (
     TooFewValuesError,
     UndefinedMetricError,
 )
+from oop_ml.core.tree.criterion import ClassificationCriterion, RegressionCriterion
+from oop_ml.core.tree.impurity import (
+    EntropyImpurity,
+    GiniImpurity,
+    Impurity,
+    VarianceImpurity,
+)
+from oop_ml.core.tree.node import (
+    ClassificationLeaf,
+    DecisionNode,
+    LeafNode,
+    TreeNode,
+)
+from oop_ml.core.tree.split import Split
 from oop_ml.core.types import (
     FloatArray,
     IndexArray,
@@ -114,6 +132,7 @@ from oop_ml.regression.neighbours.k_nearest_regressor import (
 )
 from oop_ml.regression.penalised.lasso_regression import LassoRegression
 from oop_ml.regression.penalised.ridge_regression import RidgeRegression
+from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
 __all__ = [
     # Type aliases, for annotating your own code
@@ -146,6 +165,18 @@ __all__ = [
     "LinearModel",
     "LinearFeatureRegressor",
     "NeighbourModel",
+    "TreeModel",
+    "Impurity",
+    "GiniImpurity",
+    "EntropyImpurity",
+    "VarianceImpurity",
+    "ClassificationCriterion",
+    "RegressionCriterion",
+    "Split",
+    "TreeNode",
+    "DecisionNode",
+    "LeafNode",
+    "ClassificationLeaf",
     "DistanceMetric",
     "Distance",
     "BroadcastDistance",
@@ -162,12 +193,14 @@ __all__ = [
     "LassoRegression",
     "GradientDescentRegression",
     "KNearestNeighboursRegressor",
+    "DecisionTreeRegressor",
     # Classification
     "LogisticRegression",
     "NewtonLogisticRegression",
     "MultinomialLogisticRegression",
     "OneVsRestClassifier",
     "KNearestNeighboursClassifier",
+    "DecisionTreeClassifier",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
