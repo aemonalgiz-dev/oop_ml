@@ -499,3 +499,147 @@ NEIGHBOUR_QUERY_MEAN_OF_THREE = 23.333333333333332
 # From (1.0, 1.0) with k=5 the classes tie 2-2-1, which is the tie-break case.
 NEIGHBOUR_TIE_QUERY = (1.0, 1.0)
 NEIGHBOUR_TIE_SHARES = (0.4, 0.4, 0.2)
+
+
+class TreeFixture:
+    """Fifteen rows whose greedy tree was worked out by exhaustive search.
+
+    Two predictors and a binary outcome, sized so the whole tree can be checked
+    by hand. The story is an interaction: sleeping enough is the first gate, and
+    studying only matters for rows that cleared it -- which is exactly the shape
+    a tree represents natively and a linear model cannot without being handed a
+    product column.
+
+    One row is deliberately unreachable. Row 5 slept 7.5 hours, studied 3.5, and
+    passed anyway; it lands in a leaf holding three fails, so the tree gets it
+    wrong and stays wrong. That is what stops the fixture from rewarding an
+    implementation that grows until every leaf is pure.
+
+    Parameters
+    ----------
+    studied, slept:
+        Hours, named ``studied`` and ``slept``.
+    passed:
+        The outcome, named ``passed``, as 0/1 class positions.
+    """
+
+    __slots__ = ("_passed", "_slept", "_studied")
+
+    def __init__(
+        self,
+        studied: Sequence[float],
+        slept: Sequence[float],
+        passed: Sequence[int],
+    ) -> None:
+        self._studied = list(studied)
+        self._slept = list(slept)
+        self._passed = list(passed)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The two predictors, in the order the fit sees them."""
+        return [Feature("studied", self._studied), Feature("slept", self._slept)]
+
+    @property
+    def class_feature(self) -> Feature:
+        """The binary outcome."""
+        return Feature("passed", [float(value) for value in self._passed])
+
+    @property
+    def class_values(self) -> list[int]:
+        """The outcome as plain integers."""
+        return list(self._passed)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows."""
+        return len(self._studied)
+
+
+EXAM_OUTCOMES = TreeFixture(
+    [1.0, 2.5, 3.0, 4.0, 2.0, 3.5, 5.0, 6.0, 7.0, 5.5, 5.0, 6.5, 7.5, 8.0, 9.0],
+    [8.0, 7.0, 5.0, 8.5, 6.0, 7.5, 4.0, 5.5, 5.0, 3.5, 7.0, 8.0, 7.5, 6.5, 8.0],
+    [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1],
+)
+"""Verified by exhaustive search over every candidate threshold, both criteria."""
+
+# Both criteria choose the same two splits here, which is the usual case and
+# worth pinning: if an implementation ever made them disagree on this data, the
+# disagreement would be a bug rather than a finding.
+# The canonical tree below is the one grown with this rule in force. Left at
+# the defaults the recursion does not stop there: the four-row node splits, and
+# then its two-row child splits again, until every leaf is pure and all fifteen
+# rows are reproduced exactly. That is the memorisation failure rather than the
+# model worth studying, so the fixture pins the stopped tree and a separate test
+# pins the unstopped one.
+EXAM_MIN_SAMPLES_SPLIT = 5
+
+EXAM_ROOT_SPLIT = ("slept", 6.25)
+EXAM_SECOND_SPLIT = ("studied", 4.5)
+
+EXAM_ROOT_GINI = 0.48
+EXAM_ROOT_GINI_GAIN = 0.2133333333333333
+EXAM_ROOT_ENTROPY = 0.9709505944546686
+EXAM_ROOT_ENTROPY_GAIN = 0.4199730940219749
+
+# leaf 1 (slept < 6.25), leaf 2 (slept >= 6.25, studied < 4.5), leaf 3 (rest)
+EXAM_LEAF_SIZES = (6, 4, 5)
+EXAM_LEAF_GINI = (0.0, 0.375, 0.0)
+EXAM_LEAF_SHARES = ((1.0, 0.0), (0.75, 0.25), (0.0, 1.0))
+EXAM_LEAF_PREDICTIONS = (0.0, 0.0, 1.0)
+
+# Grown to the default, every leaf ends up pure and nothing is left wrong.
+EXAM_UNSTOPPED_LEAF_COUNT = 5
+EXAM_UNSTOPPED_ACCURACY = 1.0
+
+# Depth 2, three leaves, and one row it cannot reach.
+EXAM_TREE_DEPTH = 2
+EXAM_TREE_LEAF_COUNT = 3
+EXAM_MISCLASSIFIED_ROW = 5
+EXAM_TREE_ACCURACY = 14.0 / 15.0
+
+
+class StepFixture:
+    """A single predictor and a target that jumps once, with no noise at all.
+
+    The smallest dataset on which a regression tree has exactly one right
+    answer: one split at 3.5, two leaves predicting 10 and 50, and a gain equal
+    to the whole of the parent variance because both children are constant.
+
+    Also the fixture that shows what a tree cannot do. The target is a step, so
+    the tree reproduces it perfectly; make it a straight line instead and the
+    same model can only approximate it with a staircase.
+    """
+
+    __slots__ = ("_position", "_quantity")
+
+    def __init__(self, position: Sequence[float], quantity: Sequence[float]) -> None:
+        self._position = list(position)
+        self._quantity = list(quantity)
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The single predictor."""
+        return [Feature("position", self._position)]
+
+    @property
+    def target_feature(self) -> Feature:
+        """The step target."""
+        return Feature("quantity", self._quantity)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows."""
+        return len(self._position)
+
+
+STEP_FUNCTION = StepFixture(
+    [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0],
+    [10.0, 10.0, 10.0, 10.0, 50.0, 50.0, 50.0, 50.0],
+)
+"""Verified by hand: variance 400 at the root, all of it removed by one split."""
+
+STEP_SPLIT = ("position", 3.5)
+STEP_ROOT_VARIANCE = 400.0
+STEP_ROOT_GAIN = 400.0
+STEP_LEAF_MEANS = (10.0, 50.0)
