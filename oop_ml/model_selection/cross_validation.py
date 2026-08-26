@@ -134,7 +134,7 @@ class CrossValidation(BaseModel):
         The splitter that divides the rows. Defaults to five-fold.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     folds: KFold = KFold()
 

@@ -102,7 +102,7 @@ class RowShuffler(BaseModel):
         Seed for the permutation. ``None`` means a fresh, unreproducible order.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     shuffle: bool = True
     random_seed: int | None = None
@@ -131,7 +131,7 @@ class TrainTestSplitter(BaseModel):
         Passed through to :class:`RowShuffler`.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     test_fraction: float = Field(default=0.25, gt=0.0, lt=1.0)
     shuffle: bool = True
@@ -205,7 +205,7 @@ class KFold(BaseModel):
         Passed through to :class:`RowShuffler`.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     n_folds: int = Field(default=5, ge=2)
     shuffle: bool = True
