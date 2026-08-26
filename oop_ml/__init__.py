@@ -27,6 +27,10 @@ from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
 from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
+from oop_ml.classification.multiclass.one_vs_rest_fits import (
+    ClassFit,
+    OneVsRestFits,
+)
 from oop_ml.classification.neighbours.k_nearest_classifier import (
     KNearestNeighboursClassifier,
 )
@@ -81,6 +85,13 @@ from oop_ml.core.exceptions import (
     TooFewValuesError,
     UndefinedMetricError,
 )
+from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
+from oop_ml.core.observation import Observation, Stage
+from oop_ml.core.solving.normal_equations import (
+    LeastSquaresLine,
+    NormalEquations,
+)
+from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.tree.criterion import ClassificationCriterion, RegressionCriterion
 from oop_ml.core.tree.impurity import (
     EntropyImpurity,
@@ -93,6 +104,11 @@ from oop_ml.core.tree.node import (
     DecisionNode,
     LeafNode,
     TreeNode,
+)
+from oop_ml.core.tree.search import (
+    SplitCandidate,
+    SplitRejection,
+    SplitSearch,
 )
 from oop_ml.core.tree.split import Split
 from oop_ml.core.types import (
@@ -173,6 +189,20 @@ __all__ = [
     "ClassificationCriterion",
     "RegressionCriterion",
     "Split",
+    "Observation",
+    "Stage",
+    "NormalEquations",
+    "LeastSquaresLine",
+    "OneVsRestFits",
+    "ClassFit",
+    "SplitSearch",
+    "SplitCandidate",
+    "SplitRejection",
+    "SolverPath",
+    "SolverStep",
+    "SolverStop",
+    "NeighbourSearch",
+    "NeighbourQuery",
     "TreeNode",
     "DecisionNode",
     "LeafNode",
