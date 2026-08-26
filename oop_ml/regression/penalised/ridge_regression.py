@@ -95,6 +95,7 @@ import numpy as np
 from pydantic import Field
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.solving.normal_equations import NormalEquations
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
 
@@ -113,6 +114,39 @@ class RidgeRegression(LinearFeatureRegressor):
     """
 
     penalty: float = Field(default=1.0, ge=0.0)
+
+    def normal_equations(
+        self, design_matrix: FloatArray, target_column: Column
+    ) -> NormalEquations:
+        """The matrices behind the penalised solution, penalty included.
+
+        The observed route beside :meth:`_solve`. The penalty matrix is kept
+        separately from ``X.T X`` rather than pre-added, because the whole
+        difference between this model and ordinary least squares is that one
+        matrix, and because its ``[0, 0]`` entry is worth being able to look
+        at: zeroing it unconditionally exempts a real predictor whenever
+        ``fit_intercept`` is false, which is a bug this library shipped until
+        a test caught it.
+
+        Returns
+        -------
+        NormalEquations
+            ``equations.result`` is the same array :meth:`_solve` returns.
+        """
+        penalty_matrix = np.eye(design_matrix.shape[1]) * self.penalty
+        if self.fit_intercept:
+            penalty_matrix[0, 0] = 0.0
+
+        moment_matrix = self._normal_equations_matrix(design_matrix)
+        target_moments = self._normal_equations_vector(design_matrix, target_column)
+
+        return NormalEquations(
+            design_matrix,
+            moment_matrix,
+            target_moments,
+            penalty_matrix,
+            np.linalg.solve(moment_matrix + penalty_matrix, target_moments),
+        )
 
     def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
         """Solve ``(X.T X + penalty * I) b = X.T y`` with the intercept exempt.
