@@ -60,6 +60,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from oop_ml.core.types import FloatArray
 
 
@@ -68,7 +70,6 @@ class Impurity(ABC):
 
     __slots__ = ()
 
-    @abstractmethod
     def of(self, target_values: FloatArray) -> float:
         """How mixed this node is. Zero when every row agrees.
 
@@ -84,7 +85,73 @@ class Impurity(ABC):
             Impurity, at or above zero, and zero exactly when the node is pure.
             An empty node is defined as zero: there is nothing in it to
             disagree.
+
+        Notes
+        -----
+        The empty case is settled here rather than in each measure, which is
+        the whole reason this method is concrete and :meth:`_of_non_empty` is
+        the one a subclass writes. Stated as a rule in a contract, every
+        implementation has to remember it independently and eventually one will
+        not -- and the symptom differs by measure, which makes it worse. Gini
+        returns 1.0, because the sum of no squared proportions is zero and one
+        minus zero is one. Variance returns ``nan``, because the mean of
+        nothing is undefined, and a ``nan`` then makes every comparison against
+        it false, so a split search would silently never choose that candidate.
+        Entropy happens to return zero and would have hidden the problem.
+
+        Whether an empty node is reachable at all is a separate question --
+        ``_best_split`` rejects any split that would empty a child, so within
+        the models it is not. This is a guarantee about the type rather than a
+        defence against the callers it currently has.
+
+        The coercion to ``float`` is here for the same reason. A measure whose
+        formula ends in a numpy reduction hands back a ``float64``, which is
+        duck-compatible enough that neither the tests nor the type checker
+        notice, and which then travels outward into every gain and every leaf.
+        Doing it once at the boundary means no measure has to remember.
         """
+        if target_values.size == 0:
+            return 0.0
+
+        return float(self._of_non_empty(target_values))
+
+    @abstractmethod
+    def _of_non_empty(self, target_values: FloatArray) -> float:
+        """How mixed this node is, given at least one row.
+
+        The formula, and nothing else. Emptiness has already been handled by
+        :meth:`of`, so this can divide by the row count without checking it.
+
+        Parameters
+        ----------
+        target_values:
+            ``(n_rows,)``, never empty.
+
+        Returns
+        -------
+        float
+            Impurity, at or above zero, and zero exactly when the node is pure.
+        """
+
+    @staticmethod
+    def target_probabilities(target_values: FloatArray) -> FloatArray:
+        """What share of these rows belongs to each class present.
+
+        The step that turns a column of class labels into the ``p_k`` the Gini
+        and entropy formulas are written in terms of: ``[0, 0, 1, 1]`` holds
+        two rows of each class, so it becomes ``[0.5, 0.5]``.
+
+        Returns
+        -------
+        FloatArray
+            One entry per class *present in this node*, summing to 1 -- not one
+            per row, and not one per class the fit saw. A class with no rows
+            here is absent rather than zero, which is what keeps ``log2`` away
+            from zero in the entropy measure.
+        """
+        _, counts = np.unique(target_values, return_counts=True)
+
+        return counts / counts.sum()
 
     def gain(
         self,
@@ -120,7 +187,32 @@ class Impurity(ABC):
             concave measure, and zero when both children have the same
             composition as the parent.
         """
-        raise NotImplementedError
+        parent_impurity = self.of(parent_values)
+        left_impurity = self.of(left_values)
+        right_impurity = self.of(right_values)
+        n = len(left_values) + len(right_values)
+
+        return (
+            parent_impurity
+            - len(left_values) * left_impurity / n
+            - len(right_values) * right_impurity / n
+        )
+
+    def _cumulative_class_counts(sorted_targets: FloatArray) -> FloatArray:
+        """Class counts on the left of every cut, as ``(n_rows - 1, n_classes)``.
+
+        One pass. The counts after ``i + 1`` rows are the counts after ``i``
+        plus one, which is what makes the sweep O(n) instead of O(n^2), and
+        ``cumsum`` over a one-hot encoding is how numpy says that in one call.
+        """
+        classes = sorted_targets.astype(np.int64)
+        n_rows = classes.size
+        n_classes = int(classes.max()) + 1
+
+        one_hot = np.zeros((n_rows, n_classes), dtype=np.float64)
+        one_hot[np.arange(n_rows), classes] = 1.0
+
+        return np.cumsum(one_hot, axis=0)[:-1]
 
 
 class GiniImpurity(Impurity):
@@ -138,8 +230,8 @@ class GiniImpurity(Impurity):
 
     __slots__ = ()
 
-    def of(self, target_values: FloatArray) -> float:
-        raise NotImplementedError
+    def _of_non_empty(self, target_values: FloatArray) -> float:
+        return float(1 - np.sum(self.target_probabilities(target_values) ** 2))
 
 
 class EntropyImpurity(Impurity):
@@ -159,8 +251,23 @@ class EntropyImpurity(Impurity):
 
     __slots__ = ()
 
-    def of(self, target_values: FloatArray) -> float:
-        raise NotImplementedError
+    def _of_non_empty(self, target_values: FloatArray) -> float:
+        target_probabilities = self.target_probabilities(target_values)
+        log_p_k = np.log2(target_probabilities)
+        per_class_entropy = target_probabilities * log_p_k
+        return float(-np.sum(per_class_entropy))
+
+    def _bits(counts: FloatArray, row_totals: FloatArray) -> FloatArray:
+        """Entropy of each row of counts, absent classes costing nothing.
+
+        ``where=`` leaves the zeros untouched rather than evaluating log2(0),
+        which is the vectorised form of the rule the scalar measure follows.
+        """
+        shares = counts / row_totals
+        logarithms = np.zeros_like(shares)
+        np.log2(shares, out=logarithms, where=shares > 0.0)
+
+        return -(shares * logarithms).sum(axis=1)
 
 
 class VarianceImpurity(Impurity):
@@ -174,5 +281,8 @@ class VarianceImpurity(Impurity):
 
     __slots__ = ()
 
-    def of(self, target_values: FloatArray) -> float:
-        raise NotImplementedError
+    def _of_non_empty(self, target_values: FloatArray) -> float:
+        y_mean = np.mean(target_values)
+        mean_squared_error = np.power(target_values - y_mean, 2)
+
+        return float(np.sum(mean_squared_error) / len(target_values))

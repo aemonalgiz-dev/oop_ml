@@ -136,6 +136,14 @@ class TestEveryMeasure:
             values = generator.integers(0, 4, size=12).astype(float)
             assert measure.of(values) >= 0.0
 
+    @pytest.mark.parametrize("measure", EVERY_MEASURE)
+    def test_it_returns_a_python_float(self, measure):
+        # numpy reductions hand back float64, which is duck-compatible enough
+        # that nothing complains until the value has travelled through a gain
+        # and into a leaf. The base coerces once so no measure has to.
+        assert type(measure.of(np.array([1.0, 2.0, 3.0, 4.0]))) is float
+        assert type(measure.of(np.empty(0))) is float
+
     @pytest.mark.parametrize("measure", CLASSIFICATION_MEASURES)
     def test_it_ignores_how_the_rows_are_ordered(self, measure):
         values = labels(4, 6)
