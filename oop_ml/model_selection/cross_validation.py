@@ -46,10 +46,10 @@ from collections.abc import Iterator, Sequence
 from pydantic import BaseModel, ConfigDict
 
 from oop_ml.core.base.estimator import Regressor
+from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.exceptions import EmptyValuesError
-from oop_ml.model_selection.dataset import Dataset
 from oop_ml.model_selection.splitting import KFold
 
 

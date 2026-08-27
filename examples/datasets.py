@@ -476,7 +476,7 @@ def concentric_rings(sample_count: int = 400, random_seed: int = 7) -> Dataset:
     ``k``: every value from 1 to 15 scores a perfect 1.0, and a table of
     identical numbers teaches nothing about a bias-variance trade.
 
-    Returned as a bare :class:`~oop_ml.model_selection.dataset.Dataset` rather
+    Returned as a bare :class:`~oop_ml.core.data.dataset.Dataset` rather
     than a ``SyntheticClassification`` for that reason. There is nothing to
     print in a "truth" column.
     """
