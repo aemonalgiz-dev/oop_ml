@@ -22,6 +22,10 @@ from oop_ml.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.classification.binary.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
+from oop_ml.classification.ensembles.bagging_classifier import BaggingClassifier
+from oop_ml.classification.ensembles.random_forest_classifier import (
+    RandomForestClassifier,
+)
 from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
@@ -37,6 +41,7 @@ from oop_ml.classification.neighbours.k_nearest_classifier import (
 from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
+from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
     Classifier,
     Estimator,
@@ -63,6 +68,13 @@ from oop_ml.core.distance.calculations import (
     MinkowskiDistance,
 )
 from oop_ml.core.distance.metric import DistanceMetric
+from oop_ml.core.ensemble.bootstrap import BootstrapSample
+from oop_ml.core.ensemble.fits import (
+    BoostingRound,
+    BoostingRounds,
+    EnsembleFits,
+    MemberFit,
+)
 from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
@@ -134,6 +146,13 @@ from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
 from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
 from oop_ml.preprocessing.standardization.standardizer import Standardizer
+from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
+from oop_ml.regression.ensembles.gradient_boosting_regressor import (
+    GradientBoostingRegressor,
+)
+from oop_ml.regression.ensembles.random_forest_regressor import (
+    RandomForestRegressor,
+)
 from oop_ml.regression.least_squares.gradient_descent_regression import (
     GradientDescentRegression,
 )
@@ -225,6 +244,9 @@ __all__ = [
     "GradientDescentRegression",
     "KNearestNeighboursRegressor",
     "DecisionTreeRegressor",
+    "BaggingRegressor",
+    "RandomForestRegressor",
+    "GradientBoostingRegressor",
     # Classification
     "LogisticRegression",
     "NewtonLogisticRegression",
@@ -232,6 +254,15 @@ __all__ = [
     "OneVsRestClassifier",
     "KNearestNeighboursClassifier",
     "DecisionTreeClassifier",
+    "BaggingClassifier",
+    "RandomForestClassifier",
+    "AveragingEnsemble",
+    "BoostingEnsemble",
+    "BootstrapSample",
+    "MemberFit",
+    "EnsembleFits",
+    "BoostingRound",
+    "BoostingRounds",
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
