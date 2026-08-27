@@ -75,6 +75,7 @@ from oop_ml.core.ensemble.fits import (
     EnsembleFits,
     MemberFit,
 )
+from oop_ml.core.ensemble.out_of_bag import OutOfBagEstimate
 from oop_ml.core.evaluation.classification import (
     ClassificationEvaluation,
     ConfusionMatrix,
@@ -259,6 +260,7 @@ __all__ = [
     "AveragingEnsemble",
     "BoostingEnsemble",
     "BootstrapSample",
+    "OutOfBagEstimate",
     "MemberFit",
     "EnsembleFits",
     "BoostingRound",

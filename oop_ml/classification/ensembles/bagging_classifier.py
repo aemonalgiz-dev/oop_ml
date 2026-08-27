@@ -31,6 +31,7 @@ from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.types import FloatArray
 
 
@@ -114,6 +115,39 @@ class BaggingClassifier(
         """
         consensus = member_predictions.mean(axis=0)
         return consensus.argmax(-1).astype(np.float64)
+
+    def out_of_bag_evaluate(self) -> MultiClassEvaluation:
+        """Score the fit against rows each member never drew.
+
+        The bagged answer to a train/test split, and the class count comes
+        from the fitted model rather than from the covered rows, so a rare
+        class missing from them still produces a table of the right size.
+
+        Read the caveats in
+        :mod:`~oop_ml.core.ensemble.out_of_bag` before trusting the number.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        estimate = self.out_of_bag_estimate()
+        assert self._training is not None
+        actual = self._training.target_feature.values[estimate.covered]
+
+        return MultiClassEvaluation(
+            actual, estimate.covered_predictions, self.n_classes
+        )
+
+    def out_of_bag_score(self) -> float:
+        """Accuracy against the rows each member never drew.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        return self.out_of_bag_evaluate().accuracy
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit every member on its own resample, recording the class count.

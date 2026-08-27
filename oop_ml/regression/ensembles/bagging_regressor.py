@@ -21,6 +21,7 @@ from typing import Self
 from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
@@ -69,6 +70,46 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
             ``(n_queries,)``.
         """
         return member_predictions.mean(axis=0)
+
+    def out_of_bag_evaluate(self) -> RegressionEvaluation:
+        """Score the fit against rows each member never drew.
+
+        The bagged answer to a train/test split. Every member missed about
+        36.8% of the training set, so the ensemble already contains a held-out
+        estimate; this reads it out rather than setting data aside up front.
+
+        Read the caveats in
+        :mod:`~oop_ml.core.ensemble.out_of_bag` before trusting the number.
+        The short version is that it is conservative: each row is judged by
+        roughly ``0.368 * n_members`` members, so it measures a smaller
+        ensemble than the one you fitted.
+
+        Rows no member missed are excluded, so this can be computed over fewer
+        rows than the training set holds.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        estimate = self.out_of_bag_estimate()
+        assert self._training is not None
+        actual = self._training.target_feature.values[estimate.covered]
+
+        return RegressionEvaluation(actual, estimate.covered_predictions)
+
+    def out_of_bag_score(self) -> float:
+        """R^2 against the rows each member never drew.
+
+        A thin convenience over ``out_of_bag_evaluate``, mirroring what
+        ``score`` is to ``evaluate``.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``.
+        """
+        return self.out_of_bag_evaluate().r2_score
 
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit every member on its own resample.
