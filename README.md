@@ -452,11 +452,156 @@ against your row count.
 
 **The search is greedy, and cannot be otherwise.** Finding the optimal tree is
 NP-hard, so each node takes the best split available now and never reconsiders.
-Usually fine, occasionally fatal: on a parity target every single first split
-scores exactly zero, and the recursion stops at the root even though two levels
-would separate the classes perfectly.
+Usually fine, occasionally fatal. On a parity target — the class is 1 when
+exactly one of two features is 1 — no single question helps: split on either
+one and both sides come back half and half, which is the impurity the node
+already had.
+
+I first wrote that the recursion therefore stops at the root, and measuring it
+showed otherwise. On 300 rows the real features score a gain of 0.0037 rather
+than 0.0000, because a finite sample is never perfectly balanced, and the tree
+splits on that and recovers the target completely. What actually sinks it is
+*competition*: add one pure-noise column and it scores 0.0084, wins the root on
+nothing at all, and a depth-3 tree lands at 0.537 against a coin's 0.5. Greed is
+not unlucky here — it is correctly reporting that no single question helps, and
+a single question is all it can see.
 
 **The boundary is axis-aligned.** A diagonal is only reachable as a staircase.
+
+## Many Models Instead Of One
+
+A tree is unstable. Change a handful of rows and the root split changes, and
+everything below it changes with it. That is a defect on its own and a
+resource in bulk: models that disagree can be averaged, and the disagreement is
+what the averaging spends.
+
+```python
+from oop_ml import RandomForestRegressor
+
+forest = RandomForestRegressor(n_members=100, max_features=3, random_seed=0)
+forest.fit(features, target)
+forest.score(held_out_features, held_out_target)
+```
+
+Two families, and they share only the words. With `B` members of variance `s²`
+and pairwise correlation `r`:
+
+```
+Var(average)  =  r·s²  +  (1 - r)·s²/B
+```
+
+Only the second term shrinks with `B`, so `r` is a floor no number of members
+gets below.
+
+| | Averaging | Boosting |
+|---|---|---|
+| Members fitted | independently, on resamples | in sequence, on what is left |
+| Attacks | variance | bias |
+| Ideal member | deep, unpruned | a stump |
+| Order | meaningless | load-bearing |
+| More members | stops helping | starts hurting |
+
+The reversal in that third row is the part worth sitting with. Bagging wants
+the member with the *most* variance and the least bias, which is exactly the
+unpruned tree the stopping rules exist to prevent — because in a lone tree they
+are the only defence, and here the averaging has taken that job over. Boosting
+wants the opposite, because nothing is averaging a deep member's noise away; it
+is being added up.
+
+### What the numbers actually said
+
+Bagging attacks the second term. A forest attacks `r` itself, by restricting
+which features each *node* may consider so the members stop all finding the
+same strong split first. On a fixture with one dominant feature:
+
+```
+max_features=None   20 of 20 members root on `dominant`
+max_features=3      5 or 6 different features appear there
+```
+
+That is the mechanism working. Held-out R² on the same fixture is a different
+story:
+
+```
+one tree              0.6019
+bagged                0.7364
+forest, 3 of 6        0.7343
+forest, 2 of 6        0.7117
+forest, 1 of 6        0.5877
+```
+
+**The forest does not beat bagging here.** Restriction is variance spent to buy
+decorrelation, and on 200 rows with a genuinely dominant feature the two
+cancel. I could have tuned the fixture until the library looked better; the
+tests instead assert that both beat a lone tree, and the numbers are written
+down where they can be checked.
+
+The clearest win is the one bagging alone already delivers. On the parity
+target from the trees section, where a lone tree lands at 0.537:
+
+```
+lone tree, depth 3           0.52 - 0.59
+forest, unrestricted         0.95 - 0.97
+forest, 1 feature per node   0.99
+```
+
+Here too I had the mechanism wrong first. The plan was to show that restricting
+features is what escapes a bad first move — and measuring the *unrestricted*
+forest showed resampling alone does most of it, by varying which spurious split
+happens to win each member's root. Restriction sharpens it. It is not the cause.
+
+### Boosting
+
+Where averaging fits members that never meet, boosting fits one, sees what it
+got wrong, and fits the next to *that*.
+
+```python
+from oop_ml import GradientBoostingRegressor
+
+model = GradientBoostingRegressor(n_rounds=200, learning_rate=0.05, max_depth=3)
+```
+
+Fitting to `target - prediction` is the recipe everyone learns, and it is a
+special case. Squared error's derivative with respect to the prediction is
+`-(target - prediction)`, so the residual *is* the negative gradient — and
+saying it that way is what lets the same machinery carry losses whose residual
+is not a subtraction. Each round is one step of gradient descent taken in the
+space of functions rather than parameters, with the member as the direction and
+the learning rate as the step size.
+
+That makes the rate and the round count one setting rather than two. Both of
+these travel a nominal distance of 5.0:
+
+```
+100 rounds at 0.05    better on rows it never saw
+  5 rounds at 1.00    worse
+```
+
+Committing less per step leaves less room to commit to noise — the same
+shrinkage a ridge penalty buys, arrived at from a different direction.
+
+It is also far cheaper than it looks, because the member is shallow:
+
+```
+40 boosted rounds     0.055s
+20 bagged members     0.522s
+```
+
+Nine times less for twice as many trees. The bias/variance reversal shows up as
+wall-clock, since an unpruned tree on 200 rows recurses until every leaf is
+pure.
+
+### Probabilities, and why votes are worse
+
+A bagged classifier averages its members' probability matrices rather than
+counting their votes. Six members putting a class at 0.51 outvote four putting
+the other at 0.99 — and lose the average, 0.30 to 0.70. Only the second answer
+uses how sure each member was.
+
+It also produces the first honest probability the trees here have offered. A
+lone unpruned tree reports 1.0 from every leaf it grows, because every leaf it
+grows is pure; a hundred such certainties, disagreeing, average to a number
+that means something.
 
 ## Watching A Model Work
 
@@ -467,8 +612,8 @@ it.
 ```python
 search = model.split_search(rows, targets)
 
-len(search)        # 22 candidates considered
-search.best        # Split(slept < 6.25, gain=0.2133)
+len(search)  # 22 candidates considered
+search.best  # Split(slept < 6.25, gain=0.2133)
 ```
 
 ```
@@ -519,11 +664,12 @@ untouched by any of it.
 
 | Package | Contents |
 |---------|----------|
-| `oop_ml.core.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients` — the vocabulary every other package speaks |
+| `oop_ml.core.data` | `Column`, `Feature`, `FeatureSet`, `Coefficients`, `Dataset` — the vocabulary every other package speaks |
 | `oop_ml.core.evaluation` | `RegressionEvaluation`, `ClassificationEvaluation`, `MultiClassEvaluation` |
-| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel`, `IterativeSolver`, `NeighbourModel` and `TreeModel` frames |
+| `oop_ml.core.base` | The generic `Estimator[InputT, TargetT]` hierarchy, plus the `LinearModel`, `IterativeSolver`, `NeighbourModel`, `TreeModel`, `AveragingEnsemble` and `BoostingEnsemble` frames |
 | `oop_ml.core.distance` | `DistanceMetric` and the six `Distance` calculations behind it |
 | `oop_ml.core.tree` | Impurity measures, criteria, `Split`, and the nodes a fitted tree is made of |
+| `oop_ml.core.ensemble` | `BootstrapSample` and the records a fit leaves behind |
 | `oop_ml.core.observation` | The `Observation` protocol — the second route through a calculation |
 | `oop_ml.core.solving` | `SolverPath`, `NormalEquations`, `LeastSquaresLine` |
 | `oop_ml.core.neighbours` | `NeighbourSearch` — every distance behind a prediction |
@@ -531,13 +677,15 @@ untouched by any of it.
 | `oop_ml.regression.penalised` | Ridge and lasso, where the *shape* of the penalty is the whole difference |
 | `oop_ml.regression.neighbours` | `KNearestNeighboursRegressor` — no assumed shape, no coefficients |
 | `oop_ml.regression.trees` | `DecisionTreeRegressor` — a piecewise-constant surface you can read |
+| `oop_ml.regression.ensembles` | Bagging, random forest, gradient boosting |
 | `oop_ml.classification.binary` | `LogisticRegression` and `NewtonLogisticRegression`, one objective and two solvers |
 | `oop_ml.classification.multiclass` | `MultinomialLogisticRegression` and `OneVsRestClassifier` |
 | `oop_ml.classification.neighbours` | `KNearestNeighboursClassifier`, where any number of classes is the same code |
 | `oop_ml.classification.trees` | `DecisionTreeClassifier`, whose boundary is a union of boxes |
+| `oop_ml.classification.ensembles` | Bagging and random forest, averaging probabilities rather than votes |
 | `oop_ml.preprocessing.standardization` | `Standardizer` and the `FeatureScalings` it learns |
 | `oop_ml.preprocessing.polynomial` | `PolynomialFeatures` and the `PolynomialTerms` it builds |
-| `oop_ml.model_selection` | `Dataset`, train/test and k-fold splitters, `CrossValidation` |
+| `oop_ml.model_selection` | `DataSplit`, train/test and k-fold splitters, `CrossValidation` |
 
 `oop_ml.core` is everything that is not a model, split by what a thing is
 rather than what it is for, with the type aliases, exception hierarchy and
@@ -817,20 +965,22 @@ what is costing you.
 
 ## Where This Stands
 
-Every model family that predicts from a single fitted thing is here. Regression:
-simple, multiple, gradient descent, ridge, lasso. Classification: two binary
-logistic solvers, softmax, one-vs-rest. Both non-parametric families, k-nearest
-neighbours and decision trees, across both tasks. Plus preprocessing, splitting,
-cross-validation and three kinds of evaluation — and a second, observed route
-through every calculation with intermediates worth seeing.
+Every supervised family is here. Regression: simple, multiple, gradient
+descent, ridge, lasso. Classification: two binary logistic solvers, softmax,
+one-vs-rest. Both non-parametric families, k-nearest neighbours and decision
+trees, across both tasks. Bagging, random forests and gradient boosting on top
+of those. Plus preprocessing, splitting, cross-validation and three kinds of
+evaluation — and a second, observed route through every calculation with
+intermediates worth seeing.
 
-That is **1170 passing tests**, `ruff` and `pyright` clean, with no stubs left.
+That is **1310 passing tests**, `ruff` and `pyright` clean, with no stubs left.
 
-What is missing is not a gap in that list but three areas beside it: **ensembles**
-(bagging, forests, boosting — trees are their prerequisite, which is why they are
-next), **unsupervised learning** entirely, since every base class here takes a
-target, and **kernels**. Naive Bayes and discriminant analysis are smaller and
-would slot in anywhere.
+What is missing is not a gap in that list but two areas beside it:
+**unsupervised learning** entirely, since every base class here takes a target,
+and **kernels**. Naive Bayes and discriminant analysis are smaller and would
+slot in anywhere. Within the ensembles, out-of-bag scoring is the obvious next
+step — `BootstrapSample` already reports the rows each member never saw, and
+nothing consumes them yet.
 
 Rather than leave you to discover these the hard way, here is what is not built
 yet, in the order it will matter if you are putting this into an application:
