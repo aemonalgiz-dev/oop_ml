@@ -21,6 +21,7 @@ from typing import Self
 from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.types import FloatArray
@@ -51,7 +52,7 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
         self, member: AveragingMember, input_values: Sequence[Feature]
     ) -> FloatArray:
         assert isinstance(member, Regressor)
-        return member.predict(input_values)
+        return member.predict(input_values).values
 
     def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
         """The mean of what the members said.
@@ -126,7 +127,7 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
         """
         return self._fit_members(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The members' mean prediction, one value per row.
 
         Raises
@@ -136,4 +137,6 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._combine(self._member_predictions(input_values))
+        return Predictions.already_checked(
+            self._combine(self._member_predictions(input_values))
+        )

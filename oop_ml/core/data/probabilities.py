@@ -92,6 +92,28 @@ class Probabilities:
 
         return (self._values >= threshold).astype(np.float64)
 
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """The wrapped array's shape, so a caller can assert on it directly."""
+        return self._values.shape
+
+    @property
+    def dtype(self):
+        """The wrapped array's dtype."""
+        return self._values.dtype
+
+    def __array__(self, dtype=None, copy=None) -> FloatArray:
+        """Let numpy treat this as the array it wraps.
+
+        The object is array-like where arithmetic is wanted and a named type
+        where meaning is wanted, so wrapping a return value costs a caller
+        nothing.
+        """
+        return self._values if dtype is None else self._values.astype(dtype)
+
+    def __getitem__(self, index) -> FloatArray:
+        return self._values[index]
+
     def __len__(self) -> int:
         return self.n_rows
 
@@ -99,27 +121,32 @@ class Probabilities:
         return f"Probabilities({self.n_rows} rows)"
 
 
-class ProbabilityMatrix:
-    """``(n_rows, n_classes)`` chances, whose rows sum to one.
+class ClassScores:
+    """``(n_rows, n_classes)`` chances, one per class per row.
 
-    What a multi-class classifier believes. The row sum is the invariant worth
-    carrying: the classes are exhaustive, so a row that does not sum to one is
-    either a bug or a set of independent scores wearing the wrong type. A
-    one-vs-rest wrapper produces the latter, which is why it normalises before
-    handing anything back rather than pretending.
+    What a multi-class classifier believes, without claiming the rows add up.
+    That is the weaker of the two guarantees here and it is the honest one for
+    a :class:`~oop_ml.classification.multiclass.one_vs_rest.OneVsRestClassifier`,
+    whose K models were fitted separately and never asked to agree. Its rows
+    genuinely do not sum to one, and its own spec asserts as much rather than
+    hiding it.
+
+    :class:`ProbabilityMatrix` is the stronger case, and a subclass rather than
+    a flag, so a model that does produce a distribution says so in its return
+    type and a caller needing one cannot be handed scores by mistake.
 
     Parameters
     ----------
     values:
-        ``(n_rows, n_classes)``, each in ``[0, 1]``, rows summing to one.
+        ``(n_rows, n_classes)``, each in ``[0, 1]``.
 
     Raises
     ------
     EmptyValuesError
         If there are no rows.
     InvalidValuesError
-        If the array is not two-dimensional, any entry falls outside
-        ``[0, 1]``, or a row does not sum to one.
+        If the array is not two-dimensional, or any entry falls outside
+        ``[0, 1]``.
     """
 
     __slots__ = ("_values",)
@@ -133,13 +160,6 @@ class ProbabilityMatrix:
             raise EmptyValuesError("At least one row is required")
         if not np.all((values >= 0.0) & (values <= 1.0)):
             raise InvalidValuesError("Every probability must lie in [0, 1]")
-
-        row_sums = values.sum(axis=1)
-        if not np.all(np.abs(row_sums - 1.0) <= ROW_SUM_TOLERANCE):
-            worst = float(np.max(np.abs(row_sums - 1.0)))
-            raise InvalidValuesError(
-                f"Rows of a probability matrix sum to 1, off by up to {worst}"
-            )
 
         self._values = values
 
@@ -185,8 +205,55 @@ class ProbabilityMatrix:
 
         return Probabilities(self._values[:, class_index])
 
+    @property
+    def shape(self) -> tuple[int, ...]:
+        """The wrapped array's shape, so a caller can assert on it directly."""
+        return self._values.shape
+
+    def __array__(self, dtype=None, copy=None) -> FloatArray:
+        """Let numpy treat this as the array it wraps.
+
+        The object is array-like where arithmetic is wanted and a named type
+        where meaning is wanted, so wrapping a return value costs a caller
+        nothing.
+        """
+        return self._values if dtype is None else self._values.astype(dtype)
+
+    def __getitem__(self, index) -> FloatArray:
+        return self._values[index]
+
     def __len__(self) -> int:
         return self.n_rows
 
     def __repr__(self) -> str:
-        return f"ProbabilityMatrix({self.n_rows}x{self.n_classes})"
+        return f"{type(self).__name__}({self.n_rows}x{self.n_classes})"
+
+
+class ProbabilityMatrix(ClassScores):
+    """Class scores that are also a distribution: every row sums to one.
+
+    What a softmax produces, and what an averaged ensemble of distributions
+    produces. The extra guarantee is worth its own type because a caller
+    reasoning about a distribution -- taking an entropy, sampling from it,
+    reporting one class's share as *the* remaining chance -- is wrong the
+    moment the rows do not add up, and one-vs-rest scores look identical
+    until they are summed.
+
+    Raises
+    ------
+    InvalidValuesError
+        Everything ``ClassScores`` refuses, plus a row that does not sum
+        to one.
+    """
+
+    __slots__ = ()
+
+    def __init__(self, values: FloatArray) -> None:
+        super().__init__(values)
+
+        row_sums = values.sum(axis=1)
+        if not np.all(np.abs(row_sums - 1.0) <= ROW_SUM_TOLERANCE):
+            worst = float(np.max(np.abs(row_sums - 1.0)))
+            raise InvalidValuesError(
+                f"Rows of a probability matrix sum to 1, off by up to {worst}"
+            )

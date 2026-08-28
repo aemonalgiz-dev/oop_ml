@@ -85,7 +85,7 @@ class TestProbabilities:
     def test_rows_sum_to_one(self, fitted: BaggingClassifier) -> None:
         probabilities = fitted.predict_probabilities(DOMINATED_SIGNAL.held_out_features)
 
-        assert np.allclose(probabilities.sum(axis=1), 1.0)
+        assert np.allclose(probabilities.values.sum(axis=1), 1.0)
 
     def test_is_the_mean_of_the_members_matrices(
         self, fitted: BaggingClassifier
@@ -107,7 +107,7 @@ class TestProbabilities:
         self, fitted: BaggingClassifier
     ) -> None:
         probabilities = fitted.predict_probabilities(DOMINATED_SIGNAL.held_out_features)
-        strictly_between = (probabilities > 0.0) & (probabilities < 1.0)
+        strictly_between = (probabilities.values > 0.0) & (probabilities.values < 1.0)
 
         assert strictly_between.any()
 
@@ -119,7 +119,7 @@ class TestProbabilities:
 
         assert ensemble.n_classes == 3
         assert probabilities.shape[1] == 3
-        assert np.allclose(probabilities.sum(axis=1), 1.0)
+        assert np.allclose(probabilities.values.sum(axis=1), 1.0)
 
 
 class TestPredict:

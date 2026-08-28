@@ -374,8 +374,8 @@ class TestPredictions:
             OVERLAPPING_LABELS.input_features
         )
 
-        assert probabilities.min() >= 0.0
-        assert probabilities.max() <= 1.0
+        assert probabilities.values.min() >= 0.0
+        assert probabilities.values.max() <= 1.0
 
     def test_predict_returns_zeros_and_ones_as_floats(self):
         labels = fitted_model().predict(OVERLAPPING_LABELS.input_features)

@@ -92,7 +92,7 @@ class TestRounds:
 
         assert np.allclose(
             ensemble.predict(DOMINATED_SIGNAL.held_out_features),
-            targets.mean() + lone.predict(DOMINATED_SIGNAL.held_out_features),
+            targets.mean() + lone.predict(DOMINATED_SIGNAL.held_out_features).values,
         )
 
     def test_the_rate_scales_what_each_round_contributes(self) -> None:
@@ -108,8 +108,8 @@ class TestRounds:
         start = full.initial_prediction
 
         assert np.allclose(
-            half.predict(features) - start,
-            (full.predict(features) - start) / 2.0,
+            half.predict(features).values - start,
+            (full.predict(features).values - start) / 2.0,
         )
 
     def test_the_answer_is_the_constant_plus_every_shrunken_round(
@@ -119,7 +119,7 @@ class TestRounds:
         expected = np.full(DOMINATED_SIGNAL.n_samples, fitted.initial_prediction)
         for member in fitted.members:
             assert isinstance(member, DecisionTreeRegressor)
-            expected = expected + fitted.learning_rate * member.predict(features)
+            expected = expected + fitted.learning_rate * member.predict(features).values
 
         assert np.allclose(fitted.predict(features), expected)
 

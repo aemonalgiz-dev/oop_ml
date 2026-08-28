@@ -640,7 +640,7 @@ class BoostingEnsemble(Fittable):
             # Fold the round in before the next one measures what is left.
             # Without this the residuals never move, every round fits the same
             # member, and the ensemble is one tree repeated n_rounds times.
-            running = running + self.learning_rate * member.predict(features)
+            running = running + self.learning_rate * member.predict(features).values
             members.append(member)
 
         self._members = tuple(members)

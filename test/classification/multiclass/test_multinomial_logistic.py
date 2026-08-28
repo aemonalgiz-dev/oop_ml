@@ -353,7 +353,7 @@ class TestProbabilities:
         # The property one-vs-rest cannot offer, and the reason softmax exists.
         probabilities = fitted().predict_probabilities(THREE_CLASSES.input_features)
 
-        assert probabilities.sum(axis=1) == pytest.approx(np.ones(36))
+        assert probabilities.values.sum(axis=1) == pytest.approx(np.ones(36))
 
     def test_the_shape_is_rows_by_classes(self):
         probabilities = fitted().predict_probabilities(THREE_CLASSES.input_features)
@@ -363,8 +363,8 @@ class TestProbabilities:
     def test_probabilities_are_in_the_unit_interval(self):
         probabilities = fitted().predict_probabilities(THREE_CLASSES.input_features)
 
-        assert probabilities.min() >= 0.0
-        assert probabilities.max() <= 1.0
+        assert probabilities.values.min() >= 0.0
+        assert probabilities.values.max() <= 1.0
 
     def test_predict_is_the_argmax_of_the_probabilities(self):
         model = fitted()
@@ -506,7 +506,7 @@ class TestOneVsRest:
         # The honest cost of the approach, asserted rather than hidden. The K
         # models were never asked to agree, so their answers do not add up.
         probabilities = self.build().predict_probabilities(THREE_CLASSES.input_features)
-        totals = probabilities.sum(axis=1)
+        totals = probabilities.values.sum(axis=1)
 
         assert not np.allclose(totals, 1.0)
 

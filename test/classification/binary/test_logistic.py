@@ -231,7 +231,9 @@ class TestFittedModel:
 
         probabilities = model.predict_probability(OVERLAPPING_LABELS.input_features)
 
-        assert np.all(probabilities >= 0.0) and np.all(probabilities <= 1.0)
+        assert np.all(probabilities.values >= 0.0) and np.all(
+            probabilities.values <= 1.0
+        )
         # hours is sorted ascending in the fixture, and the slope is positive.
         assert np.all(np.diff(probabilities) > 0.0)
 
@@ -241,7 +243,7 @@ class TestFittedModel:
         probabilities = model.predict_probability(OVERLAPPING_LABELS.input_features)
         labels = model.predict(OVERLAPPING_LABELS.input_features)
 
-        np.testing.assert_allclose(labels, (probabilities >= 0.5).astype(float))
+        np.testing.assert_allclose(labels, (probabilities.values >= 0.5).astype(float))
 
     @pytest.mark.parametrize(
         ("threshold", "expected_positive_count"), [(0.1, 8), (0.5, 4), (0.9, 0)]

@@ -54,6 +54,8 @@ from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
+from oop_ml.core.data.probabilities import ProbabilityMatrix
 from oop_ml.core.types import FloatArray
 
 
@@ -213,7 +215,7 @@ class KNearestNeighboursClassifier(
 
         return self._remember(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The class most of the nearest rows belong to, as ``0.0 .. K-1``.
 
         Ties break to the lowest class index.
@@ -227,9 +229,13 @@ class KNearestNeighboursClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._combine(self._neighbour_targets(input_values))
+        return Predictions.already_checked(
+            self._combine(self._neighbour_targets(input_values))
+        )
 
-    def predict_probabilities(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probabilities(
+        self, input_values: Sequence[Feature]
+    ) -> ProbabilityMatrix:
         """Each class's share of the nearest neighbours, ``(n_queries, K)``.
 
         Rows sum to 1, but read the module docstring before treating these as
@@ -245,4 +251,6 @@ class KNearestNeighboursClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._class_shares(self._neighbour_targets(input_values))
+        return ProbabilityMatrix(
+            self._class_shares(self._neighbour_targets(input_values))
+        )

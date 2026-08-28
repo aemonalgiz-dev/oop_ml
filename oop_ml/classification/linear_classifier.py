@@ -24,6 +24,7 @@ from oop_ml.core.base.estimator import Classifier
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.exceptions import UndefinedMetricError
 from oop_ml.core.types import FloatArray
@@ -108,7 +109,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         """
         return self._fit_linear_model(input_values, target_values)
 
-    def predict_probability(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict_probability(self, input_values: Sequence[Feature]) -> Probabilities:
         """P(class is 1) for each observation.
 
         The linear predictor is the log-odds, so this is simply that value put
@@ -124,7 +125,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._probabilities_for(input_values).values
+        return self._probabilities_for(input_values)
 
     def _probabilities_for(self, input_values: Sequence[Feature]) -> Probabilities:
         """The same chances, still carrying the bound the sigmoid guarantees.
@@ -135,7 +136,7 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         """
         return self._sigmoid(self._linear_predictor(input_values))
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The predicted label for each observation, as ``0.0`` or ``1.0``.
 
         Apply ``threshold`` to the probabilities from
@@ -156,7 +157,9 @@ class LinearClassifier(LinearModel, Classifier[Sequence[Feature], Feature]):
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._probabilities_for(input_values).above(self.threshold)
+        return Predictions.already_checked(
+            self._probabilities_for(input_values).above(self.threshold)
+        )
 
     def decision_boundary_at(self, feature_name: str) -> float:
         """Where this one feature crosses the boundary, holding the rest at zero.

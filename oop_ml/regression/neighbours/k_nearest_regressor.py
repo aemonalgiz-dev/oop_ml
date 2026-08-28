@@ -37,6 +37,7 @@ from typing import Self
 from oop_ml.core.base.estimator import Regressor
 from oop_ml.core.base.neighbour_model import NeighbourModel
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.predictions import Predictions
 from oop_ml.core.types import FloatArray
 
 
@@ -108,7 +109,7 @@ class KNearestNeighboursRegressor(
         """
         return self._remember(input_values, target_values)
 
-    def predict(self, input_values: Sequence[Feature]) -> FloatArray:
+    def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The mean target of the nearest rows, one value per query.
 
         All of the work is here rather than in ``fit``, which is the trade a
@@ -123,4 +124,6 @@ class KNearestNeighboursRegressor(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._combine(self._neighbour_targets(input_values))
+        return Predictions.already_checked(
+            self._combine(self._neighbour_targets(input_values))
+        )

@@ -157,7 +157,7 @@ class TestProbabilities:
             DOMINATED_SIGNAL.held_out_features
         )
 
-        assert np.allclose(probabilities.sum(axis=1), 1.0)
+        assert np.allclose(probabilities.values.sum(axis=1), 1.0)
 
 
 class TestPredict:

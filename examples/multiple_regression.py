@@ -70,7 +70,7 @@ def main() -> None:
 
     as_fitted = model.predict(data.input_features)
     as_shuffled = model.predict(shuffled)
-    largest_difference = float(np.max(np.abs(as_fitted - as_shuffled)))
+    largest_difference = float(np.max(np.abs(as_fitted.values - as_shuffled.values)))
 
     report.line(f"agree to floating point : {np.allclose(as_fitted, as_shuffled)}")
     report.line(f"bitwise identical       : {np.array_equal(as_fitted, as_shuffled)}")
