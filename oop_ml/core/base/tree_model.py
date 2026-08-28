@@ -53,6 +53,10 @@ from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.importance.importances import (
+    FeatureContribution,
+    FeatureImportances,
+)
 from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import DecisionNode, LeafNode, TreeNode
@@ -111,6 +115,59 @@ class TreeModel(Fittable):
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _root: TreeNode | None = PrivateAttr(default=None)
     _generator: np.random.Generator | None = PrivateAttr(default=None)
+
+    @property
+    def feature_importances(self) -> FeatureImportances:
+        """How much impurity each feature removed, as shares summing to 1.
+
+        Mean decrease in impurity, which is the measure a fitted tree can
+        report for free because it already stored everything needed. Walk every
+        :class:`~oop_ml.core.tree.node.DecisionNode` in the tree; each one
+        credits its split's feature with ``n_samples * gain``, and the shares
+        are those totals normalised.
+
+        The ``n_samples`` weighting is doing real work. A split near the root
+        decides where thousands of rows go and a split near a leaf decides
+        where four go, and an unweighted count would call those equal. Weight
+        by the rows that passed through and a deep, incidental split stops
+        drowning out the question the tree actually turns on.
+
+        Guard before reading anything. ``self._feature_names`` is a private
+        attribute with no guard of its own, so touching it first on an unfitted
+        model raises an ``AssertionError`` where the contract promises
+        ``NotFittedError``. Call ``self._check_fitted()`` at the top, or read
+        ``self.root`` before the names, since that property guards for you.
+
+        Nothing here needs to keep a running total. Append one
+        :class:`~oop_ml.core.importance.importances.FeatureContribution` per
+        decision node and hand the lot to
+        ``FeatureImportances.from_contributions`` with ``self._feature_names``,
+        which totals them by name and normalises. Passing the names separately
+        is what gives a feature that never won a split its zero, and a zero is
+        a finding rather than an absence.
+
+        **Read the bias before acting on the number.** A feature offering many
+        distinct values offers the split search many candidate thresholds and
+        therefore wins splits more often than a binary one does, on chance
+        alone. Continuous and high-cardinality columns score higher here than
+        they deserve, which is exactly what
+        :class:`~oop_ml.core.importance.permutation.PermutationImportance`
+        exists to check against.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        InvalidValuesError
+            If the tree never made a split, so no feature earned anything.
+        """
+        self._check_fitted()
+        assert self._feature_names is not None
+
+        contributions: list[FeatureContribution] = []
+        self._credit_splits(self.root, contributions)
+
+        return FeatureImportances.from_contributions(self._feature_names, contributions)
 
     @property
     def root(self) -> TreeNode:
@@ -188,6 +245,33 @@ class TreeModel(Fittable):
         LeafNode
             Carrying the prediction, the row count and the impurity.
         """
+
+    def _credit_splits(
+        self, node: TreeNode, contributions: list[FeatureContribution]
+    ) -> None:
+        """Credit every decision node beneath ``node``, itself included.
+
+        A leaf asked no question and is the base case, so recursing into one
+        simply returns. That single check is the whole of the termination: a
+        node whose children are leaves still credits itself, and testing the
+        children before crediting would skip every split just above the leaves,
+        which on a stopped tree is most of them.
+
+        Each decision node credits ``n_samples * gain``. The gain is read off
+        the split rather than recomputed, since the search already worked it
+        out and stored it, and recomputing invites the two to disagree about
+        what the fit actually optimised.
+        """
+        if not isinstance(node, DecisionNode):
+            return
+
+        contributions.append(
+            FeatureContribution(
+                node.split.feature_name, node.n_samples * node.split.gain
+            )
+        )
+        self._credit_splits(node.left, contributions)
+        self._credit_splits(node.right, contributions)
 
     def _features_to_consider(self) -> list[tuple[int, str]]:
         """Which features this node may split on, as ``(index, name)`` pairs.

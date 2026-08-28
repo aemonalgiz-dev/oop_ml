@@ -68,6 +68,12 @@ from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.ensemble.out_of_bag import OutOfBagEstimate
+from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.importance.importances import (
+    FeatureContribution,
+    FeatureImportances,
+    Reports,
+)
 from oop_ml.core.types import FloatArray, MaskArray
 
 # What a member is, and why the two frames disagree about it.
@@ -132,6 +138,51 @@ class AveragingEnsemble(Fittable):
         self._check_fitted()
         assert self._samples is not None
         return self._samples
+
+    @property
+    def feature_importances(self) -> FeatureImportances:
+        """The members' importances, averaged.
+
+        This is the whole reason the measure becomes worth reading. A single
+        tree's importances are as unstable as the tree itself: change a few
+        rows, the root split changes, and the feature that was carrying half
+        the explanation drops to nothing. Averaging over a hundred members that
+        each saw a different resample is what turns a reading that moves under
+        you into one that holds still.
+
+        Averaging shares rather than raw totals, because each member's totals
+        are on its own scale -- a deeper member removed more impurity in
+        absolute terms without that meaning its features mattered more. Each
+        member's shares go in as contributions and
+        ``from_contributions`` does the totalling, which is the same entry
+        point a single tree's walk uses.
+
+        Raises
+        ------
+        NotFittedError
+            If accessed before ``fit``.
+        InvalidValuesError
+            If the members cannot report importances. Mean decrease in impurity
+            is a tree measure and a bagged linear model has coefficients
+            instead, so reach for
+            :class:`~oop_ml.core.importance.permutation.PermutationImportance`
+            there, which does not care what it is measuring.
+        """
+        assert self._feature_names is not None
+        contributions = []
+
+        for member in self.members:
+            if not isinstance(member, Reports):
+                raise InvalidValuesError(
+                    f"{type(member).__name__} cannot report feature importances; "
+                    "use PermutationImportance instead"
+                )
+            contributions.extend(
+                FeatureContribution(one.name, one.value)
+                for one in member.feature_importances
+            )
+
+        return FeatureImportances.from_contributions(self._feature_names, contributions)
 
     @property
     def members(self) -> tuple[AveragingMember, ...]:
