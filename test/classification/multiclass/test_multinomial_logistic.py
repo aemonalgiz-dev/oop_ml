@@ -24,6 +24,7 @@ from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
 from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,
@@ -57,17 +58,29 @@ def two_class_features() -> tuple[list[Feature], Feature]:
     return OVERLAPPING_LABELS.input_features, OVERLAPPING_LABELS.target_feature
 
 
-def design_matrix_of(fixture) -> np.ndarray:
-    """``X`` with its ones column, built the way the model builds it."""
-    columns = [feature.values for feature in fixture.input_features]
+def design_matrix_of(fixture) -> DesignMatrix:
+    """``X`` with its ones column, built the way the model builds it.
 
-    return np.column_stack([np.ones(len(columns[0]))] + columns)
+    A :class:`~oop_ml.core.data.design_matrix.DesignMatrix` rather than a bare
+    array, because that is what every solver takes now: the matrix carries
+    whether its first column is the intercept, so nothing downstream has to
+    consult ``fit_intercept`` to find out.
+    """
+    columns = [feature.values for feature in fixture.input_features]
+    names = [feature.name for feature in fixture.input_features]
+
+    return DesignMatrix(
+        np.column_stack([np.ones(len(columns[0]))] + columns), names, True
+    )
 
 
 def log_likelihood(design_matrix, classes, learned_weights) -> float:
     """``sum_i log p_{y_i}``, computed independently of anything under test."""
     scores = np.column_stack(
-        [np.zeros(len(classes)), design_matrix @ np.asarray(learned_weights).T]
+        [
+            np.zeros(len(classes)),
+            design_matrix.values @ np.asarray(learned_weights).T,
+        ]
     )
     shifted = scores - scores.max(axis=1, keepdims=True)
     log_probabilities = shifted - np.log(np.exp(shifted).sum(axis=1, keepdims=True))
@@ -100,8 +113,8 @@ class TestScores:
 
         scores = MultinomialLogisticRegression()._scores(design, weights)
 
-        assert scores[:, 1] == pytest.approx(design @ weights[0])
-        assert scores[:, 2] == pytest.approx(design @ weights[1])
+        assert scores[:, 1] == pytest.approx(design.values @ weights[0])
+        assert scores[:, 2] == pytest.approx(design.values @ weights[1])
 
 
 class TestIndicatorMatrix:
@@ -169,7 +182,7 @@ class TestGradient:
         indicator = model._indicator_matrix(THREE_CLASSES.target_feature.column, 3)
 
         analytic = model._gradient(design, indicator, probabilities)
-        unaveraged = ((indicator - probabilities).T @ design)[1:]
+        unaveraged = ((indicator - probabilities).T @ design.values)[1:]
 
         assert analytic == pytest.approx(unaveraged / 36)
 
@@ -180,7 +193,7 @@ class TestGradient:
         probabilities = softmax(model._scores(design, self.weights()))
         indicator = model._indicator_matrix(THREE_CLASSES.target_feature.column, 3)
 
-        full = ((indicator - probabilities).T @ design) / 36
+        full = ((indicator - probabilities).T @ design.values) / 36
 
         assert model._gradient(design, indicator, probabilities) == pytest.approx(
             full[1:]

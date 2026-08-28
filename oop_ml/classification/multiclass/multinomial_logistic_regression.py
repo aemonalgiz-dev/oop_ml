@@ -90,6 +90,7 @@ from oop_ml.classification.logistic import softmax
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.exceptions import InvalidValuesError
@@ -183,8 +184,8 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         return self._intercepts.copy()
 
     @staticmethod
-    def _probabilities(design_matrix: FloatArray, learned: FloatArray) -> FloatArray:
-        return softmax(design_matrix @ learned.T)
+    def _probabilities(design_matrix: DesignMatrix, learned: FloatArray) -> FloatArray:
+        return softmax(design_matrix.values @ learned.T)
 
     def coefficients_for(self, class_index: int) -> Coefficients:
         """The weights for one class, keyed by feature name.
@@ -212,22 +213,24 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         return self._coefficients[class_index]
 
-    def _design_matrix(self, feature_set: FeatureSet) -> FloatArray:
+    def _design_matrix(self, feature_set: FeatureSet) -> DesignMatrix:
         """``X``, with a leading ones column when the bias is being learned.
 
         Column-major for the same reason every other linear model here wants
         it: the ascent reaches for ``X.T @ something`` once an epoch.
         """
-        if not self.fit_intercept:
-            return feature_set.feature_matrix
+        names = [feature.name for feature in feature_set]
 
-        design_matrix = np.empty(
+        if not self.fit_intercept:
+            return DesignMatrix(feature_set.feature_matrix, names, False)
+
+        values = np.empty(
             (feature_set.n_samples, feature_set.n_features + 1), order="F"
         )
-        design_matrix[:, 0] = 1.0
-        design_matrix[:, 1:] = feature_set.feature_matrix
+        values[:, 0] = 1.0
+        values[:, 1:] = feature_set.feature_matrix
 
-        return design_matrix
+        return DesignMatrix(values, names, True)
 
     @staticmethod
     def _indicator_matrix(target_column: Column, n_classes: int) -> FloatArray:
@@ -243,7 +246,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         return indicator
 
-    def _scores(self, design_matrix: FloatArray, weights: FloatArray) -> FloatArray:
+    def _scores(self, design_matrix: DesignMatrix, weights: FloatArray) -> FloatArray:
         """The ``(n_samples, n_classes)`` score matrix, class 0 held at zero.
 
         ``weights`` carries only the learned classes, ``1 .. K-1``, because
@@ -268,15 +271,15 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         # is strided in row-major storage and contiguous here: measured at
         # 20000x5 it is 3.63 ms row-major against 2.06 ms this way, and the
         # whole fit runs 1.57x faster for it without a coefficient moving.
-        scores = np.empty((design_matrix.shape[0], weights.shape[0] + 1), order="F")
+        scores = np.empty((design_matrix.n_rows, weights.shape[0] + 1), order="F")
         scores[:, 0] = 0.0
-        scores[:, 1:] = design_matrix @ weights.T
+        scores[:, 1:] = design_matrix.values @ weights.T
 
         return scores
 
     def _gradient(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         indicator: FloatArray,
         probabilities: FloatArray,
     ) -> FloatArray:
@@ -288,8 +291,8 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         stacked, and which way round they stack is a real decision rather than
         a formatting one::
 
-            differences.T @ design_matrix   ->  (n_classes, parameter_count)
-            design_matrix.T @ differences   ->  (parameter_count, n_classes)
+            differences.T @ design_matrix.values   ->  (n_classes, parameter_count)
+            design_matrix.values.T @ differences   ->  (parameter_count, n_classes)
 
         The same numbers either way, transposed. Return the first: one row per
         class is how the weights are stored and what ``_solve`` adds its step
@@ -323,7 +326,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
             ``(n_classes - 1, parameter_count)``, matching the learned weights.
         """
         differences = indicator - probabilities
-        gradient = differences.T @ design_matrix / design_matrix.shape[0]
+        gradient = differences.T @ design_matrix.values / design_matrix.n_rows
 
         return gradient[1:]
 
@@ -332,7 +335,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         return bool(np.max(np.abs(step)) < self.tolerance)
 
     def solver_path(
-        self, design_matrix: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, target_column: Column
     ) -> SolverPath:
         """Every epoch of the ascent, rather than only where it stopped.
 
@@ -352,7 +355,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         assert self._n_classes is not None
 
         indicator = self._indicator_matrix(target_column, self._n_classes)
-        weights = np.zeros((self._n_classes - 1, design_matrix.shape[1]))
+        weights = np.zeros((self._n_classes - 1, design_matrix.n_columns))
 
         steps: list[SolverStep] = []
         stopped = SolverStop.PASS_LIMIT_REACHED
@@ -372,7 +375,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
 
         return SolverPath(steps, weights, stopped)
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Walk uphill from zero until the coefficients settle.
 
         Start every learned weight at zero -- which makes every class equally
@@ -399,7 +402,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
         assert self._n_classes is not None
 
         indicator = self._indicator_matrix(target_column, self._n_classes)
-        weights = np.zeros((self._n_classes - 1, design_matrix.shape[1]))
+        weights = np.zeros((self._n_classes - 1, design_matrix.n_columns))
 
         self._epochs_run = 0
         self._converged = False
@@ -500,7 +503,7 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
             for row in weights
         )
 
-    def _matched_matrix(self, input_values: Sequence[Feature]) -> FloatArray:
+    def _matched_matrix(self, input_values: Sequence[Feature]) -> DesignMatrix:
         """The design matrix for ``input_values``, checked against the fit.
 
         Raises

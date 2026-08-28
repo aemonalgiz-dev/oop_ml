@@ -126,6 +126,7 @@ from oop_ml.classification.linear_classifier import LinearClassifier
 from oop_ml.classification.logistic import sigmoid
 from oop_ml.core.base.iterative_solver import IterativeSolver
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.types import FloatArray
 
 
@@ -200,7 +201,7 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
 
     def _gradient(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_values: FloatArray,
         weights: FloatArray,
     ) -> FloatArray:
@@ -228,14 +229,14 @@ class LogisticRegression(IterativeSolver, LinearClassifier):
         FloatArray
             One partial derivative per parameter.
         """
-        probabilities = self._sigmoid(design_matrix @ weights)
+        probabilities = self._sigmoid(design_matrix.values @ weights)
         differences = target_values - probabilities
 
-        return design_matrix.T @ differences / len(target_values)
+        return design_matrix.values.T @ differences / len(target_values)
 
     def _step(
         self,
-        design_matrix: FloatArray,
+        design_matrix: DesignMatrix,
         target_column: Column,
         weights: FloatArray,
     ) -> FloatArray:

@@ -21,6 +21,7 @@ from oop_ml.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.classification.binary.newton_logistic_regression import (
     NewtonLogisticRegression,
 )
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,
@@ -47,11 +48,20 @@ def fitted_model(**overrides) -> NewtonLogisticRegression:
     return model
 
 
-def design_matrix_of(fixture) -> np.ndarray:
-    """``X`` with its ones column, built the way the model builds it."""
-    columns = [feature.values for feature in fixture.input_features]
+def design_matrix_of(fixture) -> DesignMatrix:
+    """``X`` with its ones column, built the way the model builds it.
 
-    return np.column_stack([np.ones(len(columns[0]))] + columns)
+    A :class:`~oop_ml.core.data.design_matrix.DesignMatrix` rather than a bare
+    array, because that is what every solver takes now: the matrix carries
+    whether its first column is the intercept, so nothing downstream has to
+    consult ``fit_intercept`` to find out.
+    """
+    columns = [feature.values for feature in fixture.input_features]
+    names = [feature.name for feature in fixture.input_features]
+
+    return DesignMatrix(
+        np.column_stack([np.ones(len(columns[0]))] + columns), names, True
+    )
 
 
 class TestConstruction:
@@ -186,7 +196,7 @@ class TestVarianceWeights:
 class TestHessian:
     def test_is_symmetric(self):
         design = design_matrix_of(OVERLAPPING_LABELS)
-        weights = np.linspace(0.05, 0.25, design.shape[0])
+        weights = np.linspace(0.05, 0.25, design.n_rows)
 
         hessian = NewtonLogisticRegression._hessian_matrix(design, weights)
 
@@ -195,7 +205,7 @@ class TestHessian:
     def test_is_positive_semi_definite(self):
         # This is what makes an undamped Newton step safe on this objective.
         design = design_matrix_of(OVERLAPPING_LABELS)
-        weights = np.linspace(0.05, 0.25, design.shape[0])
+        weights = np.linspace(0.05, 0.25, design.n_rows)
 
         eigenvalues = np.linalg.eigvalsh(
             NewtonLogisticRegression._hessian_matrix(design, weights)
@@ -210,11 +220,11 @@ class TestHessian:
         # np.diag then matched it character for character -- a test comparing
         # the code to itself, which passes for no reason at all.
         design = design_matrix_of(OVERLAPPING_LABELS)
-        weights = np.linspace(0.05, 0.25, design.shape[0])
+        weights = np.linspace(0.05, 0.25, design.n_rows)
 
         expected = sum(
             weight * np.outer(row, row)
-            for weight, row in zip(weights, design, strict=True)
+            for weight, row in zip(weights, design.values, strict=True)
         )
 
         assert NewtonLogisticRegression._hessian_matrix(design, weights) == (
@@ -236,19 +246,19 @@ class TestHessian:
         monkeypatch.setattr(np, "diagflat", refuse)
 
         design = design_matrix_of(OVERLAPPING_LABELS)
-        weights = np.linspace(0.05, 0.25, design.shape[0])
+        weights = np.linspace(0.05, 0.25, design.n_rows)
 
         assert NewtonLogisticRegression._hessian_matrix(design, weights).shape == (
-            design.shape[1],
-            design.shape[1],
+            design.n_columns,
+            design.n_columns,
         )
 
     def test_uniform_weights_reduce_to_a_scaled_gram_matrix(self):
         design = design_matrix_of(OVERLAPPING_LABELS)
-        weights = np.full(design.shape[0], 0.25)
+        weights = np.full(design.n_rows, 0.25)
 
         assert NewtonLogisticRegression._hessian_matrix(design, weights) == (
-            pytest.approx(0.25 * (design.T @ design))
+            pytest.approx(0.25 * (design.values.T @ design.values))
         )
 
 
@@ -262,7 +272,7 @@ class TestGradient:
         model = NewtonLogisticRegression()
 
         def log_likelihood(candidate):
-            linear = design @ candidate
+            linear = design.values @ candidate
             return float(np.sum(labels * linear - np.logaddexp(0.0, linear)))
 
         step = 1e-6
@@ -277,7 +287,9 @@ class TestGradient:
             ]
         )
 
-        analytic = model._gradient(design, labels, model._sigmoid(design @ weights))
+        analytic = model._gradient(
+            design, labels, model._sigmoid(design.values @ weights)
+        )
 
         assert analytic == pytest.approx(numerical, abs=1e-6)
 
@@ -291,7 +303,7 @@ class TestGradient:
 
         analytic = model._gradient(design, labels, probabilities)
 
-        assert analytic == pytest.approx(design.T @ (labels - probabilities))
+        assert analytic == pytest.approx(design.values.T @ (labels - probabilities))
 
 
 class TestFitting:

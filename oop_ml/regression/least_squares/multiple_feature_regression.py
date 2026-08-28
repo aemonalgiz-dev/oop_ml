@@ -96,6 +96,7 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.data.column import Column
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.solving.normal_equations import NormalEquations
 from oop_ml.core.types import FloatArray
 from oop_ml.regression.linear_feature_regressor import LinearFeatureRegressor
@@ -111,7 +112,7 @@ class MultipleLinearRegression(LinearFeatureRegressor):
     """
 
     def normal_equations(
-        self, design_matrix: FloatArray, target_column: Column
+        self, design_matrix: DesignMatrix, target_column: Column
     ) -> NormalEquations:
         """The matrices behind the solution, rather than only the solution.
 
@@ -141,7 +142,7 @@ class MultipleLinearRegression(LinearFeatureRegressor):
             np.linalg.solve(moment_matrix, target_moments),
         )
 
-    def _solve(self, design_matrix: FloatArray, target_column: Column) -> FloatArray:
+    def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Solve ``X.T X b = X.T y`` directly.
 
         This mirrors the derivation exactly, which is the point of writing it

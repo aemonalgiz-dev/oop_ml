@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 from oop_ml.classification.binary.logistic_regression import LogisticRegression
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     AllSameValuesError,
@@ -159,13 +160,17 @@ class TestSigmoid:
 class TestGradient:
     def test_matches_central_finite_differences(self):
         model = LogisticRegression()
-        design = np.column_stack(
-            [np.ones(8), np.array(OVERLAPPING_LABELS.input_features[0].values)]
+        design = DesignMatrix(
+            np.column_stack(
+                [np.ones(8), np.array(OVERLAPPING_LABELS.input_features[0].values)]
+            ),
+            [OVERLAPPING_LABELS.input_features[0].name],
+            True,
         )
         labels = np.array(OVERLAPPING_LABELS.target_feature.values)
 
         def log_likelihood(weights):
-            probability = model._sigmoid(design @ weights)
+            probability = model._sigmoid(design.values @ weights)
             return float(
                 np.sum(
                     labels * np.log(probability)
@@ -186,14 +191,20 @@ class TestGradient:
 
     def test_at_zero_weights_reduces_to_the_deviation_from_a_half(self):
         model = LogisticRegression()
-        design = np.column_stack(
-            [np.ones(8), np.array(OVERLAPPING_LABELS.input_features[0].values)]
+        design = DesignMatrix(
+            np.column_stack(
+                [np.ones(8), np.array(OVERLAPPING_LABELS.input_features[0].values)]
+            ),
+            [OVERLAPPING_LABELS.input_features[0].name],
+            True,
         )
         labels = np.array(OVERLAPPING_LABELS.target_feature.values)
 
         gradient = model._gradient(design, labels, np.zeros(2)) * len(labels)
 
-        np.testing.assert_allclose(gradient, design.T @ (labels - 0.5), atol=1e-10)
+        np.testing.assert_allclose(
+            gradient, design.values.T @ (labels - 0.5), atol=1e-10
+        )
 
 
 class TestFittedModel:

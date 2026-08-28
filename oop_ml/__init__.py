@@ -56,6 +56,7 @@ from oop_ml.core.base.tree_model import TreeModel
 from oop_ml.core.data.coefficients import Coefficient, Coefficients
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.dataset import Dataset
+from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.distance.calculations import (
@@ -188,6 +189,7 @@ __all__ = [
     "Feature",
     "FeatureSet",
     "Dataset",
+    "DesignMatrix",
     "DataSplit",
     # Results
     "Coefficient",
