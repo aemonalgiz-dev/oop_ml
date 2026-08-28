@@ -63,6 +63,7 @@ from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.row_block import RowBlock, rows_of
 from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import TooFewValuesError
@@ -103,7 +104,7 @@ class NeighbourModel(Fittable):
     metric: DistanceMetric | Distance = DistanceMetric.EUCLIDEAN
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
-    _remembered_rows: FloatArray | None = PrivateAttr(default=None)
+    _remembered_rows: RowBlock | None = PrivateAttr(default=None)
     _remembered_targets: FloatArray | None = PrivateAttr(default=None)
 
     @property
@@ -121,7 +122,7 @@ class NeighbourModel(Fittable):
         """
         self._check_fitted()
         assert self._remembered_rows is not None
-        return int(self._remembered_rows.shape[0])
+        return self._remembered_rows.n_rows
 
     @abstractmethod
     def _combine(self, neighbour_targets: FloatArray) -> FloatArray:
@@ -142,7 +143,7 @@ class NeighbourModel(Fittable):
             One value per query.
         """
 
-    def _nearest_within(self, query_rows: FloatArray) -> IndexArray:
+    def _nearest_within(self, query_rows: RowBlock) -> IndexArray:
         """The nearest remembered rows to one block of queries.
 
         Notes
@@ -178,7 +179,7 @@ class NeighbourModel(Fittable):
 
         return np.take_along_axis(nearest, ordering, axis=1)
 
-    def _neighbour_indices(self, query_rows: FloatArray) -> IndexArray:
+    def _neighbour_indices(self, query_rows: RowBlock) -> IndexArray:
         """Which remembered rows are nearest to each query row.
 
         Parameters
@@ -222,8 +223,8 @@ class NeighbourModel(Fittable):
         """
         assert self._remembered_rows is not None
 
-        n_queries = query_rows.shape[0]
-        pairs = n_queries * self._remembered_rows.shape[0]
+        n_queries = query_rows.n_rows
+        pairs = n_queries * self._remembered_rows.n_rows
         workers = min(MAX_PARALLEL_WORKERS, os.cpu_count() or 1)
 
         if pairs < PARALLEL_PAIR_THRESHOLD or workers < 2 or n_queries < 2:
@@ -233,7 +234,9 @@ class NeighbourModel(Fittable):
         starts = range(0, n_queries, block_size)
 
         def nearest_for_block(start: int) -> tuple[int, IndexArray]:
-            return start, self._nearest_within(query_rows[start : start + block_size])
+            return start, self._nearest_within(
+                query_rows.rows_between(start, start + block_size)
+            )
 
         indices = np.empty((n_queries, self.n_neighbours), dtype=np.intp)
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -281,12 +284,12 @@ class NeighbourModel(Fittable):
         return NeighbourSearch(
             [
                 NeighbourQuery(
-                    query_rows[position],
+                    query_rows.row(position),
                     distances[position],
                     chosen[position],
                     self._remembered_targets[chosen[position]],
                 )
-                for position in range(query_rows.shape[0])
+                for position in range(query_rows.n_rows)
             ]
         )
 
@@ -318,13 +321,15 @@ class NeighbourModel(Fittable):
             )
 
         self._feature_names = tuple(feature.name for feature in feature_set)
-        self._remembered_rows = np.array(feature_set.feature_matrix, dtype=np.float64)
+        self._remembered_rows = rows_of(
+            feature_set.feature_matrix, [one.name for one in feature_set]
+        )
         self._remembered_targets = target_values.column.values
 
         self._mark_fitted()
         return self
 
-    def _matched_rows(self, input_values: Sequence[Feature]) -> FloatArray:
+    def _matched_rows(self, input_values: Sequence[Feature]) -> RowBlock:
         """The query rows, in the column order the fit saw.
 
         Matched by name rather than position, the same contract every other
@@ -342,7 +347,9 @@ class NeighbourModel(Fittable):
         self._check_fitted()
         assert self._feature_names is not None
 
-        return FeatureSet.matching(self._feature_names, input_values).feature_matrix
+        matched = FeatureSet.matching(self._feature_names, input_values)
+
+        return rows_of(matched.feature_matrix, self._feature_names)
 
     def _neighbour_targets(self, input_values: Sequence[Feature]) -> FloatArray:
         """The target values of each query's nearest neighbours.

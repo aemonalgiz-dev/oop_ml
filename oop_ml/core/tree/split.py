@@ -13,7 +13,8 @@ it the array is gone.
 
 from __future__ import annotations
 
-from oop_ml.core.types import FloatArray, MaskArray
+from oop_ml.core.data.row_block import RowBlock
+from oop_ml.core.types import MaskArray
 
 # Two routes through the same definition -- the swept search and the recorded
 # one -- reach a gain by different arithmetic, so a genuine tie can come back
@@ -95,20 +96,32 @@ class Split:
             1.0, abs(other._gain)
         )
 
-    def sends_left(self, rows: FloatArray) -> MaskArray:
+    def sends_left(self, rows: RowBlock) -> MaskArray:
         """Which of these rows this split sends to the left child.
+
+        Asks the block for the column *by name*. The index is still stored,
+        because the search worked in positions and a candidate has to be
+        reported against the field it was drawn from, but a fitted split is a
+        question about a named feature and looking it up by position would
+        trust an ordering nobody promised.
 
         Parameters
         ----------
         rows:
-            ``(n_rows, n_features)``, in the fitted column order.
+            The rows to route. Only their column names have to match; the
+            order they arrive in does not.
 
         Returns
         -------
         MaskArray
             ``(n_rows,)``, true where the row goes left.
+
+        Raises
+        ------
+        InvalidValuesError
+            If the block has no column of this split's feature name.
         """
-        return rows[:, self._feature_index] < self._threshold
+        return rows.column_for(self._feature_name) < self._threshold
 
     def __repr__(self) -> str:
         return (
