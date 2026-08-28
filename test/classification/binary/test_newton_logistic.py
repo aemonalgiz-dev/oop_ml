@@ -23,6 +23,7 @@ from oop_ml.classification.binary.newton_logistic_regression import (
 )
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.exceptions import (
     AllSameValuesError,
     EmptyValuesError,
@@ -179,13 +180,15 @@ class TestVarianceWeights:
         [(0.5, 0.25), (0.0, 0.0), (1.0, 0.0), (0.2, 0.16), (0.9, 0.09)],
     )
     def test_weight_is_the_bernoulli_variance(self, probability, expected):
-        weights = NewtonLogisticRegression._variance_weights(np.array([probability]))
+        weights = NewtonLogisticRegression._variance_weights(
+            Probabilities(np.array([probability]))
+        )
 
         assert weights[0] == pytest.approx(expected)
 
     def test_certainty_carries_no_weight_and_doubt_carries_most(self):
         weights = NewtonLogisticRegression._variance_weights(
-            np.array([0.001, 0.5, 0.999])
+            Probabilities(np.array([0.001, 0.5, 0.999]))
         )
 
         assert weights[1] == pytest.approx(0.25)
@@ -267,13 +270,13 @@ class TestGradient:
         # Checked against the objective itself rather than against a restated
         # formula, which would only prove the test and the code agree.
         design = design_matrix_of(OVERLAPPING_LABELS)
-        labels = np.array(OVERLAPPING_LABELS.label_values, dtype=float)
+        labels = OVERLAPPING_LABELS.target_feature.column
         weights = np.array([-0.7, 0.3])
         model = NewtonLogisticRegression()
 
         def log_likelihood(candidate):
             linear = design.values @ candidate
-            return float(np.sum(labels * linear - np.logaddexp(0.0, linear)))
+            return float(np.sum(labels.values * linear - np.logaddexp(0.0, linear)))
 
         step = 1e-6
         numerical = np.array(
@@ -297,13 +300,15 @@ class TestGradient:
         # Any constant scaling cancels in H^-1 g, so it is left out of both.
         # Dividing here and not in the Hessian would silently shrink the step.
         design = design_matrix_of(OVERLAPPING_LABELS)
-        labels = np.array(OVERLAPPING_LABELS.label_values, dtype=float)
+        labels = OVERLAPPING_LABELS.target_feature.column
         model = NewtonLogisticRegression()
-        probabilities = np.full(len(labels), 0.5)
+        probabilities = Probabilities(np.full(labels.n_samples, 0.5))
 
         analytic = model._gradient(design, labels, probabilities)
 
-        assert analytic == pytest.approx(design.values.T @ (labels - probabilities))
+        assert analytic == pytest.approx(
+            design.values.T @ (labels.values - probabilities.values)
+        )
 
 
 class TestFitting:

@@ -136,7 +136,7 @@ class TestSigmoid:
     def test_maps_log_odds_onto_a_probability(self, linear_predictor, expected):
         result = LogisticRegression._sigmoid(np.array([linear_predictor]))
 
-        assert float(result[0]) == pytest.approx(expected, abs=1e-6)
+        assert float(result.values[0]) == pytest.approx(expected, abs=1e-6)
 
     def test_is_symmetric_about_zero(self):
         values = np.array([-3.0, -1.0, 0.0, 1.0, 3.0])
@@ -144,14 +144,16 @@ class TestSigmoid:
         forward = LogisticRegression._sigmoid(values)
         backward = LogisticRegression._sigmoid(-values)
 
-        np.testing.assert_allclose(forward + backward, np.ones_like(values), atol=1e-12)
+        np.testing.assert_allclose(
+            forward.values + backward.values, np.ones_like(values), atol=1e-12
+        )
 
     @pytest.mark.parametrize("extreme", [800.0, -800.0, 1e6, -1e6])
     def test_does_not_overflow_at_the_extremes(self, extreme):
         # The naive 1 / (1 + exp(-z)) overflows here and returns nan exactly
         # when the model is most confident, which is when separated data drives
         # the linear predictor a long way out.
-        result = float(LogisticRegression._sigmoid(np.array([extreme]))[0])
+        result = float(LogisticRegression._sigmoid(np.array([extreme])).values[0])
 
         assert np.isfinite(result)
         assert 0.0 <= result <= 1.0
@@ -167,19 +169,19 @@ class TestGradient:
             [OVERLAPPING_LABELS.input_features[0].name],
             True,
         )
-        labels = np.array(OVERLAPPING_LABELS.target_feature.values)
+        labels = OVERLAPPING_LABELS.target_feature.column
 
         def log_likelihood(weights):
-            probability = model._sigmoid(design.values @ weights)
+            probability = model._sigmoid(design.values @ weights).values
             return float(
                 np.sum(
-                    labels * np.log(probability)
-                    + (1 - labels) * np.log(1 - probability)
+                    labels.values * np.log(probability)
+                    + (1 - labels.values) * np.log(1 - probability)
                 )
             )
 
         for weights in [np.zeros(2), np.array([-2.0, 1.5]), np.array([1.0, -0.3])]:
-            analytic = model._gradient(design, labels, weights) * len(labels)
+            analytic = model._gradient(design, labels, weights) * labels.n_samples
             numeric = np.zeros(2)
             for index in range(2):
                 up, down = weights.copy(), weights.copy()
@@ -198,12 +200,12 @@ class TestGradient:
             [OVERLAPPING_LABELS.input_features[0].name],
             True,
         )
-        labels = np.array(OVERLAPPING_LABELS.target_feature.values)
+        labels = OVERLAPPING_LABELS.target_feature.column
 
-        gradient = model._gradient(design, labels, np.zeros(2)) * len(labels)
+        gradient = model._gradient(design, labels, np.zeros(2)) * labels.n_samples
 
         np.testing.assert_allclose(
-            gradient, design.values.T @ (labels - 0.5), atol=1e-10
+            gradient, design.values.T @ (labels.values - 0.5), atol=1e-10
         )
 
 

@@ -123,15 +123,17 @@ class TestIndicatorMatrix:
             THREE_CLASSES.target_feature.column, 3
         )
 
-        assert indicator.shape == (36, 3)
-        assert indicator.sum(axis=1) == pytest.approx(np.ones(36))
+        assert indicator.values.shape == (36, 3)
+        assert indicator.values.sum(axis=1) == pytest.approx(np.ones(36))
 
     def test_the_one_is_in_the_class_column(self):
         indicator = MultinomialLogisticRegression._indicator_matrix(
             THREE_CLASSES.target_feature.column, 3
         )
 
-        assert np.argmax(indicator, axis=1).tolist() == THREE_CLASSES.class_values
+        assert indicator.most_likely.tolist() == [
+            float(one) for one in THREE_CLASSES.class_values
+        ]
 
 
 class TestGradient:
@@ -182,7 +184,7 @@ class TestGradient:
         indicator = model._indicator_matrix(THREE_CLASSES.target_feature.column, 3)
 
         analytic = model._gradient(design, indicator, probabilities)
-        unaveraged = ((indicator - probabilities).T @ design.values)[1:]
+        unaveraged = ((indicator.values - probabilities.values).T @ design.values)[1:]
 
         assert analytic == pytest.approx(unaveraged / 36)
 
@@ -193,7 +195,7 @@ class TestGradient:
         probabilities = softmax(model._scores(design, self.weights()))
         indicator = model._indicator_matrix(THREE_CLASSES.target_feature.column, 3)
 
-        full = ((indicator - probabilities).T @ design.values) / 36
+        full = ((indicator.values - probabilities.values).T @ design.values) / 36
 
         assert model._gradient(design, indicator, probabilities) == pytest.approx(
             full[1:]

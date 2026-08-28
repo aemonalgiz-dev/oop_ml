@@ -59,6 +59,8 @@ from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
+from oop_ml.core.data.probabilities import Probabilities, ProbabilityMatrix
+from oop_ml.core.data.row_block import RowBlock
 from oop_ml.core.distance.calculations import (
     BroadcastDistance,
     CanberraDistance,
@@ -190,6 +192,9 @@ __all__ = [
     "FeatureSet",
     "Dataset",
     "DesignMatrix",
+    "Probabilities",
+    "ProbabilityMatrix",
+    "RowBlock",
     "DataSplit",
     # Results
     "Coefficient",
