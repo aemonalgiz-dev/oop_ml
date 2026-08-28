@@ -227,7 +227,7 @@ class TreeModel(Fittable):
         return self.classification_criterion.impurity
 
     @abstractmethod
-    def _leaf(self, target_values: FloatArray) -> LeafNode:
+    def _leaf(self, target_values: Column) -> LeafNode:
         """The leaf that answers for a node holding these targets.
 
         The one line separating a tree regressor from a tree classifier, and
@@ -341,7 +341,7 @@ class TreeModel(Fittable):
         return (distinct[:-1] + distinct[1:]) / 2.0
 
     def split_search(
-        self, feature_matrix: FloatArray, target_values: FloatArray
+        self, feature_matrix: FloatArray, target_values: Column
     ) -> SplitSearch:
         """Every candidate this node considered, kept or not, and why.
 
@@ -370,6 +370,7 @@ class TreeModel(Fittable):
         """
         assert self._feature_names is not None
 
+        role = target_values.role
         candidates: list[SplitCandidate] = []
 
         for index, name in enumerate(self._feature_names):
@@ -382,8 +383,8 @@ class TreeModel(Fittable):
 
                 gain = self._impurity.gain(
                     target_values,
-                    target_values[goes_left],
-                    target_values[~goes_left],
+                    Column.selecting(target_values.values[goes_left], role),
+                    Column.selecting(target_values.values[~goes_left], role),
                 )
 
                 if (
@@ -410,7 +411,7 @@ class TreeModel(Fittable):
         return SplitSearch(candidates)
 
     def _best_split(
-        self, feature_matrix: FloatArray, target_values: FloatArray
+        self, feature_matrix: FloatArray, target_values: Column
     ) -> Split | None:
         """The highest-gain split of these rows, or ``None`` if there is none.
 
@@ -455,7 +456,7 @@ class TreeModel(Fittable):
 
         assert self._feature_names is not None
 
-        n_rows = int(target_values.size)
+        n_rows = target_values.n_samples
         if n_rows < 2:
             return None
 
@@ -471,7 +472,7 @@ class TreeModel(Fittable):
             # the difference between a second and a millisecond.
             order = np.argsort(column, kind="stable")
             sorted_column = column[order]
-            gains = self._impurity.gains_at_every_prefix(target_values[order])
+            gains = self._impurity.gains_at_every_prefix(target_values.values[order])
 
             # Entry i of gains is the cut leaving i + 1 rows on the left. Such
             # a cut is only a real question where the sorted value actually
@@ -511,7 +512,7 @@ class TreeModel(Fittable):
         return best
 
     def _grow(
-        self, feature_matrix: FloatArray, target_values: FloatArray, depth: int
+        self, feature_matrix: FloatArray, target_values: Column, depth: int
     ) -> TreeNode:
         """Build the subtree for these rows, recursively.
         This node becomes a leaf, via :meth:`_leaf`, when **any** of:
@@ -565,6 +566,7 @@ class TreeModel(Fittable):
         if best_split.gain < self.min_impurity_decrease:
             return self._leaf(target_values)
 
+        role = target_values.role
         send_left = best_split.sends_left(feature_matrix)
 
         if len(send_left) < self.min_samples_split:
@@ -573,12 +575,16 @@ class TreeModel(Fittable):
         return DecisionNode(
             split=best_split,
             left=self._grow(
-                feature_matrix[send_left], target_values[send_left], depth + 1
+                feature_matrix[send_left],
+                Column.selecting(target_values.values[send_left], role),
+                depth + 1,
             ),
             right=self._grow(
-                feature_matrix[~send_left], target_values[~send_left], depth + 1
+                feature_matrix[~send_left],
+                Column.selecting(target_values.values[~send_left], role),
+                depth + 1,
             ),
-            n_samples=len(target_values),
+            n_samples=target_values.n_samples,
             impurity=self._impurity.of(target_values),
         )
 
@@ -607,7 +613,7 @@ class TreeModel(Fittable):
         # and then slices rows to hand each child its share, and slicing rows
         # is what C order makes contiguous.
         matrix = np.ascontiguousarray(feature_set.feature_matrix, dtype=np.float64)
-        self._root = self._grow(matrix, self._validated_target(target_values).values, 0)
+        self._root = self._grow(matrix, self._validated_target(target_values), 0)
 
         self._mark_fitted()
         return self

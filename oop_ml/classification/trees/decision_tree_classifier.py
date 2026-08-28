@@ -122,7 +122,7 @@ class DecisionTreeClassifier(
 
         return target_column
 
-    def _leaf(self, target_values: FloatArray) -> LeafNode:
+    def _leaf(self, target_values: Column) -> LeafNode:
         """A leaf predicting the most common class among these targets.
 
         Ties go to the lowest class index. The prediction is returned on the
@@ -162,14 +162,16 @@ class DecisionTreeClassifier(
         # pure leaf still reports a full row and predict_probabilities can
         # stack them. _n_classes rather than n_classes: this runs during
         # growth, and the public property is still refusing until fit ends.
-        counts = np.bincount(target_values.astype(np.int64), minlength=self._n_classes)
+        counts = np.bincount(
+            target_values.values.astype(np.int64), minlength=self._n_classes
+        )
 
         return ClassificationLeaf(
             # argmax takes the first maximum, so the documented tie-break --
             # lowest class index -- arrives without being written.
             prediction=float(np.argmax(counts)),
-            class_shares=counts / target_values.size,
-            n_samples=int(target_values.size),
+            class_shares=counts / target_values.n_samples,
+            n_samples=target_values.n_samples,
             impurity=self._impurity.of(target_values),
         )
 
