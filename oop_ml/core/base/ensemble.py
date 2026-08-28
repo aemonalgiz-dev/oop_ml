@@ -67,6 +67,10 @@ from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
+from oop_ml.core.ensemble.member_predictions import (
+    MemberPredictions,
+    predictions_of,
+)
 from oop_ml.core.ensemble.out_of_bag import OutOfBagEstimate
 from oop_ml.core.exceptions import InvalidValuesError
 from oop_ml.core.importance.importances import (
@@ -215,7 +219,7 @@ class AveragingEnsemble(Fittable):
         """
 
     @abstractmethod
-    def _combine(self, member_predictions: FloatArray) -> FloatArray:
+    def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
         """Turn every member's answer into the ensemble's answer.
 
         The one line separating an averaging regressor from an averaging
@@ -378,15 +382,15 @@ class AveragingEnsemble(Fittable):
         for row in np.flatnonzero(covered):
             missed = np.flatnonzero(~in_bag[:, row])
 
-            # Slice the row as a width-1 query rather than as a scalar, so the
-            # array keeps the shape _combine expects: members on axis 0,
-            # queries on axis 1, and for a classifier the class axis after it.
-            judged = member_predictions[missed, row : row + 1]
+            # for_query keeps the query axis. Indexing a single row with a
+            # scalar drops it, and _combine would then reduce across members
+            # and queries at once -- the right type and the wrong number.
+            judged = member_predictions.for_query(int(row), missed)
             predictions[row] = self._combine(judged)[0]
 
         return OutOfBagEstimate(predictions, covered, judges)
 
-    def _training_member_predictions(self) -> FloatArray:
+    def _training_member_predictions(self) -> MemberPredictions:
         """Every member's answer about every *training* row, uncombined.
 
         ``(n_members, n_rows)`` for a regressor and
@@ -418,7 +422,7 @@ class AveragingEnsemble(Fittable):
         """
         return np.array([sample.in_bag for sample in self.samples])
 
-    def _member_predictions(self, input_values: Sequence[Feature]) -> FloatArray:
+    def _member_predictions(self, input_values: Sequence[Feature]) -> MemberPredictions:
         """``(n_members, n_queries)`` -- every member's answer, uncombined.
 
         Raises
@@ -430,9 +434,8 @@ class AveragingEnsemble(Fittable):
         """
         ordered = list(self._matched_rows(input_values))
 
-        return np.array(
-            [self._member_answer(member, ordered) for member in self.members],
-            dtype=np.float64,
+        return predictions_of(
+            [self._member_answer(member, ordered) for member in self.members]
         )
 
     @abstractmethod

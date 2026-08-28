@@ -31,6 +31,7 @@ from oop_ml.core.base.ensemble import AveragingEnsemble, AveragingMember
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.ensemble.member_predictions import MemberPredictions
 from oop_ml.core.evaluation.multiclass import MultiClassEvaluation
 from oop_ml.core.types import FloatArray
 
@@ -96,7 +97,7 @@ class BaggingClassifier(
         assert isinstance(member, MultiClassClassifier)
         return member.predict_probabilities(input_values)
 
-    def _combine(self, member_predictions: FloatArray) -> FloatArray:
+    def _combine(self, member_predictions: MemberPredictions) -> FloatArray:
         """The class with the highest averaged probability, per query.
 
         Ties go to the lowest class index, matching the rule a single tree's
@@ -113,7 +114,7 @@ class BaggingClassifier(
             ``(n_queries,)`` of class positions, as floats on the ``0 .. K-1``
             scale the target uses.
         """
-        consensus = member_predictions.mean(axis=0)
+        consensus = member_predictions.values.mean(axis=0)
         return consensus.argmax(-1).astype(np.float64)
 
     def out_of_bag_evaluate(self) -> MultiClassEvaluation:
@@ -199,4 +200,4 @@ class BaggingClassifier(
         InvalidValuesError
             If the supplied feature names do not match those seen in ``fit``.
         """
-        return self._member_predictions(input_values).mean(axis=0)
+        return self._member_predictions(input_values).values.mean(axis=0)
