@@ -79,12 +79,12 @@ class TestFromContributions:
     def test_totals_repeated_credits_to_one_feature(self) -> None:
         """A feature winning several splits collects several contributions."""
         importances = FeatureImportances.from_contributions(
-            ["slept", "studied"],
             [
                 FeatureContribution("slept", 2.0),
                 FeatureContribution("studied", 2.5),
                 FeatureContribution("slept", 1.2),
             ],
+            ["slept", "studied"],
         )
 
         assert importances["slept"] == pytest.approx(3.2 / 5.7)
@@ -97,8 +97,8 @@ class TestFromContributions:
         otherwise be missing from the result entirely.
         """
         importances = FeatureImportances.from_contributions(
-            ["slept", "studied", "noise"],
             [FeatureContribution("slept", 3.2), FeatureContribution("studied", 2.5)],
+            ["slept", "studied", "noise"],
         )
 
         assert len(importances) == 3
@@ -106,19 +106,19 @@ class TestFromContributions:
 
     def test_keeps_the_order_the_fit_saw(self) -> None:
         importances = FeatureImportances.from_contributions(
-            ["noise", "slept"], [FeatureContribution("slept", 1.0)]
+            [FeatureContribution("slept", 1.0)], ["noise", "slept"]
         )
 
         assert [one.name for one in importances] == ["noise", "slept"]
 
     def test_order_of_contributions_does_not_matter(self) -> None:
         forwards = FeatureImportances.from_contributions(
-            ["a", "b"],
             [FeatureContribution("a", 1.0), FeatureContribution("b", 3.0)],
+            ["a", "b"],
         )
         backwards = FeatureImportances.from_contributions(
-            ["a", "b"],
             [FeatureContribution("b", 3.0), FeatureContribution("a", 1.0)],
+            ["a", "b"],
         )
 
         assert forwards["a"] == pytest.approx(backwards["a"])
@@ -127,14 +127,29 @@ class TestFromContributions:
         """A typo in a feature name would otherwise vanish into a total."""
         with pytest.raises(InvalidValuesError):
             FeatureImportances.from_contributions(
-                ["slept"], [FeatureContribution("slpet", 1.0)]
+                [FeatureContribution("slpet", 1.0)], ["slept"]
             )
 
     def test_rejects_contributions_that_total_zero(self) -> None:
         with pytest.raises(InvalidValuesError):
             FeatureImportances.from_contributions(
-                ["slept"], [FeatureContribution("slept", 0.0)]
+                [FeatureContribution("slept", 0.0)], ["slept"]
             )
+
+    def test_the_names_can_be_left_out_when_the_set_is_complete(self) -> None:
+        """A producer emitting one contribution per feature already said them.
+
+        Permutation importance breaks every column in turn and therefore always
+        has a complete set, so repeating the names it just supplied inside the
+        contributions buys nothing. A tree walk cannot: a feature winning no
+        splits appends nothing at all, which is why the argument still exists.
+        """
+        importances = FeatureImportances.from_contributions(
+            [FeatureContribution("slept", 3.0), FeatureContribution("studied", 1.0)]
+        )
+
+        assert [one.name for one in importances] == ["slept", "studied"]
+        assert importances["slept"] == pytest.approx(0.75)
 
     def test_rejects_no_names(self) -> None:
         with pytest.raises(EmptyValuesError):

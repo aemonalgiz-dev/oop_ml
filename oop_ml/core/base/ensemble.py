@@ -186,7 +186,7 @@ class AveragingEnsemble(Fittable):
                 for one in member.feature_importances
             )
 
-        return FeatureImportances.from_contributions(self._feature_names, contributions)
+        return FeatureImportances.from_contributions(contributions, self._feature_names)
 
     @property
     def members(self) -> tuple[AveragingMember, ...]:
