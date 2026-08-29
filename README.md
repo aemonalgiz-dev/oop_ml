@@ -45,7 +45,9 @@ Python 3.11 or later.
 | **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, stratified folds, cross-validation |
-| **Decomposition** | principal component analysis, explained variance, loadings |
+| **Decomposition** | principal component analysis, kernel PCA, explained variance |
+| **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
+| **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
 | **Evaluation** | regression, binary and multi-class, each on its own object |
 
 ## Four Conventions I Held To
@@ -138,6 +140,8 @@ oop_ml/
   core/            everything that is not a model
     data/          Column, Feature, FeatureSet, Coefficients, Dataset
     base/          the Estimator hierarchy and one frame per model family
+    kernel/        four kernels and the Gram matrix they produce
+    clustering/    centroids and what a grouping is
     distance/      six metrics behind one closed enum
     tree/          impurity, splits, nodes
     ensemble/      bootstrap samples and the records a fit leaves behind
@@ -169,7 +173,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1479 tests
+pytest                  # 1634 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -183,7 +187,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1479 passing tests**, `ruff`
+Every supervised family is implemented and green: **1634 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -197,6 +201,6 @@ an application:
    first and cutting back on what a subtree turned out to be worth.
 4. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
    searches a space of them.
-5. **Clustering and kernels.** PCA is in; clustering is not, and it is the
-   part that genuinely needs a new frame, since the answer is a label per row
-   rather than a rewriting of the columns.
+5. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
+   expectation-maximisation is what makes k-means make sense retroactively, as
+   EM with the guesses hardened.
