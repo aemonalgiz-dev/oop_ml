@@ -14,7 +14,7 @@ from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.exceptions import EmptyValuesError, TooFewValuesError
 from oop_ml.model_selection.cross_validation import (
     CrossValidation,
-    CrossValidationResult,
+    RegressionCrossValidationResult,
 )
 from oop_ml.model_selection.splitting import KFold
 from oop_ml.regression.least_squares.multiple_feature_regression import (
@@ -37,9 +37,9 @@ def exact_dataset(n_samples: int = 20) -> Dataset:
     )
 
 
-class TestCrossValidationResult:
-    def make_result(self) -> CrossValidationResult:
-        return CrossValidationResult(
+class TestRegressionCrossValidationResult:
+    def make_result(self) -> RegressionCrossValidationResult:
+        return RegressionCrossValidationResult(
             [
                 RegressionEvaluation([1, 2, 3], [1, 2, 3]),
                 RegressionEvaluation([1, 2, 3], [2, 2, 2]),
@@ -71,7 +71,7 @@ class TestCrossValidationResult:
 
     def test_no_folds_raises(self):
         with pytest.raises(EmptyValuesError):
-            CrossValidationResult([])
+            RegressionCrossValidationResult([])
 
 
 class TestCrossValidation:

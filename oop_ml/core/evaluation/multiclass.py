@@ -167,8 +167,17 @@ class MultiClassEvaluation:
         The predicted classes, on the same scale.
     n_classes:
         How many classes the table should span. Defaults to whatever the actual
-        column contains. Pass it explicitly when scoring a fold that may not
-        contain every class, or the table will silently be the wrong size.
+        column contains, and **passing it changes what the actual column is
+        allowed to hold**.
+
+        Left out, the width has to be inferred, so the actual classes must run
+        densely from zero -- otherwise class ``k`` is not column ``k`` and a
+        gap in the run is nearly always a filtered dataset rather than a
+        decision. Passed, the width is already stated, so the actual column
+        need only hold whole positions inside it. That is the case a
+        cross-validated fold is in: a held-out fold missing the rarest class
+        is ordinary rather than suspect, and it is the reason this argument
+        exists.
 
     Raises
     ------
@@ -179,9 +188,10 @@ class MultiClassEvaluation:
     NonBinaryLabelsError
         If either input holds a negative or fractional value.
     SingleClassError
-        If the actual column holds fewer than two classes, or leaves a gap.
+        If ``n_classes`` was left out and the actual column holds fewer than
+        two classes or leaves a gap.
     InvalidValuesError
-        If a predicted class falls outside ``0 .. n_classes - 1``.
+        If an actual or predicted class falls outside ``0 .. n_classes - 1``.
     """
 
     __slots__ = (
@@ -201,12 +211,15 @@ class MultiClassEvaluation:
         self._predicted_column = Column.of(predicted_values, ValueRole.PREDICTED_VALUES)
 
         self._actual_column.check_equal_length(self._predicted_column)
-        self._actual_column.check_is_label_encoded()
 
-        self._n_classes = (
-            self._actual_column.n_classes if n_classes is None else int(n_classes)
-        )
-        self._check_predictions_are_known_classes()
+        if n_classes is None:
+            self._actual_column.check_is_label_encoded()
+            self._n_classes = self._actual_column.n_classes
+        else:
+            self._n_classes = int(n_classes)
+            self._check_are_known_classes(self._actual_column)
+
+        self._check_are_known_classes(self._predicted_column)
 
         # Counted once. Every per-class metric reads this table, so macro_f1
         # used to rebuild it 2K times -- sixteen passes over the data at eight
@@ -215,18 +228,24 @@ class MultiClassEvaluation:
             self._actual_column, self._predicted_column, self._n_classes
         )
 
-    def _check_predictions_are_known_classes(self) -> None:
-        """Raise if the model named a class the table has no column for."""
-        predicted = self._predicted_column.values
+    def _check_are_known_classes(self, column: Column) -> None:
+        """Raise if a column names a class the table has no column for.
 
-        if np.any(predicted < 0.0) or np.any(predicted != np.floor(predicted)):
+        The looser of the two guards: whole positions inside the stated width,
+        with no requirement that every one of them appears. It is what the
+        predicted column has always been held to, and what the actual column is
+        held to once a caller has stated the width themselves.
+        """
+        values = column.values
+
+        if np.any(values < 0.0) or np.any(values != np.floor(values)):
             raise InvalidValuesError(
-                "predicted values must be whole class positions starting at 0"
+                f"{column.role} must hold whole class positions starting at 0"
             )
-        if predicted.size and predicted.max() >= self._n_classes:
+        if values.size and values.max() >= self._n_classes:
             raise InvalidValuesError(
-                f"predicted class {int(predicted.max())} is outside a problem "
-                f"with {self._n_classes} classes"
+                f"{column.role} names class {int(values.max())}, which is outside "
+                f"a problem with {self._n_classes} classes"
             )
 
     @property

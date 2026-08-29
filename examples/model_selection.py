@@ -33,8 +33,8 @@ from examples.datasets import wide_correlated_design
 from examples.reporting import Report, configure_logging_from_command_line
 from oop_ml import (
     CrossValidation,
-    CrossValidationResult,
     KFold,
+    RegressionCrossValidationResult,
     RidgeRegression,
     TrainTestSplitter,
 )
@@ -44,10 +44,11 @@ logger = logging.getLogger(__name__)
 CANDIDATE_PENALTIES = [0.0, 0.5, 1.0, 2.0, 5.0, 20.0, 100.0]
 
 
-def standard_error_of_mean_r2(result: CrossValidationResult) -> float:
+def standard_error_of_mean_r2(result: RegressionCrossValidationResult) -> float:
     """Standard error of the fold R^2 scores.
 
-    ``CrossValidationResult`` exposes the mean and the max-minus-min spread; the
+    ``RegressionCrossValidationResult`` exposes the mean and the max-minus-min
+    spread; the
     standard error is derived here by iterating the folds, which the result
     object supports directly. The spread answers "should I trust this mean at
     all"; the standard error answers "is this mean distinguishable from that
