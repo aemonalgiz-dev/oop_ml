@@ -845,3 +845,99 @@ PARITY_MAX_DEPTH = 3
 # enough not to pin a particular draw.
 PARITY_LONE_TREE_CEILING = 0.65
 PARITY_ENSEMBLE_FLOOR = 0.95
+
+
+class DecompositionFixture:
+    """Two features whose principal components are known exactly.
+
+    Parameters
+    ----------
+    first, second:
+        The two columns, named by ``first_name`` and ``second_name``.
+    first_name, second_name:
+        What the columns are called, so a fixture can carry its units in its
+        names where that is the point being made.
+    """
+
+    __slots__ = ("_first", "_first_name", "_second", "_second_name")
+
+    def __init__(
+        self,
+        first: Sequence[float],
+        second: Sequence[float],
+        first_name: str = "first",
+        second_name: str = "second",
+    ) -> None:
+        self._first = list(first)
+        self._second = list(second)
+        self._first_name = first_name
+        self._second_name = second_name
+
+    @property
+    def input_features(self) -> list[Feature]:
+        """The columns, in the order the fit sees them."""
+        return [
+            Feature(self._first_name, self._first),
+            Feature(self._second_name, self._second),
+        ]
+
+    @property
+    def feature_names(self) -> tuple[str, str]:
+        """What the two columns are called."""
+        return (self._first_name, self._second_name)
+
+    @property
+    def n_samples(self) -> int:
+        """How many rows the fixture holds."""
+        return len(self._first)
+
+
+# Chosen so the whole decomposition can be done by hand. Centred, the columns
+# are [2, -2, 1, -1, 0] and [2, -2, -1, 1, 0], which gives a sample covariance
+# (dividing by n - 1) of [[2.5, 1.5], [1.5, 2.5]]. That has eigenvalues 2.5 +/-
+# 1.5, so 4.0 and 1.0, along (1, 1)/sqrt(2) and (1, -1)/sqrt(2).
+#
+# The means are 10 and 100 rather than 0, and far apart, so a fit that forgets
+# to centre does not merely lose accuracy -- it points the first component
+# almost exactly at (0, 1) and is impossible to miss.
+ROTATED_ELLIPSE = DecompositionFixture(
+    [12.0, 8.0, 11.0, 9.0, 10.0],
+    [102.0, 98.0, 99.0, 101.0, 100.0],
+)
+
+ROTATED_ELLIPSE_MEANS = (10.0, 100.0)
+ROTATED_ELLIPSE_COVARIANCE = ((2.5, 1.5), (1.5, 2.5))
+ROTATED_ELLIPSE_VARIANCES = (4.0, 1.0)
+ROTATED_ELLIPSE_TOTAL_VARIANCE = 5.0
+ROTATED_ELLIPSE_SHARES = (0.8, 0.2)
+ROTATED_ELLIPSE_CUMULATIVE_SHARES = (0.8, 1.0)
+
+# The loading magnitude every entry of both components has. A sign is arbitrary
+# -- v and -v are the same direction -- so tests compare absolute values.
+ROTATED_ELLIPSE_LOADING = 0.7071067811865476
+
+# The first component's coordinate for each row, up to that same sign. Centred
+# row 0 is (2, 2), and (2 + 2) / sqrt(2) is 2.8284.
+ROTATED_ELLIPSE_FIRST_COORDINATES = (
+    2.8284271247461903,
+    -2.8284271247461903,
+    0.0,
+    0.0,
+    0.0,
+)
+
+# Two columns carrying one signal in two units: the second is the first times a
+# thousand. Nothing here is measured, only rescaled, so any difference between
+# the two fits is the unit and nothing else.
+MISMATCHED_UNITS = DecompositionFixture(
+    [1.0, 2.0, 3.0, 4.0, 5.0],
+    [1000.0, 2000.0, 3000.0, 4000.0, 5000.0],
+    first_name="width_metres",
+    second_name="length_millimetres",
+)
+
+# Unstandardized, the thousand-times column owns the first component almost
+# entirely: its loading is 1000x the other's, so the small one comes out near
+# 0.001. Standardized, the two columns become identical and the loading splits
+# evenly at 1/sqrt(2).
+MISMATCHED_UNITS_RAW_SMALL_LOADING_CEILING = 0.01

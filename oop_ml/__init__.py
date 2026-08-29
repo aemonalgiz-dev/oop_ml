@@ -66,6 +66,10 @@ from oop_ml.core.data.probabilities import (
     ProbabilityMatrix,
 )
 from oop_ml.core.data.row_block import RowBlock
+from oop_ml.core.decomposition.components import (
+    PrincipalComponent,
+    PrincipalComponents,
+)
 from oop_ml.core.distance.calculations import (
     BroadcastDistance,
     CanberraDistance,
@@ -144,6 +148,9 @@ from oop_ml.core.types import (
     Numeric,
     NumericInput,
     NumericValues,
+)
+from oop_ml.decomposition.principal_component_analysis import (
+    PrincipalComponentAnalysis,
 )
 from oop_ml.model_selection.cross_validation import (
     ClassificationCrossValidationResult,
@@ -302,6 +309,9 @@ __all__ = [
     "Splits",
     "CrossValidation",
     "ClassificationCrossValidationResult",
+    "PrincipalComponent",
+    "PrincipalComponentAnalysis",
+    "PrincipalComponents",
     "RegressionCrossValidationResult",
     # Errors, all of which derive from MLLibError
     "MLLibError",
