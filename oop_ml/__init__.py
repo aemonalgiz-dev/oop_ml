@@ -50,6 +50,7 @@ from oop_ml.clustering.k_means import KMeans
 from oop_ml.core.base.ensemble import AveragingEnsemble, BoostingEnsemble
 from oop_ml.core.base.estimator import (
     Classifier,
+    Clusterer,
     Estimator,
     Fittable,
     MultiClassClassifier,
@@ -108,6 +109,7 @@ from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.exceptions import (
     AllSameValuesError,
     CollinearFeaturesError,
+    DivergenceError,
     EmptyValuesError,
     InvalidValuesError,
     MLLibError,
@@ -350,8 +352,10 @@ __all__ = [
     "ClassificationCrossValidationResult",
     "Candidate",
     "CollinearFeaturesError",
+    "DivergenceError",
     "Centroid",
     "ClassificationPipeline",
+    "Clusterer",
     "Centroids",
     "Clustering",
     "InitialisationAttempt",

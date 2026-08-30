@@ -20,7 +20,12 @@ import numpy as np
 
 from examples.datasets import independent_predictors
 from examples.reporting import Report, configure_logging_from_command_line
-from oop_ml import GradientDescentRegression, MultipleLinearRegression, Standardizer
+from oop_ml import (
+    DivergenceError,
+    GradientDescentRegression,
+    MultipleLinearRegression,
+    Standardizer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,20 +57,19 @@ def main() -> None:
         )
 
     raw_descent = GradientDescentRegression(learning_rate=0.01, max_epochs=5_000)
-    with np.errstate(over="ignore", invalid="ignore"):
-        raw_descent.fit(data.input_features, data.target_feature)
-
-    report.line(f"converged : {raw_descent.converged}")
-    report.line(f"epochs    : {raw_descent.epochs_run}")
-    report.line(f"intercept : {raw_descent.intercept}")
-
-    if not np.isfinite(raw_descent.intercept):
+    try:
+        with np.errstate(over="ignore", invalid="ignore"):
+            raw_descent.fit(data.input_features, data.target_feature)
+        report.line(f"converged : {raw_descent.converged}")
+        report.line(f"epochs    : {raw_descent.epochs_run}")
+        report.line(f"intercept : {raw_descent.intercept}")
+    except DivergenceError as failure:
         report.warn(
-            "the walk diverged: it overshot on the first step and never came "
-            "back, so every coefficient is nan. Nothing about this model can be "
-            "scored -- RegressionEvaluation rejects non-finite predictions at "
-            "the boundary, so the symptom you see is a complaint about "
-            "predicted_values rather than about the learning rate."
+            f"the fit refused to finish: {failure}. The walk overshot on the "
+            "first step and never came back -- every step on these raw "
+            "columns is scaled by values in the hundreds of thousands. The "
+            "failure names its cause at the fit, rather than surfacing as "
+            "nan predictions three calls later."
         )
 
     report.heading("The same walk on standardized columns")
@@ -95,35 +99,33 @@ def main() -> None:
         model = GradientDescentRegression(
             learning_rate=learning_rate, max_epochs=20_000
         )
-        with np.errstate(over="ignore", invalid="ignore"):
-            model.fit(scaled_features, data.target_feature)
 
-        # A diverged fit cannot be scored: its predictions are nan, and
-        # RegressionEvaluation rejects non-finite values rather than quietly
-        # reporting nan as a number. So ask the model before asking for a score.
-        if np.isfinite(model.intercept):
+        # A diverged fit refuses to finish: the walk overflows to non-finite
+        # weights and the fit raises DivergenceError naming the cause, rather
+        # than handing back a model that answers nan to every question.
+        try:
+            with np.errstate(over="ignore", invalid="ignore"):
+                model.fit(scaled_features, data.target_feature)
             outcome = f"{model.score(scaled_features, data.target_feature):.6f}"
-        else:
+            converged = str(model.converged)
+            epochs = str(model.epochs_run)
+        except DivergenceError:
             outcome = "diverged"
+            converged = "False"
+            epochs = "-"
             concerns.append(
-                f"learning_rate={learning_rate:g} diverged: every step overshot "
-                f"further than the last, so the coefficients are nan"
+                f"learning_rate={learning_rate:g} diverged: every step "
+                f"overshot further than the last, and the fit refused to "
+                f"finish rather than return nan coefficients"
             )
+        else:
+            if not model.converged:
+                concerns.append(
+                    f"learning_rate={learning_rate:g} ran out of patience at "
+                    f"{model.epochs_run} epochs without converging"
+                )
 
-        if not model.converged and np.isfinite(model.intercept):
-            concerns.append(
-                f"learning_rate={learning_rate:g} ran out of patience at "
-                f"{model.epochs_run} epochs without converging"
-            )
-
-        rows.append(
-            [
-                f"{learning_rate:g}",
-                str(model.converged),
-                str(model.epochs_run),
-                outcome,
-            ]
-        )
+        rows.append([f"{learning_rate:g}", converged, epochs, outcome])
 
     report.table(["rate", "converged", "epochs", "R2"], rows)
 

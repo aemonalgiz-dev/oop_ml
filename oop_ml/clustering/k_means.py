@@ -134,8 +134,9 @@ class KMeans(Clusterer[Sequence[Feature]]):
 
     Raises
     ------
-    InvalidValuesError
-        If any count is below its minimum.
+    pydantic.ValidationError
+        If any count is below its minimum. Field bounds are pydantic's to
+        enforce, so the error is pydantic's too.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")

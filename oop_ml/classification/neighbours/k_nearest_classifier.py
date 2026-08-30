@@ -211,9 +211,15 @@ class KNearestNeighboursClassifier(
         SingleClassError
             If the target holds fewer than two classes, or leaves a gap.
         """
-        self._n_classes = self._validated_target(target_values).n_classes
+        # The count is committed only after _remember has validated and
+        # stored everything: assigning it first left a still-fitted model
+        # whose class count disagreed with its remembered targets whenever a
+        # refit failed validation partway.
+        class_count = self._validated_target(target_values).n_classes
+        fitted = self._remember(input_values, target_values)
+        self._n_classes = class_count
 
-        return self._remember(input_values, target_values)
+        return fitted
 
     def predict(self, input_values: Sequence[Feature]) -> Predictions:
         """The class most of the nearest rows belong to, as ``0.0 .. K-1``.

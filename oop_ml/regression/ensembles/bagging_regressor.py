@@ -46,6 +46,26 @@ class BaggingRegressor(AveragingEnsemble, Regressor[Sequence[Feature], Feature])
     base_model: Regressor = DecisionTreeRegressor()
 
     def _prototype(self, position: int) -> AveragingMember:
+        """The configured member, its own seed offset by position.
+
+        A member carrying a random seed -- a tree restricting features, say --
+        would otherwise be deep-copied with the identical seed into every
+        member, and all of them would replay one random stream: the same
+        degeneracy the forest's per-member offset exists to prevent, arrived
+        at through configuration instead of code.
+        """
+        member_fields = type(self.base_model).model_fields
+        member_seed = getattr(self.base_model, "random_seed", None)
+
+        if "random_seed" in member_fields and member_seed is not None:
+            configured = {
+                name: getattr(self.base_model, name) for name in member_fields
+            }
+
+            return type(self.base_model)(
+                **{**configured, "random_seed": member_seed + position}
+            )
+
         return self.base_model
 
     def _member_answer(

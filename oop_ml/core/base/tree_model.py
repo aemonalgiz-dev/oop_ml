@@ -59,7 +59,6 @@ from oop_ml.core.importance.importances import (
     FeatureContribution,
     FeatureImportances,
 )
-from oop_ml.core.tree.criterion import ClassificationCriterion
 from oop_ml.core.tree.impurity import Impurity
 from oop_ml.core.tree.node import DecisionNode, LeafNode, TreeNode
 from oop_ml.core.tree.search import (
@@ -110,9 +109,6 @@ class TreeModel(Fittable):
     min_impurity_decrease: float = Field(default=0.0, ge=0.0)
     max_features: int | None = Field(default=None, ge=1)
     random_seed: int | None = None
-    classification_criterion: ClassificationCriterion = Field(
-        default=ClassificationCriterion.GINI
-    )
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _root: TreeNode | None = PrivateAttr(default=None)
@@ -224,9 +220,18 @@ class TreeModel(Fittable):
         return "\n".join(self.root.description_lines())
 
     @property
+    @abstractmethod
     def _impurity(self) -> Impurity:
-        """The measure this task scores splits with."""
-        return self.classification_criterion.impurity
+        """The measure this task scores splits with.
+
+        Abstract, where it used to default to a classification criterion the
+        base also declared as a field. Both concrete trees override this and
+        carry their own ``criterion``, so the base's field was accepted
+        everywhere and read nowhere: DecisionTreeClassifier(
+        classification_criterion=ENTROPY) constructed cleanly and split on
+        Gini -- the plausible-wrong-value failure ``extra="forbid"`` exists
+        to stop, reintroduced by a vestigial field.
+        """
 
     @abstractmethod
     def _leaf(self, target_values: Column) -> LeafNode:
@@ -340,7 +345,15 @@ class TreeModel(Fittable):
         if distinct.size < 2:
             return np.empty(0, dtype=np.float64)
 
-        return (distinct[:-1] + distinct[1:]) / 2.0
+        midpoints = (distinct[:-1] + distinct[1:]) / 2.0
+
+        # Two adjacent float64s can average to the lower one -- round-to-even
+        # on the sum -- and a threshold equal to the lower value sends zero
+        # rows left under the strict < routing, crashing growth on valid data
+        # (0.3 and 0.1 + 0.2 are adjacent floats, so computed features hit
+        # this). The upper value is then the correct cut: strictly above the
+        # lower, and the upper routes right because < is strict.
+        return np.where(midpoints > distinct[:-1], midpoints, distinct[1:])
 
     def split_search(
         self, feature_matrix: RowBlock, target_values: Column
@@ -521,6 +534,12 @@ class TreeModel(Fittable):
                 continue
 
             threshold = (sorted_column[at] + sorted_column[at + 1]) / 2.0
+
+            # Same adjacent-float guard as _candidate_thresholds, and the two
+            # routes have to apply it identically or the agreement test on an
+            # exact tie splits them apart.
+            if threshold <= sorted_column[at]:
+                threshold = sorted_column[at + 1]
             candidate = Split(index, name, float(threshold), gain)
             if candidate.beats(best):
                 best = candidate

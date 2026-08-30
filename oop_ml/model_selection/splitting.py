@@ -104,10 +104,6 @@ class Splits:
         """How many partitions there are."""
         return len(self._splits)
 
-    @property
-    def splits(self) -> Sequence[DataSplit]:
-        return self._splits
-
     def __iter__(self) -> Iterator[DataSplit]:
         return iter(self._splits)
 

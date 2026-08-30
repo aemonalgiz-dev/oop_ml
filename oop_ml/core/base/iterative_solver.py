@@ -55,6 +55,7 @@ from pydantic import Field, PrivateAttr
 from oop_ml.core.base.linear_model import LinearModel
 from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
+from oop_ml.core.exceptions import DivergenceError
 from oop_ml.core.solving.path import SolverPath, SolverStep, SolverStop
 from oop_ml.core.types import FloatArray
 
@@ -191,7 +192,31 @@ class IterativeSolver(LinearModel):
                 stopped = SolverStop.CONVERGED
                 break
 
+        self._check_finite(weights)
+
         return SolverPath(steps, weights, stopped)
+
+    @staticmethod
+    def _check_finite(weights: FloatArray) -> None:
+        """Raise if the walk overflowed rather than converged.
+
+        Checked once at the end rather than every pass, because a diverged
+        walk cannot recover -- nan plus anything is nan -- so the final state
+        tells the whole story at a fraction of the cost. Shared by the
+        efficient and observed routes, which must agree about failures the
+        way they agree about answers.
+
+        Raises
+        ------
+        DivergenceError
+            If any weight is non-finite. The usual cause is a learning rate
+            too large for the data.
+        """
+        if not np.all(np.isfinite(weights)):
+            raise DivergenceError(
+                "the fit diverged: the weights overflowed to non-finite "
+                "values. Lower the learning rate"
+            )
 
     def _solve(self, design_matrix: DesignMatrix, target_column: Column) -> FloatArray:
         """Walk from zero until the steps stop mattering.
@@ -223,5 +248,7 @@ class IterativeSolver(LinearModel):
             if self._has_converged(step):
                 self._converged = True
                 break
+
+        self._check_finite(weights)
 
         return weights

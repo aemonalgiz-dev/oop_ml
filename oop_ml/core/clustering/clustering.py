@@ -67,6 +67,13 @@ class Clustering:
                 f"{as_array.shape}"
             )
 
+        # Before the range check and the intp cast: astype would silently
+        # truncate 1.5 to 1, reassigning the row instead of refusing it.
+        if as_array.size and np.any(as_array != np.floor(as_array)):
+            raise InvalidValuesError(
+                "labels must be whole group positions; got a fractional value"
+            )
+
         if as_array.size and (
             as_array.min() < 0 or as_array.max() >= centroids.n_clusters
         ):
