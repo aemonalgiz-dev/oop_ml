@@ -86,7 +86,7 @@ optimisation rather than a different model.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -311,6 +311,13 @@ class SupportVectorClassifier(Classifier[Sequence[Feature], Feature]):
     learning_rate: float = Field(default=0.001, gt=0.0)
     max_epochs: int = Field(default=1000, ge=1)
     tolerance: float = Field(default=1e-06, gt=0.0)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_multipliers",
+        "_signed_labels",
+        "_training_rows",
+        "_epochs_run",
+    )
 
     _multipliers: FloatArray | None = PrivateAttr(default=None)
     _signed_labels: FloatArray | None = PrivateAttr(default=None)

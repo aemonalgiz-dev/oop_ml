@@ -77,7 +77,7 @@ you. See :class:`~oop_ml.core.clustering.clustering.Clustering` for that.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import ConfigDict, Field, PrivateAttr
@@ -146,6 +146,12 @@ class KMeans(Clusterer[Sequence[Feature]]):
     max_iterations: int = Field(default=300, ge=1)
     tolerance: float = Field(default=1e-08, gt=0.0)
     random_seed: int | None = None
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_clustering",
+        "_feature_names",
+        "_iterations_run",
+    )
 
     _clustering: Clustering | None = PrivateAttr(default=None)
     _feature_names: tuple[str, ...] = PrivateAttr(default=())

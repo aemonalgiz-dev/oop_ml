@@ -27,7 +27,7 @@ share one contract without either of them having to widen its types to ``Any``.
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Generic, Self, TypeVar
+from typing import ClassVar, Generic, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, PrivateAttr
 
@@ -76,6 +76,16 @@ class Fittable(BaseModel):
     # TrainTestSplitter(testing_share=...) against a field named
     # test_fraction, and ran quietly on the wrong split.
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ()
+    """The private attributes that constitute this model's fitted self.
+
+    The persistence format contract for the class: exactly these are written
+    to a saved document and restored from one, so renaming an attribute listed
+    here is a format change. Runtime-only state -- a random generator, a
+    cache -- stays out of documents by never being listed. Empty means the
+    class is not persistable.
+    """
 
     _fitted: bool = PrivateAttr(default=False)
 

@@ -75,7 +75,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import Self
+from typing import ClassVar, Self
 
 from pydantic import ConfigDict, Field, PrivateAttr
 
@@ -133,6 +133,11 @@ class Pipeline(Fittable):
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     steps: PipelineSteps = Field(default_factory=PipelineSteps)
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_fitted_steps",
+        "_fitted_model",
+    )
 
     _fitted_steps: PipelineSteps | None = PrivateAttr(default=None)
 

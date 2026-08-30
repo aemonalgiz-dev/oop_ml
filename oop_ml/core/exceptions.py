@@ -58,6 +58,17 @@ class CollinearFeaturesError(MLLibError):
     """
 
 
+class InvalidDocumentError(MLLibError):
+    """Raised when a saved model document cannot be trusted or read.
+
+    An unknown model type, a format version this build does not speak, a
+    missing learned part, a payload of the wrong shape. Distinct from the
+    data errors because the remedy is different: bad data means fixing the
+    input, a bad document means the file is from a different build, a
+    different library, or a hand that edited it.
+    """
+
+
 class DivergenceError(MLLibError):
     """Raised when an iterative fit's weights overflow to non-finite values.
 

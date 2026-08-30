@@ -46,6 +46,7 @@ Python 3.11 or later.
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, stratified folds, cross-validation, grid search |
 | **Pipelines** | preprocessing and a model as one estimator, safe inside a fold |
+| **Persistence** | fitted models as readable JSON, revalidated on load |
 | **Decomposition** | principal component analysis, kernel PCA, explained variance |
 | **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
 | **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
@@ -174,7 +175,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1743 tests
+pytest                  # 1792 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -188,16 +189,14 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1743 passing tests**, `ruff`
+Every supervised family is implemented and green: **1792 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
 an application:
 
-1. **Persistence.** A fitted model cannot be serialised yet, so a process has
-   to fit at start-up rather than load a trained artifact.
-2. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
+1. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
    first and cutting back on what a subtree turned out to be worth.
-3. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
+2. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
    expectation-maximisation is what makes k-means make sense retroactively, as
    EM with the guesses hardened.

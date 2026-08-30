@@ -81,7 +81,7 @@ cost and leaves the second-order version as a later question.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -120,6 +120,14 @@ class MultinomialLogisticRegression(MultiClassClassifier[Sequence[Feature], Feat
     max_epochs: int = Field(default=10_000, gt=0)
     tolerance: float = Field(default=1e-8, gt=0.0)
     fit_intercept: bool = True
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_n_classes",
+        "_coefficients",
+        "_intercepts",
+        "_epochs_run",
+        "_converged",
+    )
 
     _n_classes: int | None = PrivateAttr(default=None)
     # One Coefficients per class, in class order, class 0's all zero. The names

@@ -45,7 +45,7 @@ is a model that answers differently on identical input.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import PrivateAttr
@@ -78,6 +78,11 @@ class KNearestNeighboursClassifier(
     metric:
         What "near" means. Standardise the features first.
     """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        *NeighbourModel.LEARNED_STATE,
+        "_n_classes",
+    )
 
     _n_classes: int | None = PrivateAttr(default=None)
 

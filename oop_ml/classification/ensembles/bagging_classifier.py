@@ -19,7 +19,7 @@ disagree produces a graded number where each member had only a certainty.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import PrivateAttr
@@ -59,6 +59,11 @@ class BaggingClassifier(
     """
 
     base_model: MultiClassClassifier = DecisionTreeClassifier()
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        *AveragingEnsemble.LEARNED_STATE,
+        "_n_classes",
+    )
 
     _n_classes: int | None = PrivateAttr(default=None)
 

@@ -44,7 +44,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -109,6 +109,10 @@ class TreeModel(Fittable):
     min_impurity_decrease: float = Field(default=0.0, ge=0.0)
     max_features: int | None = Field(default=None, ge=1)
     random_seed: int | None = None
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_feature_names", "_root")
+    """The generator is deliberately absent: it seeds growth and nothing
+    else, so a restored tree predicts identically without one."""
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _root: TreeNode | None = PrivateAttr(default=None)

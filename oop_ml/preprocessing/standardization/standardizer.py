@@ -74,7 +74,7 @@ rescaling, and the intercept absorbs the recentring of every column at once.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 from pydantic import PrivateAttr
 
@@ -91,6 +91,8 @@ class Standardizer(Transformer[Sequence[Feature]]):
     Learns one mean and one standard deviation per feature during ``fit``, and
     applies exactly those to every later ``transform``.
     """
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_scalings",)
 
     _scalings: FeatureScalings | None = PrivateAttr(default=None)
 

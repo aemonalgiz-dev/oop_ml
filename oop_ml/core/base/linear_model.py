@@ -32,7 +32,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Sequence
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import PrivateAttr
@@ -60,6 +60,8 @@ class LinearModel(Fittable):
     """
 
     fit_intercept: bool = True
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = ("_intercept", "_coefficients")
 
     _intercept: float | None = PrivateAttr(default=None)
     _coefficients: Coefficients | None = PrivateAttr(default=None)

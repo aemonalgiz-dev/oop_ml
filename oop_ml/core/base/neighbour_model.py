@@ -54,7 +54,7 @@ import os
 from abc import abstractmethod
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
-from typing import Self
+from typing import ClassVar, Self
 
 import numpy as np
 from pydantic import Field, PrivateAttr
@@ -102,6 +102,12 @@ class NeighbourModel(Fittable):
 
     n_neighbours: int = Field(default=5, gt=0)
     metric: DistanceMetric | Distance = DistanceMetric.EUCLIDEAN
+
+    LEARNED_STATE: ClassVar[tuple[str, ...]] = (
+        "_feature_names",
+        "_remembered_rows",
+        "_remembered_targets",
+    )
 
     _feature_names: tuple[str, ...] | None = PrivateAttr(default=None)
     _remembered_rows: RowBlock | None = PrivateAttr(default=None)
