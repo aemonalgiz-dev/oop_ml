@@ -252,7 +252,11 @@ class ClassificationLeaf(LeafNode):
         impurity: float,
     ) -> None:
         super().__init__(prediction, n_samples, impurity)
-        self._class_shares = class_shares
+        # Frozen: predict_probabilities hands this buffer out for every
+        # query reaching the leaf, so a caller's in-place write would
+        # permanently alter later answers.
+        self._class_shares = class_shares.copy()
+        self._class_shares.setflags(write=False)
 
     @property
     def class_shares(self) -> FloatArray:

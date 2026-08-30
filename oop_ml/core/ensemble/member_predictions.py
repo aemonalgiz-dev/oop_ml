@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 
 from oop_ml.core.exceptions import EmptyValuesError, InvalidValuesError
-from oop_ml.core.types import FloatArray, IndexArray
+from oop_ml.core.types import FloatArray, IndexArray, array_for_protocol
 
 
 class MemberPredictions:
@@ -115,13 +115,12 @@ class MemberPredictions:
         return self._values.dtype
 
     def __array__(self, dtype=None, copy=None) -> FloatArray:
-        """Let numpy treat this as the array it wraps.
+        """Hand numpy this wrapper, honouring the copy parameter.
 
-        The object is array-like where arithmetic is wanted and a named type
-        where meaning is wanted, so wrapping a return value costs a caller
-        nothing.
+        See :func:`~oop_ml.core.types.array_for_protocol` for the
+        contract and the corruption it exists to prevent.
         """
-        return self._values if dtype is None else self._values.astype(dtype)
+        return array_for_protocol(self._values, dtype, copy)
 
     def __getitem__(self, index) -> FloatArray:
         return self._values[index]

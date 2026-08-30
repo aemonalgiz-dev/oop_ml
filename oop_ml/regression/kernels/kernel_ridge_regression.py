@@ -302,6 +302,10 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
     def training_rows(self) -> RowBlock:
         """The rows this model kept, which prediction needs.
 
+        A copy: the internal block's buffer is exactly what ``predict``
+        kernels every query against, so handing it out live would let one
+        stray in-place write silently corrupt every later prediction.
+
         Raises
         ------
         NotFittedError
@@ -309,7 +313,9 @@ class KernelRidgeRegression(Regressor[Sequence[Feature], Feature]):
         """
         self._check_fitted()
         assert self._training_rows is not None
-        return self._training_rows
+        return rows_of(
+            self._training_rows.values.copy(), self._training_rows.feature_names
+        )
 
     @property
     def target_mean(self) -> float:
