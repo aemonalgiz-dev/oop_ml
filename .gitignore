@@ -223,3 +223,7 @@ Thumbs.db
 
 # JetBrains project files: per-developer, not part of the library
 .idea/
+
+# Nested independent repositories (their own git history and remotes)
+/website/
+/api/
