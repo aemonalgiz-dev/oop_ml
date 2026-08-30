@@ -27,6 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "numpy>=1.26",
+    "scipy>=1.11",
     "pydantic>=2.6",
 ]
 

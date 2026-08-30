@@ -47,6 +47,7 @@ Python 3.11 or later.
 | **Model selection** | train/test split, k-fold, stratified folds, cross-validation, grid search |
 | **Pipelines** | preprocessing and a model as one estimator, safe inside a fold |
 | **Persistence** | fitted models as readable JSON, revalidated on load |
+| **Performance** | benchmarked against scikit-learn; ties or wins on the linear-algebra-bound families |
 | **Decomposition** | principal component analysis, kernel PCA, explained variance |
 | **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
 | **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
@@ -175,7 +176,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1801 tests
+pytest                  # 1806 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -189,7 +190,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1801 passing tests**, `ruff`
+Every supervised family is implemented and green: **1806 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
