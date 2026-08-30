@@ -175,7 +175,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1792 tests
+pytest                  # 1801 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -189,7 +189,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1792 passing tests**, `ruff`
+Every supervised family is implemented and green: **1801 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
