@@ -44,7 +44,7 @@ Python 3.11 or later.
 | **Ensembles** | bagging, random forest, gradient boosting, out-of-bag scoring |
 | **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
-| **Model selection** | train/test split, k-fold, stratified folds, cross-validation |
+| **Model selection** | train/test split, k-fold, stratified folds, cross-validation, grid search |
 | **Decomposition** | principal component analysis, kernel PCA, explained variance |
 | **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
 | **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
@@ -173,7 +173,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1634 tests
+pytest                  # 1664 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -187,7 +187,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1634 passing tests**, `ruff`
+Every supervised family is implemented and green: **1664 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -199,8 +199,6 @@ an application:
    leak across the split, and the serving path has to re-apply it by hand.
 3. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
    first and cutting back on what a subtree turned out to be worth.
-4. **Hyperparameter search.** `CrossValidation` scores one candidate; nothing
-   searches a space of them.
-5. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
+4. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
    expectation-maximisation is what makes k-means make sense retroactively, as
    EM with the guesses hardened.

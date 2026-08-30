@@ -179,6 +179,14 @@ from oop_ml.model_selection.cross_validation import (
     RegressionCrossValidationResult,
 )
 from oop_ml.model_selection.dataset import DataSplit
+from oop_ml.model_selection.search import (
+    Candidate,
+    GridSearch,
+    ParameterRange,
+    ScoredCandidate,
+    SearchResult,
+    SearchSpace,
+)
 from oop_ml.model_selection.splitting import (
     KFold,
     RowShuffler,
@@ -333,10 +341,12 @@ __all__ = [
     "Splits",
     "CrossValidation",
     "ClassificationCrossValidationResult",
+    "Candidate",
     "Centroid",
     "Centroids",
     "Clustering",
     "InitialisationAttempt",
+    "GridSearch",
     "KMeans",
     "Kernel",
     "KernelComponent",
@@ -346,11 +356,15 @@ __all__ = [
     "KernelRidgeRegression",
     "LinearKernel",
     "PolynomialKernel",
+    "ParameterRange",
     "PrincipalComponent",
     "PrincipalComponentAnalysis",
     "PrincipalComponents",
     "RadialBasisKernel",
     "RegressionCrossValidationResult",
+    "ScoredCandidate",
+    "SearchResult",
+    "SearchSpace",
     "SigmoidKernel",
     "SupportVector",
     "SupportVectorClassifier",
