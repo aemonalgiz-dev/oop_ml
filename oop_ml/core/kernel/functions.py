@@ -253,7 +253,7 @@ class RadialBasisKernel(Kernel):
         left_squares = np.sum(left.values * left.values, axis=1)[:, None]
         right_squares = np.sum(right.values * right.values, axis=1)[None, :]
         squared_gaps = (
-            left_squares - 2.0 * (left.values @ right.values.T) + (right_squares)
+            left_squares - 2.0 * (left.values @ right.values.T) + right_squares
         )
 
         return np.exp(-self.gamma * np.maximum(squared_gaps, 0.0))

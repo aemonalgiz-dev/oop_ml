@@ -201,6 +201,15 @@ class Candidate:
         caller's, it is reused for every candidate, and a search that left it
         modified would make the result depend on the order the grid ran in.
 
+        The unset fields are read with ``getattr`` rather than taken from
+        ``model_dump()``, and that is not a preference. ``model_dump``
+        *recurses*: a field holding another pydantic model comes back as a
+        plain dict, and rebuilding from it then tries to instantiate the
+        field's declared type -- which for ``KernelRidgeRegression.kernel`` is
+        the abstract ``Kernel``, and for ``RegressionPipeline.model`` is the
+        abstract ``Regressor``. Both raise. ``getattr`` hands back the
+        configured object itself, which is what the constructor wants.
+
         Raises
         ------
         ValidationError
@@ -208,7 +217,11 @@ class Candidate:
             a zero neighbour count. That rule belongs to the model and is left
             there rather than duplicated into the search.
         """
-        return type(prototype)(**{**prototype.model_dump(), **self._assignments})
+        configured = {
+            name: getattr(prototype, name) for name in type(prototype).model_fields
+        }
+
+        return type(prototype)(**{**configured, **self._assignments})
 
     def __repr__(self) -> str:
         described = ", ".join(

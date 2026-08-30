@@ -45,6 +45,7 @@ Python 3.11 or later.
 | **Interpretation** | feature importance, by impurity and by permutation |
 | **Preprocessing** | standardization, polynomial features |
 | **Model selection** | train/test split, k-fold, stratified folds, cross-validation, grid search |
+| **Pipelines** | preprocessing and a model as one estimator, safe inside a fold |
 | **Decomposition** | principal component analysis, kernel PCA, explained variance |
 | **Clustering** | k-means with k-means++ seeding, inertia, named centroids |
 | **Kernels** | linear, polynomial, radial basis, sigmoid; kernel ridge, SVM |
@@ -173,7 +174,7 @@ number that has not been spent on anything else.
 ## Development
 
 ```bash
-pytest                  # 1664 tests
+pytest                  # 1696 tests
 ruff check .
 ruff format .
 pyright oop_ml test
@@ -187,7 +188,7 @@ pyright oop_ml test
 
 ## Status
 
-Every supervised family is implemented and green: **1664 passing tests**, `ruff`
+Every supervised family is implemented and green: **1696 passing tests**, `ruff`
 and `pyright` clean, no stubs.
 
 Not built yet, roughly in the order it will matter if you are putting this into
@@ -195,10 +196,8 @@ an application:
 
 1. **Persistence.** A fitted model cannot be serialised yet, so a process has
    to fit at start-up rather than load a trained artifact.
-2. **`Pipeline`.** A transformer fitted outside a cross-validation loop can
-   leak across the split, and the serving path has to re-apply it by hand.
-3. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
+2. **Tree pruning.** Growth stops on rules chosen up front, rather than growing
    first and cutting back on what a subtree turned out to be worth.
-4. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
+3. **More unsupervised models.** k-means is in and Gaussian mixtures are not;
    expectation-maximisation is what makes k-means make sense retroactively, as
    EM with the guesses hardened.

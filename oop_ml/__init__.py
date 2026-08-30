@@ -193,6 +193,12 @@ from oop_ml.model_selection.splitting import (
     Splits,
     TrainTestSplitter,
 )
+from oop_ml.pipeline.pipelines import (
+    ClassificationPipeline,
+    Pipeline,
+    RegressionPipeline,
+)
+from oop_ml.pipeline.steps import PipelineStep, PipelineSteps
 from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
 from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
@@ -343,6 +349,7 @@ __all__ = [
     "ClassificationCrossValidationResult",
     "Candidate",
     "Centroid",
+    "ClassificationPipeline",
     "Centroids",
     "Clustering",
     "InitialisationAttempt",
@@ -357,11 +364,15 @@ __all__ = [
     "LinearKernel",
     "PolynomialKernel",
     "ParameterRange",
+    "Pipeline",
+    "PipelineStep",
+    "PipelineSteps",
     "PrincipalComponent",
     "PrincipalComponentAnalysis",
     "PrincipalComponents",
     "RadialBasisKernel",
     "RegressionCrossValidationResult",
+    "RegressionPipeline",
     "ScoredCandidate",
     "SearchResult",
     "SearchSpace",
