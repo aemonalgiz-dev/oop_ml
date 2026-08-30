@@ -48,7 +48,7 @@ from collections.abc import Sequence
 from typing import Self
 
 import numpy as np
-from pydantic import PrivateAttr
+from pydantic import Field, PrivateAttr
 
 from oop_ml.core.base.estimator import MultiClassClassifier
 from oop_ml.core.base.tree_model import TreeModel
@@ -81,9 +81,21 @@ class DecisionTreeClassifier(
         The stopping rules, inherited from
         :class:`~oop_ml.core.base.tree_model.TreeModel`. Left at their defaults
         the tree grows until every leaf is pure, which is memorisation.
+    n_known_classes:
+        How many classes the problem has, stated by the caller, **and stating
+        it changes what the target is allowed to hold** -- the same rule
+        :class:`~oop_ml.core.evaluation.multiclass.MultiClassEvaluation` has
+        for the same reason. Left as ``None`` the width is inferred, so the
+        classes must run densely from zero. Stated, the target need only hold
+        whole positions inside the width: a class may be missing, and even a
+        single-class target fits, as a lone leaf. That is the case a bagged
+        ensemble's member is in -- a bootstrap resample of imbalanced data
+        misses a rare class routinely, and the ensemble states the width so
+        every member answers with probability rows of the same shape.
     """
 
     criterion: ClassificationCriterion = ClassificationCriterion.GINI
+    n_known_classes: int | None = Field(default=None, ge=2)
 
     _n_classes: int | None = PrivateAttr(default=None)
 
@@ -116,10 +128,19 @@ class DecisionTreeClassifier(
         NonBinaryLabelsError
             If the target holds a negative or fractional value.
         SingleClassError
-            If fewer than two classes are present, or they leave a gap.
+            If the width is being inferred and fewer than two classes are
+            present or they leave a gap. With ``n_known_classes`` stated the
+            dense run is not required -- see the field's docstring.
+        InvalidValuesError
+            If ``n_known_classes`` is stated and the target names a class at
+            or beyond it.
         """
         target_column = super()._validated_target(target_values)
-        target_column.check_is_label_encoded()
+
+        if self.n_known_classes is None:
+            target_column.check_is_label_encoded()
+        else:
+            target_column.check_are_class_positions(self.n_known_classes)
 
         return target_column
 
@@ -202,12 +223,23 @@ class DecisionTreeClassifier(
         NonBinaryLabelsError
             If the target holds a negative or fractional value.
         SingleClassError
-            If the target holds fewer than two classes, or leaves a gap.
+            If the width is inferred and the target holds fewer than two
+            classes or leaves a gap.
+        InvalidValuesError
+            If ``n_known_classes`` is stated and the target names a class at
+            or beyond it.
         """
         # Before _fit_tree, because _leaf reads n_classes on the way down and
         # a leaf built during growth would otherwise size its shares off a
-        # model that does not yet know how wide they should be.
-        self._n_classes = self._validated_target(target_values).n_classes
+        # model that does not yet know how wide they should be. The stated
+        # width wins over the inferred one: a resample missing the top class
+        # would otherwise infer too narrow and stack against nothing.
+        target_column = self._validated_target(target_values)
+        self._n_classes = (
+            target_column.n_classes
+            if self.n_known_classes is None
+            else self.n_known_classes
+        )
 
         return self._fit_tree(input_values, target_values)
 

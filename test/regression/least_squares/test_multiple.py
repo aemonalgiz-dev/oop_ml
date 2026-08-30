@@ -209,3 +209,24 @@ class TestScoring:
         )
 
         assert getattr(evaluation, metric) == pytest.approx(expected)
+
+
+class TestDuplicateFeatureNames:
+    """A duplicated column must be refused, not silently summed twice.
+
+    The name guard used to compare sets, so predict([area, area]) passed it
+    and the linear predictor added area's contribution once per copy --
+    doubling that coefficient's effect with no error anywhere. The wrong
+    answer is a plausible number, which is the failure class this library
+    documents as the dangerous one.
+    """
+
+    def test_predicting_with_a_duplicated_feature_raises(self) -> None:
+        model = MultipleLinearRegression().fit(
+            EXACT_PLANE.input_features, EXACT_PLANE.target_feature
+        )
+        first = EXACT_PLANE.input_features[0]
+        doubled = [first, *EXACT_PLANE.input_features]
+
+        with pytest.raises(NonUniqueFeaturesError):
+            model.predict(doubled)

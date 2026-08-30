@@ -24,6 +24,7 @@ from oop_ml.classification.multiclass.multinomial_logistic_regression import (
     MultinomialLogisticRegression,
 )
 from oop_ml.classification.multiclass.one_vs_rest import OneVsRestClassifier
+from oop_ml.core.data.column import Column
 from oop_ml.core.data.design_matrix import DesignMatrix
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
@@ -36,6 +37,7 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     SingleClassError,
 )
+from oop_ml.core.validation import ValueRole
 from test.fixtures import (
     OVERLAPPING_LABELS,
     THREE_CLASSES,
@@ -534,3 +536,33 @@ class TestOneVsRest:
                 [Feature("first", [1.0, 2.0, 3.0, 4.0])],
                 Feature("outcome", [1, 1, 1, 1]),
             )
+
+
+class TestSolverPathUnfitted:
+    """The observed route runs the guard, not a bare assert.
+
+    The same trap this library has now recorded six times: an assert on
+    private fitted state placed before ``_check_fitted`` turns an unfitted
+    call into a message-less ``AssertionError`` instead of a
+    ``NotFittedError``.
+    """
+
+    def test_solver_path_before_fit_raises_not_fitted(self) -> None:
+        with pytest.raises(NotFittedError):
+            MultinomialLogisticRegression().solver_path(
+                design_matrix_of(THREE_CLASSES),
+                Column.of(THREE_CLASSES.target_feature, ValueRole.TARGET_VALUES),
+            )
+
+
+class TestDuplicateFeatureNames:
+    """The multiclass guard deduplicated through a dict and noticed nothing."""
+
+    def test_predicting_with_a_duplicated_feature_raises(self) -> None:
+        model = MultinomialLogisticRegression(max_epochs=500).fit(
+            THREE_CLASSES.input_features, THREE_CLASSES.target_feature
+        )
+        first = THREE_CLASSES.input_features[0]
+
+        with pytest.raises(NonUniqueFeaturesError):
+            model.predict([first, *THREE_CLASSES.input_features])

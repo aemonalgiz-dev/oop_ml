@@ -76,6 +76,36 @@ class BaggingClassifier(
         return self._n_classes
 
     def _prototype(self, position: int) -> AveragingMember:
+        """The configured member, told the class width when it can be told.
+
+        A bootstrap resample of imbalanced data misses a rare class routinely,
+        and a member left to infer its own width from its resample either
+        rejects the gap or answers with a probability matrix narrower than its
+        siblings' -- a fitted ensemble whose predict then cannot stack. The
+        ensemble read the width from the full target before any member fits,
+        so it states it here.
+
+        Matched by field rather than by type: any member whose class declares
+        ``n_known_classes`` is rebuilt through its own constructor with the
+        width filled in, which keeps the ensemble ignorant of which member
+        types exist. A member type without the field is fitted exactly as
+        configured and remains subject to resample luck -- there is no way to
+        tell it something it cannot be told.
+        """
+        member_fields = type(self.base_model).model_fields
+
+        if (
+            "n_known_classes" in member_fields
+            and getattr(self.base_model, "n_known_classes", None) is None  # noqa: B009
+        ):
+            configured = {
+                name: getattr(self.base_model, name) for name in member_fields
+            }
+
+            return type(self.base_model)(
+                **{**configured, "n_known_classes": self._n_classes}
+            )
+
         return self.base_model
 
     def _validated_target(self, target_values: Feature) -> Column:
@@ -155,10 +185,13 @@ class BaggingClassifier(
     def fit(self, input_values: Sequence[Feature], target_values: Feature) -> Self:
         """Fit every member on its own resample, recording the class count.
 
-        The count is read before the members are fitted, for the same reason
-        ``DecisionTreeClassifier.fit`` reads it first: a member fitted on a
-        resample can easily miss a rare class, and its probability matrix would
-        then be narrower than the others and refuse to stack.
+        The count is read before the members are fitted **and handed to each
+        member through** ``_prototype``: a member fitted on a resample can
+        easily miss a rare class, and left to infer its own width it would
+        either reject the gap or answer with a probability matrix narrower
+        than its siblings' and refuse to stack. An earlier version read the
+        count and never passed it on, which is a fit that succeeds and a
+        predict that crashes -- on ordinary imbalanced data, not an edge case.
 
         Raises
         ------

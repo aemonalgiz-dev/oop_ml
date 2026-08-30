@@ -153,6 +153,39 @@ def check_is_label_encoded(values: FloatArray, role: ValueRole) -> None:
         )
 
 
+def check_are_class_positions(
+    values: FloatArray, n_classes: int, role: ValueRole
+) -> None:
+    """Raise unless every value is a whole class position inside a stated width.
+
+    The looser sibling of :func:`check_is_label_encoded`, for the callers that
+    already know how many classes the problem has. The dense-run rule exists to
+    make an *inferred* width trustworthy; once the width is stated, whole
+    positions inside it is the whole requirement -- a bootstrap resample or a
+    held-out fold missing a class is ordinary, not suspect. Even a single
+    class is allowed: a resample can come out that way, and a tree fitted to
+    it is a lone leaf rather than an error.
+
+    Raises
+    ------
+    NonBinaryLabelsError
+        If a value is negative or is not a whole number.
+    InvalidValuesError
+        If a value names a class at or beyond ``n_classes``.
+    """
+    if values.size and (np.any(values < 0.0) or np.any(values != np.floor(values))):
+        raise NonBinaryLabelsError(
+            f"{role} must hold whole class positions starting at 0, "
+            f"and holds at least one value that is negative or fractional"
+        )
+
+    if values.size and values.max() >= n_classes:
+        raise InvalidValuesError(
+            f"{role} names class {int(values.max())}, which is outside a "
+            f"problem with {n_classes} classes"
+        )
+
+
 def check_has_both_classes(values: FloatArray, role: ValueRole) -> None:
     """Raise unless both 0 and 1 appear at least once.
 

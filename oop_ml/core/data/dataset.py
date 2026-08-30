@@ -27,7 +27,8 @@ import numpy as np
 
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
-from oop_ml.core.types import IndexArray
+from oop_ml.core.exceptions import InvalidValuesError
+from oop_ml.core.types import IndexArray, MaskArray
 
 
 class Dataset:
@@ -86,14 +87,49 @@ class Dataset:
         """Number of predictor columns."""
         return len(self._input_features)
 
-    def select_rows(self, row_indices: IndexArray | Sequence[int]) -> Dataset:
+    def select_rows(
+        self, row_indices: IndexArray | MaskArray | Sequence[int]
+    ) -> Dataset:
         """A new dataset holding only the rows at ``row_indices``, in that order.
 
         Every column is subset identically, which is what keeps the predictors
         and the target aligned through a split. Names are preserved, so a model
         fitted on one subset can predict on another.
+
+        A boolean mask selects the rows where it is True, the same reading
+        RowBlock.select_rows has. That case has to be caught before the
+        integer cast: casting a mask to integer indices silently turns True
+        and False into the indices 1 and 0, which returns the wrong subset,
+        aligned and error-free -- the plausible-number failure this library
+        documents as the dangerous one.
+
+        Raises
+        ------
+        InvalidValuesError
+            If a mask's length is not the row count, or an index falls outside
+            ``-n_samples .. n_samples - 1`` (Python's negative indexing is
+            honoured).
         """
-        indices = np.asarray(row_indices, dtype=np.intp)
+        as_supplied = np.asarray(row_indices)
+
+        if as_supplied.dtype == np.bool_:
+            if as_supplied.size != self.n_samples:
+                raise InvalidValuesError(
+                    f"a row mask must cover every row: got {as_supplied.size} "
+                    f"entries for {self.n_samples} rows"
+                )
+            indices = np.flatnonzero(as_supplied)
+        else:
+            indices = np.asarray(as_supplied, dtype=np.intp)
+
+            if indices.size and (
+                indices.min() < -self.n_samples or indices.max() >= self.n_samples
+            ):
+                raise InvalidValuesError(
+                    f"row indices must fall in -{self.n_samples} .. "
+                    f"{self.n_samples - 1}; got "
+                    f"{int(indices.min())} .. {int(indices.max())}"
+                )
 
         return Dataset(
             [

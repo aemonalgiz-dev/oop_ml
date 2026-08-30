@@ -7,6 +7,7 @@ from oop_ml.core.data.dataset import Dataset
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import (
     EmptyValuesError,
+    InvalidValuesError,
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
 )
@@ -118,3 +119,40 @@ class TestDataSplit:
 
     def test_reports_the_total(self):
         assert self.make_split().n_samples == 5
+
+
+class TestSelectingRows:
+    """Masks are honoured and bad indices are refused, both loudly."""
+
+    def small(self) -> Dataset:
+        return Dataset(
+            [Feature("first", [10.0, 20.0, 30.0])],
+            Feature("outcome", [1.0, 2.0, 3.0]),
+        )
+
+    def test_a_boolean_mask_selects_the_masked_rows(self) -> None:
+        """The sibling RowBlock.select_rows honours masks; this must too.
+
+        np.asarray(mask, dtype=intp) silently casts True/False to 1/0, so the
+        first version returned rows [0, 1, 1] for the mask [False, True, True]
+        -- the wrong training subset, aligned and plausible, with no error
+        anywhere. The wrong value being a plausible one is this library's
+        documented worst failure class.
+        """
+        selected = self.small().select_rows(np.array([False, True, True]))
+
+        assert list(selected.target_feature.values) == [2.0, 3.0]
+
+    def test_a_mask_of_the_wrong_length_is_refused(self) -> None:
+        with pytest.raises(InvalidValuesError):
+            self.small().select_rows(np.array([True, False]))
+
+    def test_an_out_of_range_index_is_refused_with_a_typed_error(self) -> None:
+        """Used to escape as a bare numpy IndexError from inside Feature."""
+        with pytest.raises(InvalidValuesError):
+            self.small().select_rows([5])
+
+    def test_python_style_negative_indices_still_work(self) -> None:
+        selected = self.small().select_rows([-1, 0])
+
+        assert list(selected.target_feature.values) == [3.0, 1.0]

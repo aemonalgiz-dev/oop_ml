@@ -254,8 +254,17 @@ class PolynomialFeatures(Transformer[Sequence[Feature]]):
             If called before ``fit``.
         InvalidValuesError
             If a feature the expansion needs was not supplied.
+        NonEqualArrayLengthError
+            If the supplied features disagree in length.
+        NonUniqueFeaturesError
+            If two supplied features share a name.
         """
         self._check_fitted()
+        # FeatureSet is the alignment guard fit already uses: equal lengths
+        # and unique names, checked before any term multiplies two columns.
+        # Without it, unequal columns escaped as a bare numpy broadcast
+        # ValueError from inside a product.
+        FeatureSet(list(input_values))
         self._check_names_were_learned(input_values)
 
         return self.terms.expand(input_values)

@@ -26,7 +26,9 @@ answering the wrong question.
 import numpy as np
 import pytest
 
+from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
+from oop_ml.core.data.row_block import rows_of
 from oop_ml.core.exceptions import (
     EmptyValuesError,
     InvalidValuesError,
@@ -36,6 +38,7 @@ from oop_ml.core.exceptions import (
 )
 from oop_ml.core.tree.criterion import RegressionCriterion
 from oop_ml.core.tree.node import DecisionNode, LeafNode
+from oop_ml.core.validation import ValueRole
 from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import (
     STEP_FUNCTION,
@@ -91,6 +94,10 @@ class TestNotFitted:
             lambda model: model.depth,
             lambda model: model.n_leaves,
             lambda model: model.describe(),
+            lambda model: model.split_search(
+                rows_of(np.array([[1.0], [2.0], [3.0]]), ("position",)),
+                Column.of([1.0, 2.0, 3.0], ValueRole.TARGET_VALUES),
+            ),
         ],
     )
     def test_it_raises_before_fit(self, call):

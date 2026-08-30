@@ -24,6 +24,9 @@ import numpy as np
 import pytest
 
 from oop_ml.classification.ensembles.bagging_classifier import BaggingClassifier
+from oop_ml.classification.ensembles.random_forest_classifier import (
+    RandomForestClassifier,
+)
 from oop_ml.classification.trees.decision_tree_classifier import (
     DecisionTreeClassifier,
 )
@@ -243,3 +246,73 @@ class TestInvalidInput:
     ) -> None:
         with pytest.raises(InvalidValuesError):
             fitted.predict(DOMINATED_SIGNAL.held_out_features[:2])
+
+
+class TestRareClasses:
+    """A resample that misses a class must not break the ensemble.
+
+    A bootstrap draws n rows with replacement, so a class holding two of
+    thirty rows is absent from a given resample about 87% of the time --
+    ordinary imbalanced data, not an edge case. The first version recorded the
+    ensemble's class count and never handed it to the members, so each tree
+    re-inferred its own width from its own resample: a missing top class gave
+    a fitted ensemble whose predict crashed with a bare numpy ValueError, and
+    a missing middle class made fit itself reject valid three-class data with
+    SingleClassError.
+    """
+
+    def rare_top_class(self) -> tuple[list[Feature], Feature]:
+        generator = np.random.default_rng(11)
+        classes = np.array([0.0] * 14 + [1.0] * 14 + [2.0] * 2)
+
+        return (
+            [
+                Feature("first", generator.normal(size=30) + classes),
+                Feature("second", generator.normal(size=30) - classes),
+            ],
+            Feature("outcome", classes),
+        )
+
+    def rare_middle_class(self) -> tuple[list[Feature], Feature]:
+        generator = np.random.default_rng(12)
+        classes = np.array([0.0] * 14 + [1.0] * 2 + [2.0] * 14)
+
+        return (
+            [
+                Feature("first", generator.normal(size=30) + classes),
+                Feature("second", generator.normal(size=30) - classes),
+            ],
+            Feature("outcome", classes),
+        )
+
+    def test_a_missing_top_class_still_stacks(self) -> None:
+        """Every member answers with the full width, present or not."""
+        features, target = self.rare_top_class()
+        model = BaggingClassifier(n_members=20, random_seed=1).fit(features, target)
+
+        probabilities = model.predict_probabilities(features)
+
+        assert np.asarray(probabilities).shape == (30, 3)
+        assert len(np.asarray(model.predict(features))) == 30
+
+    def test_a_missing_middle_class_still_fits(self) -> None:
+        """A gap in a resample is a fact about the draw, not about the data."""
+        features, target = self.rare_middle_class()
+        model = BaggingClassifier(n_members=20, random_seed=1).fit(features, target)
+
+        assert model.n_classes == 3
+
+    def test_the_forest_inherits_the_width(self) -> None:
+        features, target = self.rare_top_class()
+        model = RandomForestClassifier(n_members=20, max_features=1, random_seed=1).fit(
+            features, target
+        )
+
+        assert np.asarray(model.predict_probabilities(features)).shape == (30, 3)
+
+    def test_out_of_bag_scoring_survives_the_rare_class(self) -> None:
+        """The other public path the narrow members used to crash."""
+        features, target = self.rare_top_class()
+        model = BaggingClassifier(n_members=20, random_seed=1).fit(features, target)
+
+        assert 0.0 <= model.out_of_bag_score() <= 1.0

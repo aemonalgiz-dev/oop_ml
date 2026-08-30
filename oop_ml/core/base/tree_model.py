@@ -54,6 +54,7 @@ from oop_ml.core.data.column import Column
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.data.feature_set import FeatureSet
 from oop_ml.core.data.row_block import RowBlock, rows_of
+from oop_ml.core.exceptions import NotFittedError
 from oop_ml.core.importance.importances import (
     FeatureContribution,
     FeatureImportances,
@@ -368,8 +369,22 @@ class TreeModel(Fittable):
         SplitSearch
             Iterable over every candidate. ``search.best`` is the same answer
             :meth:`_best_split` returns, and a test asserts that.
+
+        Raises
+        ------
+        NotFittedError
+            If called before ``fit``. Guarded on the recorded feature names
+            rather than the fitted flag, deliberately: the search itself needs
+            only the names, and the agreement tests drive single nodes through
+            it on models that never grew a tree. A public caller reaches this
+            only unfitted, and used to be answered with a message-less
+            ``AssertionError``.
         """
-        assert self._feature_names is not None
+        if self._feature_names is None:
+            raise NotFittedError(
+                "split_search needs the feature names a fit records; "
+                "fit the model first"
+            )
 
         role = target_values.role
         candidates: list[SplitCandidate] = []
