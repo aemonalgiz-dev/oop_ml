@@ -46,6 +46,18 @@ class NonBinaryLabelsError(MLLibError):
     """Raised when a binary classifier is handed a target that is not 0 or 1."""
 
 
+class CollinearFeaturesError(MLLibError):
+    """Raised when the features are linear combinations of each other.
+
+    A column that is (nearly) a sum or multiple of other columns makes
+    ``X.T X`` singular, so the normal equations have no unique solution --
+    infinitely many coefficient vectors fit equally well, and no solver can
+    choose among them. Given a name of its own so that it routes with the rest
+    of the hierarchy rather than escaping as a bare ``numpy.linalg.LinAlgError``,
+    which for years was the one reachable failure outside it.
+    """
+
+
 class SingularHessianError(MLLibError):
     """Raised when a second-order solver's Hessian has no unique solution.
 

@@ -282,6 +282,26 @@ class TestSearching:
             result.best.candidate.value_for("penalty")
         )
 
+    def test_identical_candidates_score_identically_even_unseeded(self) -> None:
+        """Every candidate must be scored on the same fold arrangement.
+
+        ``KFold`` defaults to ``shuffle=True`` with no seed, and an unseeded
+        shuffle deals fresh folds on every ``.split()`` call -- so without a
+        guard, each candidate is scored on different folds and the comparison
+        includes pure fold noise. Two copies of the same configuration are the
+        detector: on identical folds they tie exactly, on redrawn folds they
+        differ with near-certainty.
+        """
+        result = GridSearch().search(
+            KNearestNeighboursRegressor(),
+            SearchSpace.over(KNearestNeighboursRegressor, n_neighbours=[3, 3]),
+            noisy_line(),
+        )
+
+        scores = [one.score for one in result]
+
+        assert scores[0] == scores[1]
+
     def test_a_space_for_another_model_is_refused(self) -> None:
         """Caught before the search runs, not hundreds of fits into it."""
         with pytest.raises(InvalidValuesError):
@@ -333,10 +353,39 @@ class TestSelectionOptimism:
         result = searched()
         holdout = noisy_line(n_rows=40, seed=999)
 
-        honest = result.honest_score_on(RidgeRegression(), holdout)
+        honest = result.honest_score_on(RidgeRegression(), noisy_line(), holdout)
 
         assert isinstance(honest, float)
         assert honest != pytest.approx(result.best_score)
+
+    def test_the_honest_score_cannot_be_a_training_score(self) -> None:
+        """It must be fit on the training rows and scored on the held-out ones.
+
+        The first version of this method fit the winner on the holdout and
+        scored the same rows -- a training score wearing the name honest.
+
+        The probe is a search whose only candidate is k=1, because that is
+        where the two behaviours separate structurally rather than
+        statistically. Fit-and-score-on-the-same-rows at k=1 returns exactly
+        1.0 -- every row's nearest neighbour is itself -- while the honest
+        procedure, fit on the search data and scored on fresh noise, lands
+        near zero. At larger k the same-rows flattering shrinks to roughly
+        1/k and drowns in forty-row sampling noise, which is why the sharp
+        version of this test is the small-k one.
+        """
+        search_data = pure_noise(seed=7)
+        holdout = pure_noise(n_rows=40, seed=999)
+        result = GridSearch(folds=KFold(n_folds=5, random_seed=3)).search(
+            KNearestNeighboursRegressor(),
+            SearchSpace.over(KNearestNeighboursRegressor, n_neighbours=[1]),
+            search_data,
+        )
+
+        honest = result.honest_score_on(
+            KNearestNeighboursRegressor(), search_data, holdout
+        )
+
+        assert honest < 0.9
 
 
 class TestSearchingAClassifier:

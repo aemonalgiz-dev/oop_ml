@@ -75,6 +75,7 @@ from collections.abc import Callable, Iterator, Sequence
 from itertools import product
 from typing import Any
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from oop_ml.core.base.estimator import MultiClassClassifier, Regressor
@@ -480,26 +481,36 @@ class SearchResult:
     def honest_score_on(
         self,
         prototype: Regressor[Sequence[Feature], Feature],
+        training: Dataset,
         holdout: Dataset,
     ) -> float:
-        """Refit the winner on nothing, and score it on rows the search never saw.
+        """Refit the winner on ``training``, score it on rows the search never saw.
 
         The number to quote. :attr:`best_score` was chosen *because* it was the
         largest, so it carries the selection's optimism; this one was not used
         to choose anything, so it does not.
 
-        ``holdout`` must be data the search never touched -- held out before
-        the search began, not carved off afterwards. Passing the rows the
-        search cross-validated over gives a number with the same problem and no
-        warning attached.
+        The two datasets play different roles and the roles must not be
+        swapped. ``training`` is what the winner is refitted on -- usually the
+        very data the search cross-validated over, which is fine, since
+        refitting the chosen configuration on all of it is the standard move.
+        ``holdout`` is what the score is read on, and it must be data the
+        search never touched: held out before the search began, not carved off
+        afterwards.
+
+        The first version of this method fit the winner on the holdout and
+        scored the same rows -- a training score wearing the name honest.
+        Measured on pure noise, where nothing can genuinely beat zero, it
+        reported +0.19 while the selection score itself said -0.38, which made
+        the method named honest the most flattering number on the object.
 
         Raises
         ------
         EmptyValuesError, NonEqualArrayLengthError
-            From the underlying fit, if ``holdout`` is malformed.
+            From the underlying fit, if either dataset is malformed.
         """
         model = self.best_model(prototype)
-        model.fit(holdout.input_features, holdout.target_feature)
+        model.fit(training.input_features, training.target_feature)
 
         return model.score(holdout.input_features, holdout.target_feature)
 
@@ -522,10 +533,11 @@ class GridSearch(BaseModel):
     Parameters
     ----------
     folds:
-        The splitter each candidate is scored with. The *same* splitter for
-        every candidate, which matters: comparing a score from one fold
+        The splitter each candidate is scored with. Every candidate must be
+        scored on the *same fold arrangement*: comparing a score from one
         arrangement against a score from another compares the arrangements as
-        much as the candidates.
+        much as the candidates. Passing the same ``KFold`` object is not
+        enough to guarantee that -- see :meth:`_comparable_folds`.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
@@ -549,6 +561,7 @@ class GridSearch(BaseModel):
             If the dataset has fewer rows than folds.
         """
         self._check_space_matches(prototype, space)
+        validator = CrossValidation(folds=self._comparable_folds())
 
         return SearchResult(
             self._scored_candidates(
@@ -556,7 +569,7 @@ class GridSearch(BaseModel):
                 space,
                 dataset,
                 lambda result: result.mean_r2_score,
-                CrossValidation(folds=self.folds).evaluate,
+                validator.evaluate,
             )
         )
 
@@ -582,6 +595,7 @@ class GridSearch(BaseModel):
             ``prototype``.
         """
         self._check_space_matches(prototype, space)
+        validator = CrossValidation(folds=self._comparable_folds())
 
         return SearchResult(
             self._scored_candidates(
@@ -589,7 +603,7 @@ class GridSearch(BaseModel):
                 space,
                 dataset,
                 lambda result: result.pooled_accuracy,
-                CrossValidation(folds=self.folds).evaluate_classifier,
+                validator.evaluate_classifier,
             )
         )
 
@@ -646,6 +660,30 @@ class GridSearch(BaseModel):
             )
             for candidate in space.candidates()
         ]
+
+    def _comparable_folds(self) -> KFold:
+        """The folds every candidate is actually scored with.
+
+        ``KFold`` defaults to ``shuffle=True`` with no seed, and an unseeded
+        shuffle deals a *fresh* arrangement on every ``.split()`` call. The
+        splitter object being shared is therefore not enough: each candidate's
+        cross-validation would run on different folds, and the comparison
+        between candidates would include pure fold noise -- which is exactly
+        what the ``folds`` docstring says must not happen.
+
+        So when the splitter is unseeded and shuffling, one seed is drawn here,
+        once per search, and pinned for every candidate. Run-to-run randomness
+        is preserved -- two searches still fold differently -- while within one
+        search every candidate sees the same arrangement. A seeded or
+        unshuffled splitter is already deterministic and passes through
+        untouched.
+        """
+        if self.folds.random_seed is not None or not self.folds.shuffle:
+            return self.folds
+
+        drawn = int(np.random.default_rng().integers(2**31 - 1))
+
+        return KFold(**{**self.folds.model_dump(), "random_seed": drawn})
 
     @staticmethod
     def _check_space_matches(prototype: Any, space: SearchSpace) -> None:
