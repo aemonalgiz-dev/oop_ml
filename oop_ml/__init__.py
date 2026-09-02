@@ -18,6 +18,15 @@ whenever you want to be explicit about where something lives, or when you need a
 name that this surface does not re-export.
 """
 
+from oop_ml.associative_memory.hopfield_network import (
+    BipolarPattern,
+    HebbianWeights,
+    HopfieldNetwork,
+    RecallPass,
+    RecallStop,
+    RecallWalk,
+    UpdateRule,
+)
 from oop_ml.classification.binary.logistic_regression import LogisticRegression
 from oop_ml.classification.binary.newton_logistic_regression import (
     NewtonLogisticRegression,
@@ -478,6 +487,13 @@ __all__ = [
     "ConstantSchedule",
     "LinearDecaySchedule",
     "ExponentialDecaySchedule",
+    "HopfieldNetwork",
+    "BipolarPattern",
+    "HebbianWeights",
+    "RecallPass",
+    "RecallWalk",
+    "RecallStop",
+    "UpdateRule",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
