@@ -146,6 +146,7 @@ from oop_ml.core.network.activation import (
     Sigmoid,
 )
 from oop_ml.core.network.convolution import Conv2d
+from oop_ml.core.network.dropout import Dropout, DropoutResponse
 from oop_ml.core.network.flatten import Flatten
 from oop_ml.core.network.gradient import BackwardPass, LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import DenseLayer, Layer, LayerResponse
@@ -159,6 +160,11 @@ from oop_ml.core.network.loss import (
     SquaredError,
 )
 from oop_ml.core.network.neuron import Neuron, NeuronResponse
+from oop_ml.core.network.normalisation import (
+    BatchNormalization,
+    BatchStatistics,
+    NormalisationResponse,
+)
 from oop_ml.core.network.pooling import AveragePool2d, MaxPool2d, Pool2d
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
@@ -443,6 +449,11 @@ __all__ = [
     "MaxPool2d",
     "AveragePool2d",
     "PassPurpose",
+    "Dropout",
+    "DropoutResponse",
+    "BatchNormalization",
+    "BatchStatistics",
+    "NormalisationResponse",
     "AbsoluteError",
     "BackwardPass",
     "BinaryCrossEntropy",
