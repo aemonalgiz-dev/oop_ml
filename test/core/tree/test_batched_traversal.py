@@ -10,7 +10,7 @@ pair in this library carries an agreement test.
 import numpy as np
 
 from oop_ml.core.data.feature import Feature
-from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 
 
 def test_batched_and_single_row_reach_the_same_leaves() -> None:

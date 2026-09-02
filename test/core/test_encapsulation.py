@@ -26,7 +26,9 @@ from oop_ml.core.data.probabilities import Probabilities
 from oop_ml.core.ensemble.bootstrap import BootstrapSample
 from oop_ml.core.evaluation.regression import RegressionEvaluation
 from oop_ml.core.kernel.functions import PolynomialKernel
-from oop_ml.regression.kernels.kernel_ridge_regression import KernelRidgeRegression
+from oop_ml.numpy.regression.kernels.kernel_ridge_regression import (
+    KernelRidgeRegression,
+)
 
 
 class TestArrayProtocol:

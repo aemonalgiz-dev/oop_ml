@@ -25,19 +25,19 @@ two saw different data.
 import numpy as np
 import pytest
 
-from oop_ml.classification.ensembles.random_forest_classifier import (
-    RandomForestClassifier,
-)
-from oop_ml.classification.trees.decision_tree_classifier import (
-    DecisionTreeClassifier,
-)
 from oop_ml.core.data.feature import Feature
 from oop_ml.core.exceptions import InvalidValuesError, NotFittedError
 from oop_ml.core.importance.permutation import PermutationImportance
-from oop_ml.regression.ensembles.random_forest_regressor import (
+from oop_ml.numpy.classification.ensembles.random_forest_classifier import (
+    RandomForestClassifier,
+)
+from oop_ml.numpy.classification.trees.decision_tree_classifier import (
+    DecisionTreeClassifier,
+)
+from oop_ml.numpy.regression.ensembles.random_forest_regressor import (
     RandomForestRegressor,
 )
-from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import (
     DOMINATED_SIGNAL,
     ENSEMBLE_MEMBERS,

@@ -7,7 +7,7 @@ score passes about 709. Neither failure is a wrong formula; both are the right
 formula written in the order that loses.
 
 These live in ``core`` because two unrelated parts of the library now want
-them. :mod:`oop_ml.classification.logistic` wraps them into ``Probabilities``
+them. :mod:`oop_ml.numpy.classification.logistic` wraps them into ``Probabilities``
 and ``ProbabilityMatrix``, the bounded types a classifier's output deserves,
 and :mod:`oop_ml.core.network.activation` wants the same arithmetic with no
 such claim attached, since a hidden neuron's sigmoid output is a coordinate in

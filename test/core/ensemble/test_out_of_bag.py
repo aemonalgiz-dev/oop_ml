@@ -20,8 +20,8 @@ import numpy as np
 import pytest
 
 from oop_ml.core.exceptions import NotFittedError
-from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
-from oop_ml.regression.trees.decision_tree_regressor import DecisionTreeRegressor
+from oop_ml.numpy.regression.ensembles.bagging_regressor import BaggingRegressor
+from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRegressor
 from test.fixtures import DOMINATED_SIGNAL, ENSEMBLE_MEMBERS
 
 
