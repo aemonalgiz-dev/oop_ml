@@ -938,7 +938,22 @@ class HebbianPrincipalComponents(Transformer[Sequence[Feature]], ConvergentFit):
         A plain Python loop over the components is a perfectly good answer, and
         ``n_components`` is small.
         """
-        raise NotImplementedError
+        # Every component reads the outputs as they stood at the start of the
+        # row, so they are computed once, before anything moves.
+        outputs = weights @ centred_row
+        updated = np.empty_like(weights)
+
+        for component in range(weights.shape[0]):
+            # Sanger's rule. The sum runs up to and including this component:
+            # the earlier terms deflate, so it sees the row minus what its
+            # predecessors already explain, and the term for itself is Oja's
+            # own normalisation, which is what keeps its length bounded.
+            explained = outputs[: component + 1] @ weights[: component + 1]
+            updated[component] = weights[component] + rate * outputs[component] * (
+                centred_row - explained
+            )
+
+        return updated
 
     def _walk(self, centred: RowBlock, generator: np.random.Generator) -> FloatArray:
         """Present the rows repeatedly until the weights stop moving.

@@ -548,7 +548,34 @@ class BatchNormalization(Layer):
         root rather than added afterwards. A constant feature then normalises to
         zero rather than to ``nan``.
         """
-        raise NotImplementedError
+        if purpose == PassPurpose.PREDICTING:
+            deviation = np.sqrt(self.running_variance + self.epsilon)
+            normalised = (inputs - self.running_mean) / deviation
+            outputs = self.scale * normalised + self.shift
+
+            # A plain response carrying no statistics, which is exactly what
+            # ``_checked_statistics`` needs in order to refuse to differentiate a
+            # pass that standardised by the running figures.
+            return LayerResponse.already_checked(
+                inputs=inputs,
+                scores=normalised,
+                outputs=outputs,
+            )
+
+        batch_mean = inputs.mean(axis=0)
+        batch_variance = inputs.var(axis=0)
+        deviation = np.sqrt(batch_variance + self.epsilon)
+        normalised = (inputs - batch_mean) / deviation
+        outputs = self.scale * normalised + self.shift
+
+        return NormalisationResponse.recording(
+            inputs=inputs,
+            normalised=normalised,
+            outputs=outputs,
+            batch_mean=batch_mean,
+            batch_variance=batch_variance,
+            deviation=deviation,
+        )
 
     def _checked_statistics(self, response: LayerResponse) -> NormalisationResponse:
         """The response, refusing one that carries no batch statistics.
@@ -633,7 +660,38 @@ class BatchNormalization(Layer):
         ``(n_neurons, n_inputs)``. ``d scale`` above is ``(n_features,)`` and
         needs a trailing axis added to sit in it.
         """
-        raise NotImplementedError
+        recorded = self._checked_statistics(response)
+        arriving = self._checked_arriving(response, arriving)
+
+        normalised = recorded.normalised
+        n_rows = float(recorded.n_rows)
+
+        # The easy half. One scale and one shift serve every row, so their
+        # slopes are sums down the rows.
+        scale_slope = (arriving * normalised).sum(axis=0)
+        shift_slope = arriving.sum(axis=0)
+
+        # The half worth reading twice. The mean and the deviation are functions
+        # of every row, so each input reaches the loss by three routes rather
+        # than one. The two subtracted terms are the mean route and the variance
+        # route, and dropping them leaves ``scaled / deviation``, which trains
+        # and is not the gradient of the loss.
+        scaled = arriving * self.scale
+        passed_down = (
+            n_rows * scaled
+            - scaled.sum(axis=0)
+            - normalised * (scaled * normalised).sum(axis=0)
+        ) / (n_rows * recorded.deviation)
+
+        return LayerCorrection(
+            passed_down=passed_down,
+            gradient=BatchStatistics(
+                weights=scale_slope[:, None],
+                biases=shift_slope,
+                batch_mean=recorded.batch_mean,
+                batch_variance=recorded.batch_variance,
+            ),
+        )
 
     def stepped_by(self, gradient: LayerGradient | None, learning_rate: float) -> Layer:
         """A new layer with moved parameters and updated running statistics.

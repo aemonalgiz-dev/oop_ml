@@ -311,7 +311,20 @@ class Dropout(Layer):
         ``1 / keep_probability`` where a unit survived. See
         :class:`DropoutResponse` for why it is kept in that form.
         """
-        raise NotImplementedError
+        if purpose == PassPurpose.PREDICTING:
+            return LayerResponse.already_checked(
+                inputs=inputs, scores=inputs, outputs=inputs
+            )
+
+        drop_mask = self._drawing.random(inputs.shape) >= self.drop_probability
+        scaled_mask = drop_mask / self.keep_probability
+        outputs = inputs * scaled_mask
+
+        return DropoutResponse.recording(
+            inputs=inputs,
+            outputs=outputs,
+            kept=scaled_mask,
+        )
 
     def _checked_mask(self, response: LayerResponse) -> FloatArray:
         """The mask this response carries, refusing a response that has none.
@@ -388,7 +401,10 @@ class Dropout(Layer):
         and the effective learning rate is quietly not the one that was
         configured. The finite-difference check in the spec is what settles it.
         """
-        raise NotImplementedError
+        arriving = self._checked_arriving(response, arriving)
+        kept = self._checked_mask(response)
+
+        return LayerCorrection(passed_down=arriving * kept, gradient=None)
 
     def stepped_by(self, gradient: LayerGradient | None, learning_rate: float) -> Layer:
         """This same layer, because there is nothing in it to move.
