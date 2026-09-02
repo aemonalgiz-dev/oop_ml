@@ -66,7 +66,7 @@ guess was wrong. "More than half identical" is nowhere near enough: a column of
 eight needs seven of them, a column of twelve needs ten, and a column of a
 hundred needs seventy six. It converges on three quarters, because that is when
 the third quartile is still inside the repeated run. Six identical values out of
-eight leaves quartiles of 5.0 and 6.0 and is accepted; seven leaves 5.0 and 5.0
+eight leaves quartiles of 5.0 and 5.25 and is accepted; seven leaves 5.0 and 5.0
 and is refused.
 
 That is a real data shape rather than a degenerate one, and the refusal is still

@@ -76,37 +76,12 @@ from abc import abstractmethod
 import numpy as np
 
 from oop_ml.core.exceptions import InvalidValuesError, ShapeMismatchError
+from oop_ml.core.network.blocks import as_per_feature
 from oop_ml.core.network.gradient import LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import Layer, LayerResponse
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.types import FloatArray
-
-
-def _as_per_feature(values: object, n_features: int, role: str) -> FloatArray:
-    """Read one per-feature vector, refusing in the library's own words.
-
-    Raises
-    ------
-    InvalidValuesError
-        If it cannot be read as a float array, or carries a non-finite entry.
-    ShapeMismatchError
-        If it is not one-dimensional with exactly ``n_features`` entries.
-    """
-    try:
-        block = np.array(values, dtype=np.float64, copy=True)
-    except (TypeError, ValueError) as error:
-        raise InvalidValuesError(f"{role} must be readable as a float array") from error
-
-    if block.ndim != 1 or block.shape[0] != n_features:
-        raise ShapeMismatchError(
-            f"{role} is one value per feature, so ({n_features},), got {block.shape}"
-        )
-    if not np.isfinite(block).all():
-        raise InvalidValuesError(f"{role} must contain only finite values")
-
-    block.setflags(write=False)
-    return block
 
 
 class WithinRowNormalization(Layer):
@@ -167,10 +142,10 @@ class WithinRowNormalization(Layer):
             )
 
         self._epsilon = floor
-        self._scale = _as_per_feature(
+        self._scale = as_per_feature(
             np.ones(width) if scale is None else scale, width, "a scale"
         )
-        self._shift = _as_per_feature(
+        self._shift = as_per_feature(
             np.zeros(width) if shift is None else shift, width, "a shift"
         )
 

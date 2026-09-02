@@ -69,51 +69,14 @@ import numpy as np
 from oop_ml.core.data.column import ColumnSource
 from oop_ml.core.exceptions import (
     EmptyValuesError,
-    InvalidValuesError,
     ShapeMismatchError,
 )
+from oop_ml.core.network.blocks import as_block, check_finite
 from oop_ml.core.network.gradient import LayerCorrection, LayerGradient
 from oop_ml.core.network.neuron import Neuron, NeuronResponse
 from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.types import FloatArray
-
-
-def _as_block(values: object, role: str) -> FloatArray:
-    """Read ``values`` as a float array, refusing in the library's own words.
-
-    Both entry points here reach straight for ``.ndim``, which turns an
-    ordinary mistake -- handing in a list of rows -- into a bare
-    ``AttributeError`` from numpy rather than a typed refusal. Coercing first
-    keeps every failure inside the ``MLLibError`` hierarchy, and it lets a list
-    of rows work, which is what a caller reasonably expects given that a neuron
-    accepts a plain sequence for its row.
-    """
-    try:
-        return np.array(values, dtype=np.float64, copy=True)
-    except (TypeError, ValueError) as error:
-        raise InvalidValuesError(f"{role} must be readable as a float array") from error
-
-
-def _check_finite(values: FloatArray, role: str) -> None:
-    """Refuse a block carrying a non-finite entry.
-
-    This guard used to arrive for free. The layer's first forward pass asked
-    each neuron for its own answer, every neuron coerced its row through a
-    ``Column``, and a ``nan`` was refused there. Replacing that loop with a
-    matrix multiply is worth three orders of magnitude and it silently took the
-    check away with it, so a poisoned row began travelling the whole network
-    and answering ``nan`` to everything. The spec caught it, which is the
-    argument for having written the spec before the fast version.
-
-    Restoring it costs one vectorised scan of the block rather than one
-    ``Column`` per neuron per row. Measured against the multiply it guards,
-    that is 1.2% at 1024x64 into 128, 4.3% at 256x32 into 64, and 29.6% on a
-    32x8 toy where the multiply itself is only microseconds. Cheap enough that
-    keeping the contract is not a trade.
-    """
-    if not np.isfinite(values).all():
-        raise InvalidValuesError(f"{role} must contain only finite values")
 
 
 class LayerResponse:
@@ -145,7 +108,7 @@ class LayerResponse:
 
     It is a copy rather than a reference, and not because it needs to be:
     :meth:`DenseLayer.respond_to` coerces every block it is handed through
-    ``_as_block``, which copies, so each layer's ``inputs`` is already a
+    ``as_block``, which copies, so each layer's ``inputs`` is already a
     private array by the time it arrives here. Skipping that copy when the
     block is one this library produced is the ``already_checked`` trick again
     and is an optimisation to measure, not a correction.
@@ -210,9 +173,9 @@ class LayerResponse:
     def __init__(
         self, inputs: FloatArray, scores: FloatArray, outputs: FloatArray
     ) -> None:
-        frozen_inputs = _as_block(inputs, "inputs")
-        frozen_scores = _as_block(scores, "scores")
-        frozen_outputs = _as_block(outputs, "outputs")
+        frozen_inputs = as_block(inputs, "inputs")
+        frozen_scores = as_block(scores, "scores")
+        frozen_outputs = as_block(outputs, "outputs")
 
         if frozen_scores.ndim < 2 or frozen_outputs.ndim < 2:
             raise ShapeMismatchError(
@@ -372,8 +335,8 @@ class Layer(ABC):
             If the block cannot be read as a float array, or any entry in it is
             not finite.
         """
-        block = _as_block(inputs, "inputs")
-        _check_finite(block, "inputs")
+        block = as_block(inputs, "inputs")
+        check_finite(block, "inputs")
 
         if block.ndim < 2:
             raise ShapeMismatchError(
@@ -447,7 +410,7 @@ class Layer(ABC):
                 f"from one reading {response.inputs.shape[1:]}"
             )
 
-        block = _as_block(arriving, "arriving")
+        block = as_block(arriving, "arriving")
 
         if block.ndim < 2 or block.shape[1:] != self.shape.answers:
             raise ShapeMismatchError(
@@ -620,8 +583,8 @@ class DenseLayer(Layer):
         ShapeMismatchError
             If either block does not match this layer's shape.
         """
-        weight_block = _as_block(weights, "weights")
-        bias_block = _as_block(biases, "biases")
+        weight_block = as_block(weights, "weights")
+        bias_block = as_block(biases, "biases")
 
         expected = (self._shape.n_outputs, self._shape.n_inputs)
         if weight_block.shape != expected:
