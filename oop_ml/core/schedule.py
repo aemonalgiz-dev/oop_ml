@@ -186,11 +186,19 @@ class ExponentialDecaySchedule(Schedule):
     spends most of the walk at small values, where a linear decay spends half
     of it above the midpoint.
 
-    Worth seeing the difference in numbers. From 0.5 to 0.005 over 100 passes,
-    at pass 50 a linear decay is at 0.2525 and this is at 0.0502, five times
+    Worth seeing the difference in numbers. From 0.5 to 0.005, halfway through
+    the walk a linear decay is at 0.2525 and this is at 0.0500, five times
     smaller. That is the whole reason to prefer it for a rate and to prefer a
     linear decay for a radius measured in grid units, where the midpoint really
     should be the middle.
+
+    Halfway through, and not "at pass 50 of 100", which is what this said
+    before its spec was written. The elapsed fraction is
+    ``(pass_number - 1) / (total_passes - 1)``, so pass 50 of 100 is 49/99 of
+    the way through rather than half, and the values there are 0.2550 and
+    0.0512. The claim was out by a whole pass, which is the argument for a
+    docstring's numbers being asserted somewhere rather than merely written
+    down.
 
     Parameters
     ----------
