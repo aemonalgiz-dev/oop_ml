@@ -182,12 +182,12 @@ from oop_ml.core.network.normalisation import (
     NormalisationResponse,
 )
 from oop_ml.core.network.pooling import AveragePool2d, MaxPool2d, Pool2d
+from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.row_normalisation import (
     LayerNormalization,
     RMSNormalization,
     WithinRowNormalization,
 )
-from oop_ml.core.network.purpose import PassPurpose
 from oop_ml.core.network.shape import LayerShape
 from oop_ml.core.network.stack import LayerStack, StackResponse
 from oop_ml.core.network.weight_normalisation import (
@@ -286,6 +286,15 @@ from oop_ml.pipeline.pipelines import (
 from oop_ml.pipeline.steps import PipelineStep, PipelineSteps
 from oop_ml.preprocessing.polynomial.features import PolynomialFeatures
 from oop_ml.preprocessing.polynomial.terms import PolynomialTerm, PolynomialTerms
+from oop_ml.preprocessing.rescaling.affine import (
+    AffineScaling,
+    AffineScalings,
+    FeatureScaler,
+    MaxAbsScaler,
+    MinMaxScaler,
+    RobustScaler,
+    RootMeanSquareScaler,
+)
 from oop_ml.preprocessing.standardization.scaling import FeatureScaling, FeatureScalings
 from oop_ml.preprocessing.standardization.standardizer import Standardizer
 from oop_ml.regression.ensembles.bagging_regressor import BaggingRegressor
@@ -421,6 +430,13 @@ __all__ = [
     # Preprocessing
     "Standardizer",
     "PolynomialFeatures",
+    "FeatureScaler",
+    "AffineScaling",
+    "AffineScalings",
+    "MinMaxScaler",
+    "MaxAbsScaler",
+    "RobustScaler",
+    "RootMeanSquareScaler",
     "PolynomialTerm",
     "PolynomialTerms",
     "FeatureScaling",
