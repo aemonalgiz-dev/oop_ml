@@ -223,6 +223,11 @@ from oop_ml.core.types import (
     NumericInput,
     NumericValues,
 )
+from oop_ml.decomposition.hebbian_principal_components import (
+    HebbianDirection,
+    HebbianDirections,
+    HebbianPrincipalComponents,
+)
 from oop_ml.decomposition.kernel_principal_component_analysis import (
     KernelComponent,
     KernelComponents,
@@ -504,6 +509,9 @@ __all__ = [
     "UnitGrid",
     "MapUnit",
     "GridPosition",
+    "HebbianPrincipalComponents",
+    "HebbianDirection",
+    "HebbianDirections",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
