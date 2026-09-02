@@ -138,6 +138,28 @@ from oop_ml.core.kernel.functions import (
 )
 from oop_ml.core.kernel.matrix import KernelMatrix
 from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
+from oop_ml.core.network.activation import (
+    Activation,
+    HyperbolicTangent,
+    Identity,
+    RectifiedLinear,
+    Sigmoid,
+)
+from oop_ml.core.network.gradient import BackwardPass, LayerCorrection, LayerGradient
+from oop_ml.core.network.layer import DenseLayer, Layer, LayerResponse
+from oop_ml.core.network.loss import (
+    AbsoluteError,
+    BinaryCrossEntropy,
+    HuberError,
+    Loss,
+    LossMeasurement,
+    SoftmaxCrossEntropy,
+    SquaredError,
+)
+from oop_ml.core.network.neuron import Neuron, NeuronResponse
+from oop_ml.core.network.purpose import PassPurpose
+from oop_ml.core.network.shape import LayerShape
+from oop_ml.core.network.stack import LayerStack, StackResponse
 from oop_ml.core.observation import Observation, Stage
 from oop_ml.core.solving.normal_equations import (
     LeastSquaresLine,
@@ -399,6 +421,31 @@ __all__ = [
     "load_model",
     "model_document",
     "save_model",
+    # Networks, the vocabulary a neural model is built from
+    "Activation",
+    "Identity",
+    "RectifiedLinear",
+    "Sigmoid",
+    "HyperbolicTangent",
+    "Neuron",
+    "NeuronResponse",
+    "DenseLayer",
+    "LayerResponse",
+    "LayerShape",
+    "Layer",
+    "LayerCorrection",
+    "PassPurpose",
+    "AbsoluteError",
+    "BackwardPass",
+    "BinaryCrossEntropy",
+    "HuberError",
+    "LayerGradient",
+    "Loss",
+    "LossMeasurement",
+    "SoftmaxCrossEntropy",
+    "SquaredError",
+    "LayerStack",
+    "StackResponse",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
