@@ -118,6 +118,7 @@ from oop_ml.core.exceptions import (
     NonEqualArrayLengthError,
     NonUniqueFeaturesError,
     NotFittedError,
+    ShapeMismatchError,
     SingleClassError,
     SingularHessianError,
     TooFewValuesError,
@@ -399,6 +400,7 @@ __all__ = [
     "model_document",
     "save_model",
     # Errors, all of which derive from MLLibError
+    "ShapeMismatchError",
     "MLLibError",
     "ModelDocument",
     "NotFittedError",

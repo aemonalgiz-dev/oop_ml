@@ -97,3 +97,16 @@ class SingleClassError(MLLibError):
     valid; there is simply nothing to discriminate between, and a boundary
     fitted against them would be meaningless rather than merely wrong.
     """
+
+
+class ShapeMismatchError(MLLibError):
+    """Raised when two widths that have to agree do not.
+
+    The error this library exists to raise *early*. A network's shape is a
+    chain of integer equalities, each layer's output count matching the next
+    layer's input count, and every one of those numbers is known before any
+    data arrives. So a disagreement is a fact about the architecture rather
+    than a discovery made part-way through a training run, and it should
+    surface at construction, where the mistake is, instead of hours later
+    inside a matrix multiply, where the mistake merely lands.
+    """
