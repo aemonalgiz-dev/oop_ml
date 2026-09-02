@@ -236,6 +236,12 @@ from oop_ml.decomposition.kernel_principal_component_analysis import (
 from oop_ml.decomposition.principal_component_analysis import (
     PrincipalComponentAnalysis,
 )
+from oop_ml.generative.restricted_boltzmann_machine import (
+    BoltzmannParameters,
+    ContrastiveDivergenceUpdate,
+    GibbsState,
+    RestrictedBoltzmannMachine,
+)
 from oop_ml.model_selection.cross_validation import (
     ClassificationCrossValidationResult,
     CrossValidation,
@@ -512,6 +518,10 @@ __all__ = [
     "HebbianPrincipalComponents",
     "HebbianDirection",
     "HebbianDirections",
+    "RestrictedBoltzmannMachine",
+    "BoltzmannParameters",
+    "GibbsState",
+    "ContrastiveDivergenceUpdate",
     # Errors, all of which derive from MLLibError
     "ShapeMismatchError",
     "MLLibError",
