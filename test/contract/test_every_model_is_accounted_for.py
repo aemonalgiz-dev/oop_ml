@@ -26,11 +26,18 @@ def _is_model(name: str) -> bool:
 
     Two kinds of export are not models and are not held to account. Value
     objects such as responses and gradients belong to the numpy implementation.
-    Abstract bases such as ``LinearFeatureRegressor`` and ``FeatureScaler`` are
-    the numpy backend's own frame, and a backend that wraps an engine has no
-    reason to reproduce another backend's frame. The first run of this test
-    flagged exactly those three bases as "forgotten", which is the harness
-    doing its job and the reason this predicate says *concrete*.
+    Abstract bases are the numpy backend's own frame, and a backend that wraps
+    an engine has no reason to reproduce another backend's frame. The first run
+    of this test flagged exactly three of them as "forgotten", which is the
+    harness doing its job and the reason this predicate says *concrete*.
+
+    The three are ``LinearFeatureRegressor``, ``FeatureScaler`` and
+    ``LinearClassifier``, and they are named because the scikit backend does
+    not treat them alike. It copies the first two and inherits the third
+    across the backend boundary, so ``LogisticRegression`` there runs a numpy
+    module's ``fit`` and ``predict``. Settling that is a decision about where
+    a shared frame lives rather than about this predicate, which excludes all
+    three either way.
     """
     candidate = getattr(reference, name)
     return (
