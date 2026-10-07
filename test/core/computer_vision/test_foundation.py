@@ -180,7 +180,7 @@ class TestTheSweep:
 
     def test_weights_that_are_not_a_grid_are_refused(self):
         with pytest.raises(InvalidValuesError, match="two-dimensional"):
-            checked_weights([1.0, 0.0, 1.0])
+            checked_weights(np.array([1.0, 0.0, 1.0]))
 
     def test_a_grid_larger_than_the_picture_is_refused(self):
         with pytest.raises(ShapeMismatchError, match="does not fit"):
