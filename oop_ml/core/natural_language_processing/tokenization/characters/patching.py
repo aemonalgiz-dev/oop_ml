@@ -400,7 +400,7 @@ class EntropyPatcher(Fittable):
 
     _counts_by_context: dict[tuple[int, ...], dict[int, int]] = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Count, for every context of ``order`` bytes, what followed it.
 
         Raises

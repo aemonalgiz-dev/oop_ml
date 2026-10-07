@@ -490,7 +490,7 @@ class GreedyCoverageTokenizer(LearnedTokenizer):
     _vocabulary: Vocabulary = PrivateAttr()
     _chosen_pieces: ChosenPieces = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Choose the pieces from ``corpus``.
 
         Raises

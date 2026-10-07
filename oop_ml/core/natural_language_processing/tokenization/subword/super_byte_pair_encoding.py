@@ -142,7 +142,7 @@ class SuperBytePairEncoding(LearnedTokenizer):
             )
         return self
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the within-word merges, then the merges across words.
 
         Raises

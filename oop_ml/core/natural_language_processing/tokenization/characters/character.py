@@ -78,7 +78,7 @@ class CharacterTokenizer(LearnedTokenizer):
 
     _vocabulary: Vocabulary = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the set of characters in ``corpus``.
 
         Raises

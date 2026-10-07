@@ -133,7 +133,7 @@ class ByteLevelBytePairEncoding(LearnedTokenizer):
     _merges: Merges = PrivateAttr()
     _generator: random.Random = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the merges from ``corpus``.
 
         Raises

@@ -213,7 +213,7 @@ class BytePairEncoding(LearnedTokenizer):
     _generator: random.Random = PrivateAttr()
     _alphabet: frozenset[str] = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the merges from ``corpus``.
 
         Raises

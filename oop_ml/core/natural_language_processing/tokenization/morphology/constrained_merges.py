@@ -123,7 +123,7 @@ class MorphemeConstrainedBytePairEncoding(LearnedTokenizer):
     _vocabulary: Vocabulary = PrivateAttr()
     _merges: Merges = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the merges from ``corpus``, one spelled word per morph.
 
         Raises

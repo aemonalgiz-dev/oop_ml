@@ -1032,7 +1032,7 @@ class UnigramLanguageModel(LearnedTokenizer):
     _n_pruning_rounds: int = PrivateAttr()
     _generator: random.Random = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the piece table from ``corpus``.
 
         Raises

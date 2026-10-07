@@ -834,7 +834,7 @@ class MorfessorBaseline(LearnedTokenizer):
     _epochs_run: int = PrivateAttr()
     _converged: bool = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the morph lexicon from ``corpus``.
 
         Raises

@@ -159,7 +159,7 @@ class WordPiece(LearnedTokenizer):
     _vocabulary: Vocabulary = PrivateAttr()
     _n_merges: int = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the vocabulary from ``corpus``.
 
         Raises

@@ -60,6 +60,7 @@ from pydantic import BaseModel, ConfigDict
 
 from oop_ml.core.base.estimator import Fittable
 from oop_ml.core.exceptions import InvalidValuesError, UnknownTokenError
+from oop_ml.core.natural_language_processing.tokenization.corpus import Corpus
 from oop_ml.core.natural_language_processing.tokenization.encoding import (
     Encoding,
     Token,
@@ -201,8 +202,12 @@ class LearnedTokenizer(Tokenizer, Fittable):
     """
 
     @abstractmethod
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn a vocabulary from ``corpus`` and return ``self``.
+
+        ``corpus`` is a :class:`Corpus` or the raw texts one is built from.
+        :meth:`Corpus.of` takes either, so an implementation validates a raw
+        sequence once and re-checks a corpus it was handed not at all.
 
         Implementations should validate the corpus, learn into locals, assign
         the private attributes at the end, then call ``self._mark_fitted()``,

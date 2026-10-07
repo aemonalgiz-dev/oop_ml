@@ -34,9 +34,18 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING
 
 from oop_ml.core.exceptions import EmptyValuesError, InvalidValuesError
-from oop_ml.core.natural_language_processing.tokenization.tokenizer import PreTokenizer
+
+if TYPE_CHECKING:
+    # Annotation only. ``tokenizer`` imports this module for the type its
+    # ``fit`` takes, so importing it back at runtime would be a cycle. Under
+    # ``from __future__ import annotations`` the name is never evaluated here,
+    # and pyright reads it all the same.
+    from oop_ml.core.natural_language_processing.tokenization.tokenizer import (
+        PreTokenizer,
+    )
 
 
 class WordCount:

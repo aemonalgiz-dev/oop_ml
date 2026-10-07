@@ -466,7 +466,7 @@ class ShortestPathTokenizer(LearnedTokenizer):
     _n_pruning_rounds: int = PrivateAttr()
     _total_token_count: int = PrivateAttr()
 
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         """Learn the pieces from ``corpus``.
 
         Raises

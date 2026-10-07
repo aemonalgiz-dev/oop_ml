@@ -16,6 +16,7 @@ from oop_ml.core.exceptions import (
     NotFittedError,
     UnknownTokenError,
 )
+from oop_ml.core.natural_language_processing.tokenization.corpus import Corpus
 from oop_ml.core.natural_language_processing.tokenization.encoding import (
     Encoding,
     Token,
@@ -63,7 +64,7 @@ class PurposeSpy(CharacterTokens):
 
 
 class LearnsItsAlphabet(LearnedTokenizer):
-    def fit(self, corpus: Sequence[str]) -> Self:
+    def fit(self, corpus: Corpus | Sequence[str]) -> Self:
         self._alphabet = sorted({character for text in corpus for character in text})
         self._mark_fitted()
         return self
