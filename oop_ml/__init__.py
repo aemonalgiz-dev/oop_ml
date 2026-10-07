@@ -280,8 +280,10 @@ from oop_ml.core.network.activation import (
     RectifiedLinear,
     Sigmoid,
 )
+from oop_ml.core.network.attention import AttentionResponse, MultiHeadAttention
 from oop_ml.core.network.convolution import Conv2d
 from oop_ml.core.network.dropout import Dropout, DropoutResponse
+from oop_ml.core.network.embedding import Embedding
 from oop_ml.core.network.flatten import Flatten
 from oop_ml.core.network.gradient import BackwardPass, LayerCorrection, LayerGradient
 from oop_ml.core.network.layer import DenseLayer, Layer, LayerResponse
@@ -301,7 +303,19 @@ from oop_ml.core.network.normalisation import (
     NormalisationResponse,
 )
 from oop_ml.core.network.pooling import AveragePool2d, MaxPool2d, Pool2d
+from oop_ml.core.network.positions import PositionalEncoding
 from oop_ml.core.network.purpose import PassPurpose
+from oop_ml.core.network.radial_basis import RadialBasisLayer
+from oop_ml.core.network.recurrent import (
+    CellCorrection,
+    CellStep,
+    GatedRecurrentUnit,
+    LongShortTermMemory,
+    RecurrentLayer,
+    RecurrentResponse,
+    SimpleRecurrent,
+)
+from oop_ml.core.network.residual import Residual, ResidualResponse
 from oop_ml.core.network.row_normalisation import (
     LayerNormalization,
     RMSNormalization,
@@ -443,6 +457,19 @@ from oop_ml.numpy.generative.restricted_boltzmann_machine import (
     GibbsState,
     RestrictedBoltzmannMachine,
 )
+from oop_ml.numpy.modern import (
+    AdversarialGaussian,
+    CausalLanguageModel,
+    DiagonalGaussian,
+    GaussianDiffusion,
+    LinearAutoencoder,
+    LowRankAdapter,
+    SoftmaxPolicy,
+    TermOverlapRetriever,
+    TokenCrossEntropy,
+    TokenDistribution,
+    discounted_returns,
+)
 from oop_ml.numpy.persistence import (
     ModelDocument,
     build_model,
@@ -493,6 +520,18 @@ from oop_ml.numpy.regression.trees.decision_tree_regressor import DecisionTreeRe
 from oop_ml.numpy.sequences.markov_chain import MarkovChain
 
 __all__ = [
+    # Inspectable operations for modern generative models
+    "AdversarialGaussian",
+    "CausalLanguageModel",
+    "DiagonalGaussian",
+    "GaussianDiffusion",
+    "LinearAutoencoder",
+    "LowRankAdapter",
+    "SoftmaxPolicy",
+    "TermOverlapRetriever",
+    "TokenCrossEntropy",
+    "TokenDistribution",
+    "discounted_returns",
     # Type aliases, for annotating your own code
     "Numeric",
     "NumericValues",
@@ -695,6 +734,20 @@ __all__ = [
     "WithinRowNormalization",
     "LayerNormalization",
     "RMSNormalization",
+    "RecurrentLayer",
+    "SimpleRecurrent",
+    "LongShortTermMemory",
+    "GatedRecurrentUnit",
+    "RecurrentResponse",
+    "CellStep",
+    "CellCorrection",
+    "MultiHeadAttention",
+    "AttentionResponse",
+    "RadialBasisLayer",
+    "Embedding",
+    "PositionalEncoding",
+    "Residual",
+    "ResidualResponse",
     "WeightNormalization",
     "ReparameterisedGradient",
     "AbsoluteError",
