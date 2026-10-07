@@ -36,6 +36,13 @@ sum over any rectangle four lookups whatever its size, features built from
 those sums, and stages ordered so the cheap ones run on everything and the
 expensive ones on almost nothing.
 
+:mod:`alignment` asks how the camera moved between two pictures of one
+scene, which is the question keypoints were found for. It gives each keypoint
+a direction of its own so that a description read in that frame survives a
+turn, two ways, which are ORB's and SIFT's; matches the descriptions; and
+reads the turn, the change of scale and the shift off the matches by fitting
+the move that explains the most of them and naming the rest as outliers.
+
 What is deliberately absent
 ---------------------------
 Anything learned by gradient descent, which is the network package's business,
