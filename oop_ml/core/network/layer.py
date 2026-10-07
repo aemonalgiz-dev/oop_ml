@@ -335,8 +335,7 @@ class Layer(ABC):
             If the block cannot be read as a float array, or any entry in it is
             not finite.
         """
-        block = as_block(inputs, "inputs")
-        check_finite(block, "inputs")
+        block = self._read_block(inputs)
 
         if block.ndim < 2:
             raise ShapeMismatchError(
@@ -352,6 +351,37 @@ class Layer(ABC):
             )
 
         return self._response_for(block, purpose)
+
+    def _read_block(self, inputs: object) -> FloatArray:
+        """Coerce what arrived, and refuse what this layer cannot read.
+
+        Every layer here reads measurements, so the rule is the same for all of
+        them: a float block, and every entry finite. It is a method rather than
+        two lines inside :meth:`respond_to` because there is exactly one kind of
+        layer for which it is the wrong rule, and this package used to record
+        that as a hole it could not close.
+
+        A layer that reads *positions* rather than measurements, an embedding
+        being the one that matters, is handed whole numbers naming rows of a
+        table. Coercing those to float and scanning for infinities checks
+        nothing that can go wrong and misses both things that can. A position
+        of 2.9999 truncates to 2 and a position of -1 wraps to the last row of
+        the table, and the finiteness scan passes in both cases, so the layer
+        answers the wrong row and nothing is raised.
+
+        Overriding this is how such a layer states its own rule. The shape
+        checks in :meth:`respond_to` are unaffected and still run afterwards,
+        so a subclass cannot accidentally take over more than the coercion.
+
+        Raises
+        ------
+        InvalidValuesError
+            If the block cannot be read as a float array, or holds a value that
+            is not finite.
+        """
+        block = as_block(inputs, "inputs")
+        check_finite(block, "inputs")
+        return block
 
     @abstractmethod
     def _response_for(self, inputs: FloatArray, purpose: PassPurpose) -> LayerResponse:
