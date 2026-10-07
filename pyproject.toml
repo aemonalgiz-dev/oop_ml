@@ -57,6 +57,19 @@ dev = [
 scikit = [
     "scikit-learn>=1.9",
 ]
+# The torch backend, optional for the same reason. oop_ml.pytorch is the one
+# part of the package that imports torch, and it checks at import time rather
+# than letting a bare ModuleNotFoundError name a package nobody asked for.
+#
+# The floor is 1.10 because two of the five loss translations do not exist
+# below it: cross entropy only accepts probability targets, which is what a
+# one-hot block is, from 1.10, and the Huber loss arrived in 1.9. Unlike the
+# scikit floor, what happens below this one is loud, a TypeError from the
+# engine naming a keyword, so the floor exists so that the sentence a reader
+# meets names the extra instead. Built and measured against 2.14, CPU only.
+pytorch = [
+    "torch>=1.10",
+]
 # The benchmarks time the numpy backend against the same engine.
 benchmark = [
     "scikit-learn>=1.9",
@@ -105,3 +118,5 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 # engine into a sentence has to run before them, and the alternative is four
 # noqa comments saying the same thing less clearly.
 "oop_ml/scikit/__init__.py" = ["E402"]
+# The same guard-first shape for the torch backend, for the same reason.
+"oop_ml/pytorch/__init__.py" = ["E402"]

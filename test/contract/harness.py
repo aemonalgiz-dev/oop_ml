@@ -21,10 +21,11 @@ from types import ModuleType
 
 import pytest
 
-#: Every backend, by the name of its package under ``oop_ml``. pytorch joins
-#: this list when it exists; until then listing it would be a lie the harness
-#: cannot tell from a missing install.
-BACKENDS: tuple[str, ...] = ("numpy", "scikit")
+#: Every backend, by the name of its package under ``oop_ml``. Each one is
+#: held to every model the reference exports, and each declines the ones it
+#: does not provide by name, so adding a backend here is what puts it under
+#: the contract.
+BACKENDS: tuple[str, ...] = ("numpy", "scikit", "pytorch")
 
 
 def declined(backend: ModuleType) -> dict[str, str]:
