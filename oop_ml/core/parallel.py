@@ -36,9 +36,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from sys import platform
 from typing import TypeVar
 
 _Result = TypeVar("_Result")
+
+THREADS_AVAILABLE = platform not in {"emscripten", "wasi"}
+"""Browser Python runs the same work serially because it has no native threads."""
 
 DEFAULT_MAX_WORKERS = 4
 """How many threads to use at most.
@@ -72,7 +76,7 @@ def parallel_map(
     that has enough independent work to fill it, not a new default that taxes
     the small case.
     """
-    if len(items) < PARALLEL_THRESHOLD or max_workers <= 1:
+    if not THREADS_AVAILABLE or len(items) < PARALLEL_THRESHOLD or max_workers <= 1:
         return [work(item) for item in items]
 
     workers = min(max_workers, len(items))

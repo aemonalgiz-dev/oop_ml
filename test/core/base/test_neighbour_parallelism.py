@@ -58,6 +58,20 @@ def queries(n_queries: int, n_features: int = 3, seed: int = 1):
 
 
 class TestItAgreesWithTheSerialPath:
+    def test_browser_search_uses_the_serial_route(self, monkeypatch):
+        features, target = build(20)
+        asked = queries(4)
+        model = KNearestNeighboursRegressor(n_neighbours=3).fit(features, target)
+        expected = model.predict(asked)
+        monkeypatch.setattr(neighbour_model, "PARALLEL_PAIR_THRESHOLD", 0)
+        monkeypatch.setattr(neighbour_model, "THREADS_AVAILABLE", False)
+
+        def refuse_pool(*args, **kwargs):
+            raise AssertionError("a browser must not start native threads")
+
+        monkeypatch.setattr(neighbour_model, "ThreadPoolExecutor", refuse_pool)
+        assert np.array_equal(model.predict(asked), expected)
+
     @pytest.mark.parametrize("n_queries", [1, 2, 3, 7, 8, 9, 16, 17, 33, 64])
     def test_the_same_neighbours_come_back(self, n_queries, monkeypatch):
         # Query counts that divide badly across workers, because an even split

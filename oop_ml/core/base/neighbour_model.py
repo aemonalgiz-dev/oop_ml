@@ -68,6 +68,7 @@ from oop_ml.core.distance.calculations import Distance
 from oop_ml.core.distance.metric import DistanceMetric
 from oop_ml.core.exceptions import TooFewValuesError
 from oop_ml.core.neighbours.search import NeighbourQuery, NeighbourSearch
+from oop_ml.core.parallel import THREADS_AVAILABLE
 from oop_ml.core.types import FloatArray, IndexArray
 
 # Below this many (query, remembered) pairs, splitting the work across threads
@@ -233,7 +234,12 @@ class NeighbourModel(Fittable):
         pairs = n_queries * self._remembered_rows.n_rows
         workers = min(MAX_PARALLEL_WORKERS, os.cpu_count() or 1)
 
-        if pairs < PARALLEL_PAIR_THRESHOLD or workers < 2 or n_queries < 2:
+        if (
+            not THREADS_AVAILABLE
+            or pairs < PARALLEL_PAIR_THRESHOLD
+            or workers < 2
+            or n_queries < 2
+        ):
             return self._nearest_within(query_rows)
 
         block_size = max(1, -(-n_queries // workers))

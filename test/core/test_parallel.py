@@ -7,7 +7,18 @@ finished first, so a downstream reduction sees the same sequence it saw serial.
 
 import time
 
+from oop_ml.core import parallel
 from oop_ml.core.parallel import PARALLEL_THRESHOLD, parallel_map
+
+
+def test_browser_runtime_runs_every_item_without_starting_threads(monkeypatch) -> None:
+    monkeypatch.setattr(parallel, "THREADS_AVAILABLE", False)
+
+    def refuse_pool(*args, **kwargs):
+        raise AssertionError("a browser runtime must not create a thread pool")
+
+    monkeypatch.setattr(parallel, "ThreadPoolExecutor", refuse_pool)
+    assert parallel_map(lambda value: value * 2, [3, 1, 4, 2]) == [6, 2, 8, 4]
 
 
 def test_results_are_in_input_order_not_completion_order() -> None:

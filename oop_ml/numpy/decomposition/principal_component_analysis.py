@@ -365,7 +365,7 @@ class PrincipalComponentAnalysis(Transformer[Sequence[Feature]]):
         covariance_matrix = centred.values.T @ centred.values / (centred.n_rows - 1)
         eigenvalues, eigen_vectors = np.linalg.eigh(covariance_matrix)
 
-        sorted_eigen_indices = eigenvalues.argsort(descending=True)
+        sorted_eigen_indices = eigenvalues.argsort()[::-1]
 
         sorted_eigenvalues = np.maximum(eigenvalues[sorted_eigen_indices], 0.0)
         sorted_eigen_vectors = eigen_vectors[:, sorted_eigen_indices]
