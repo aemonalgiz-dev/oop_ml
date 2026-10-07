@@ -247,6 +247,14 @@ pyright oop_ml test
 - [The models](docs/models.md), for each family and what measuring it showed
 - [On scikit-learn](docs/comparison.md), for what differs and when to use theirs
 
+## Supporting the Work
+
+The library is free and so is FitLab, the teaching site built on top of it, and I
+intend to keep both that way. If either has been useful to you and you would
+like to help with the hosting and the time, I have a
+[Patreon](https://www.patreon.com/c/JeffreyGordon), though nothing here is or
+will be held behind it.
+
 ## Status
 
 Every supervised family is implemented and green, and tokenization and
