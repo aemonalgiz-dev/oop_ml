@@ -227,3 +227,4 @@ Thumbs.db
 # Nested independent repositories (their own git history and remotes)
 /website/
 /api/
+/backend/
