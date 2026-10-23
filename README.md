@@ -249,7 +249,7 @@ pyright oop_ml test
 
 ## Supporting the Work
 
-The library is free and so is FitLab, the teaching site built on top of it, and I
+The library is free and so is Perceptron Lab, the teaching site built on top of it, and I
 intend to keep both that way. If either has been useful to you and you would
 like to help with the hosting and the time, I have a
 [Patreon](https://www.patreon.com/c/JeffreyGordon), though nothing here is or
